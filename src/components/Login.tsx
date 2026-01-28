@@ -1,20 +1,64 @@
 import { useState } from "react";
+import { login } from "../services/authService";
 
 interface LoginProps {
-  onLogin: (username: string, password: string) => void;
+  onLogin: () => void;
 }
 
 export function Login({ onLogin }: LoginProps) {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [emailError, setEmailError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const validateForm = (): boolean => {
+    let isValid = true;
+    setEmailError("");
+
+    // Validate email
+    if (!email) {
+      setEmailError("Email is required");
+      isValid = false;
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      setEmailError("Email address is invalid");
+      isValid = false;
+    }
+
+    // Validate password
+    if (!password) {
+      setError("Password is required");
+      isValid = false;
+    } else if (password.length < 6) {
+      setError("Password must be at least 6 characters");
+      isValid = false;
+    }
+
+    return isValid;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (username === "admin" && password === "password") {
-      onLogin(username, password);
-    } else {
-      setError("Invalid username or password");
+
+    if (!validateForm()) {
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+
+    try {
+      const result = await login({ email, password });
+
+      if (result.success) {
+        onLogin();
+      } else {
+        setError(result.message || "Login failed. Please try again.");
+      }
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred during login.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -61,31 +105,46 @@ export function Login({ onLogin }: LoginProps) {
               color: '#374151',
               marginBottom: '0.5rem'
             }}>
-              Username
+              Email
             </label>
             <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              type="email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (emailError) setEmailError(""); // Clear error when user starts typing
+              }}
               style={{
                 width: '100%',
                 padding: '0.75rem',
-                border: '1px solid #d1d5db',
+                border: emailError ? '1px solid #ef4444' : '1px solid #d1d5db',
                 borderRadius: '0.375rem',
                 fontSize: '0.875rem',
                 backgroundColor: '#ffffff',
                 transition: 'border-color 0.2s, box-shadow 0.2s'
               }}
               onFocus={(e) => {
-                e.target.style.borderColor = '#3b82f6';
-                e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                const target = e.target as HTMLInputElement;
+                target.style.borderColor = emailError ? '#ef4444' : '#3b82f6';
+                target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
               }}
               onBlur={(e) => {
-                e.target.style.borderColor = '#d1d5db';
-                e.target.style.boxShadow = 'none';
+                const target = e.target as HTMLInputElement;
+                target.style.borderColor = emailError ? '#ef4444' : '#d1d5db';
+                target.style.boxShadow = 'none';
               }}
               required
+              disabled={loading}
             />
+            {emailError && (
+              <p style={{
+                color: '#dc2626',
+                fontSize: '0.75rem',
+                marginTop: '0.25rem'
+              }}>
+                {emailError}
+              </p>
+            )}
           </div>
 
           <div style={{ marginBottom: '1.5rem' }}>
@@ -112,14 +171,17 @@ export function Login({ onLogin }: LoginProps) {
                 transition: 'border-color 0.2s, box-shadow 0.2s'
               }}
               onFocus={(e) => {
-                e.target.style.borderColor = '#3b82f6';
-                e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                const target = e.target as HTMLInputElement;
+                target.style.borderColor = '#3b82f6';
+                target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
               }}
               onBlur={(e) => {
-                e.target.style.borderColor = '#d1d5db';
-                e.target.style.boxShadow = 'none';
+                const target = e.target as HTMLInputElement;
+                target.style.borderColor = '#d1d5db';
+                target.style.boxShadow = 'none';
               }}
               required
+              disabled={loading}
             />
           </div>
 
@@ -141,20 +203,30 @@ export function Login({ onLogin }: LoginProps) {
             type="submit"
             style={{
               width: '100%',
-              backgroundColor: '#2563eb',
+              backgroundColor: loading ? '#60a5fa' : '#2563eb',
               color: '#ffffff',
               padding: '0.75rem 1rem',
               borderRadius: '0.375rem',
               fontSize: '0.875rem',
               fontWeight: '500',
               border: 'none',
-              cursor: 'pointer',
-              transition: 'background-color 0.2s'
+              cursor: loading ? 'not-allowed' : 'pointer',
+              transition: 'background-color 0.2s',
+              opacity: loading ? 0.8 : 1
             }}
-            onMouseOver={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#1d4ed8'}
-            onMouseOut={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#2563eb'}
+            onMouseOver={(e) => {
+              if (!loading) {
+                (e.target as HTMLButtonElement).style.backgroundColor = '#1d4ed8';
+              }
+            }}
+            onMouseOut={(e) => {
+              if (!loading) {
+                (e.target as HTMLButtonElement).style.backgroundColor = '#2563eb';
+              }
+            }}
+            disabled={loading}
           >
-            Sign In
+            {loading ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
 
@@ -164,7 +236,7 @@ export function Login({ onLogin }: LoginProps) {
           fontSize: '0.75rem',
           color: '#9ca3af'
         }}>
-          Demo credentials: admin / password
+          Demo credentials: admin@example.com / password
         </div>
       </div>
     </div>

@@ -37,6 +37,7 @@ import {
 import { Login } from "./components/Login";
 import SystemInitialization from "./components/SystemInitialization";
 import { checkSystemReadiness } from "./services/apiServices";
+import { isAuthenticated, logout, getUserInfo, setupAxiosInterceptors } from "./services/authService";
 
 interface SidebarProps {
   activeView: string;
@@ -194,6 +195,11 @@ export default function App() {
     }
   };
 
+  // Initialize axios interceptors
+  useEffect(() => {
+    setupAxiosInterceptors();
+  }, []);
+
   // Check system initialization status on mount
   useEffect(() => {
     console.log('Checking system initialization...');
@@ -202,20 +208,16 @@ export default function App() {
 
   // Check login status on mount
   useEffect(() => {
-    const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
-    setIsLoggedIn(loggedIn);
+    const authenticated = isAuthenticated();
+    setIsLoggedIn(authenticated);
   }, []);
 
-  const handleLogin = (username: string, password: string) => {
-    // In a real app, this would be an API call
-    if (username === 'admin' && password === 'password') {
-      localStorage.setItem('isLoggedIn', 'true');
-      setIsLoggedIn(true);
-    }
+  const handleLogin = () => {
+    setIsLoggedIn(true);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('isLoggedIn');
+    logout();
     setIsLoggedIn(false);
   };
 
