@@ -18,14 +18,14 @@ import { PerformanceView } from "./components/PerformanceView";
 import { RecruitmentView } from "./components/RecruitmentView";
 import { ReportsView } from "./components/ReportsView";
 import { mockNotifications, mockStaffData } from "./data/staffData";
-import { 
-  LayoutDashboard, 
-  Users, 
-  Calendar, 
-  FileText, 
-  BarChart3, 
-  Settings, 
-  Search, 
+import {
+  LayoutDashboard,
+  Users,
+  Calendar,
+  FileText,
+  BarChart3,
+  Settings,
+  Search,
   Bell,
   UserPlus,
   Clock,
@@ -35,6 +35,8 @@ import {
   Sun
 } from "lucide-react";
 import { Login } from "./components/Login";
+import SystemInitialization from "./components/SystemInitialization";
+import { checkSystemReadiness } from "./services/apiServices";
 
 interface SidebarProps {
   activeView: string;
@@ -153,7 +155,9 @@ function Sidebar({ activeView, onNavigate }: SidebarProps) {
 }
 
 export default function App() {
+  console.log('App component is rendering');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isSystemInitialized, setIsSystemInitialized] = useState<boolean|null>(null); // null = checking, true/false = result
   const [activeView, setActiveView] = useState("dashboard");
   const [activeTab, setActiveTab] = useState("overview");
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
@@ -174,6 +178,27 @@ export default function App() {
     return `${day}${ordinal} ${month} ${year}. ${hours}:${minutes}`;
   });
   const unreadNotifications = mockNotifications.filter(n => !n.read).length;
+
+  // Define the function outside of useEffect to make it accessible
+  const checkSystemInitialization = async () => {
+    console.log('Starting system initialization check...');
+    try {
+      console.log('About to call checkSystemReadiness...');
+      const readinessData = await checkSystemReadiness();
+      console.log('System initialization data:', readinessData);
+      setIsSystemInitialized(readinessData.ready || readinessData.initialized || false);
+    } catch (error) {
+      console.error('Error checking system initialization:', error);
+      // If there's an error checking (network error, timeout, etc.), assume system is not initialized
+      setIsSystemInitialized(false);
+    }
+  };
+
+  // Check system initialization status on mount
+  useEffect(() => {
+    console.log('Checking system initialization...');
+    checkSystemInitialization();
+  }, []);
 
   // Check login status on mount
   useEffect(() => {
@@ -583,6 +608,19 @@ export default function App() {
 
   const pageInfo = getPageTitle();
 
+  console.log('isSystemInitialized value:', isSystemInitialized);
+
+  // If system is not initialized, show the SystemInitialization component
+  if (isSystemInitialized === false || isSystemInitialized === null) {
+    console.log('Showing SystemInitialization component');
+    return <SystemInitialization onSystemInitialized={() => {
+      // When system is initialized, refresh the readiness check
+      checkSystemInitialization();
+    }} />;
+  } else {
+    console.log('System is initialized, proceeding to login check');
+  }
+
   if (!isLoggedIn) {
     return <Login onLogin={handleLogin} />;
   }
@@ -603,10 +641,10 @@ export default function App() {
                   <div className="input-icon">
                     <Search className="w-4 h-4" />
                   </div>
-                  <input 
+                  <input
                     ref={setSearchInputRef}
                     type="text"
-                    placeholder="Search staff, departments, leave types... (Ctrl+K)" 
+                    placeholder="Search staff, departments, leave types... (Ctrl+K)"
                     className="input input-with-icon"
                     value={searchQuery}
                     onChange={(e) => handleSearch(e.target.value)}
@@ -614,7 +652,7 @@ export default function App() {
                     style={{ backgroundColor: "#f9fafb", border: "1px solid #e5e7eb", width: '100%' }}
                   />
                 </div>
-                
+
                 {/* Enhanced Search Results Dropdown */}
                 {showSearchResults && searchResults.length > 0 && (
                   <div style={{
