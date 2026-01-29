@@ -17,6 +17,8 @@ import { EmployeesView } from "./components/EmployeesView";
 import { PerformanceView } from "./components/PerformanceView";
 import { RecruitmentView } from "./components/RecruitmentView";
 import { ReportsView } from "./components/ReportsView";
+import { StaffManagementView } from "./components/StaffManagementView";
+import { StaffInvitationView } from "./components/StaffInvitationView";
 import { mockNotifications, mockStaffData } from "./data/staffData";
 import {
   LayoutDashboard,
@@ -101,7 +103,7 @@ function Sidebar({ activeView, onNavigate }: SidebarProps) {
               </button>
             </li>
             <li className="sidebar-menu-item">
-              <button 
+              <button
                 onClick={() => onNavigate("attendance")}
                 className={`sidebar-menu-button ${activeView === "attendance" ? "active" : ""}`}
               >
@@ -110,7 +112,7 @@ function Sidebar({ activeView, onNavigate }: SidebarProps) {
               </button>
             </li>
             <li className="sidebar-menu-item">
-              <button 
+              <button
                 onClick={() => onNavigate("branches")}
                 className={`sidebar-menu-button ${activeView === "branches" ? "active" : ""}`}
               >
@@ -119,12 +121,21 @@ function Sidebar({ activeView, onNavigate }: SidebarProps) {
               </button>
             </li>
             <li className="sidebar-menu-item">
-              <button 
+              <button
                 onClick={() => onNavigate("timemanagement")}
                 className={`sidebar-menu-button ${activeView === "timemanagement" ? "active" : ""}`}
               >
                 <Clock className="w-4 h-4" />
                 <span>Time Management</span>
+              </button>
+            </li>
+            <li className="sidebar-menu-item">
+              <button
+                onClick={() => onNavigate("staffinvitation")}
+                className={`sidebar-menu-button ${activeView === "staffinvitation" ? "active" : ""}`}
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Staff Invitation</span>
               </button>
             </li>
           </ul>
@@ -532,6 +543,8 @@ export default function App() {
 
       case "rolemanagement":
         return <RoleManagementView />;
+      case "staffinvitation":
+        return <StaffInvitationView />;
       case "settings":
         return (
           <div className="space-y-6">
@@ -612,6 +625,11 @@ export default function App() {
         return {
           title: "Role Management",
           subtitle: "Manage user roles and permissions"
+        };
+      case "staffinvitation":
+        return {
+          title: "Staff Invitation",
+          subtitle: "Invite new staff members to join the system"
         };
       case "settings":
         return {

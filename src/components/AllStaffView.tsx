@@ -6,11 +6,14 @@ import { useState, useEffect } from 'react';
 // Import Lucide React icons for UI elements
 import { Search, Users, UserX, Plus, X, Check, Upload, Calendar, Briefcase, GraduationCap, Phone, MapPin, FileText, Clock } from 'lucide-react';
 // Import staff data types and mock data from staffData module
-import { mockStaffData, StaffMember, Education, Leave, OffDay, Document, isStaffOnActiveOffDay } from '../data/staffData';
+import { StaffMember, Education, Leave, OffDay, Document, isStaffOnActiveOffDay } from '../data/staffData';
+import { StaffMember as ApiStaffMember } from '../services/staffManagementService';
 // Import StaffProfileView component for detailed staff information
 import { StaffProfileView } from './StaffProfileView';
 // Import AddStaffModal component for adding new staff members
 import { AddStaffModal } from './AddStaffModal';
+// Import staff management service
+import { getAllStaff, activateStaff, deactivateStaff } from '../services/staffManagementService';
 
 // Main component function for displaying all staff
 export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: StaffMember | null }) {
@@ -26,12 +29,18 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(initialSelectedStaff || null);
   // State for showing add staff modal
   const [showAddModal, setShowAddModal] = useState(false);
-  // State for staff list (synced with mock data)
-  const [staffList, setStaffList] = useState<StaffMember[]>(mockStaffData);
+  // State for staff list (from API)
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  // State for loading
+  const [loading, setLoading] = useState(true);
+  // State for error
+  const [error, setError] = useState<string | null>(null);
+  // State for action loading
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  // Effect to sync staff list with localStorage changes on component mount
+  // Effect to fetch staff list from API on component mount
   useEffect(() => {
-    setStaffList([...mockStaffData]); // Update staff list with current mock data
+    loadStaffList();
   }, []);
 
   // Effect to update selectedStaff when initialSelectedStaff changes
@@ -41,10 +50,132 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
     }
   }, [initialSelectedStaff]);
 
+  // Function to map API staff member to UI staff member format
+  const mapApiToUiStaff = (apiStaff: ApiStaffMember): StaffMember => {
+    // Parse the full name into first, middle, and last names
+    const fullNameParts = apiStaff.full_name ? apiStaff.full_name.split(' ') : [];
+    const firstName = fullNameParts[0] || 'N/A';
+    const lastName = fullNameParts.length > 1 ? fullNameParts[fullNameParts.length - 1] : apiStaff.employee_id || 'N/A';
+    const middleName = fullNameParts.length > 2 ? fullNameParts.slice(1, -1).join(' ') : '';
+
+    return {
+      id: apiStaff.id.toString(), // Convert to string as expected by UI
+      firstName: firstName,
+      middleName: middleName,
+      lastName: lastName,
+      dateOfBirth: 'N/A', // Not in API response
+      placeOfBirth: 'N/A', // Not in API response
+      gender: 'Male', // Default value
+      stateOfOrigin: 'N/A', // Not in API response
+      lga: 'N/A', // Not in API response
+
+      // Contact Details
+      phoneNumber: 'N/A', // Not in API response
+      email: apiStaff.email || apiStaff.work_email || apiStaff.personal_email || 'N/A',
+      address: 'N/A', // Not in API response
+
+      // Education section - initialize as empty
+      education: [],
+
+      // Employment Details
+      department: apiStaff.department || 'N/A',
+      departmentRole: apiStaff.designation || 'N/A',
+      branchType: 'Single', // Default value
+      jobStatus: 'Permanent', // Default value
+      dateEmployed: apiStaff.joining_date || 'N/A',
+      branches: [], // Initialize as empty
+
+      // Guardian Details - initialize with defaults
+      guardianFirstName: 'N/A',
+      guardianLastName: 'N/A',
+      guardianDOB: 'N/A',
+      guardianPhone: 'N/A',
+      guardianEmail: 'N/A',
+      guardianAddress: 'N/A',
+      guardianBusinessName: 'N/A',
+      guardianBusinessAddress: 'N/A',
+
+      // Leave and Off Days - initialize as empty
+      leaves: [],
+      offDays: [],
+
+      // Documents - initialize as empty
+      documents: [],
+
+      // Status
+      status: (apiStaff.status as 'Active' | 'Inactive') || 'Active',
+
+      // Avatar - generate from name initials
+      avatar: `${firstName.charAt(0)}${lastName.charAt(0)}`
+    };
+  };
+
+  const loadStaffList = async () => {
+    try {
+      setLoading(true);
+      const response = await getAllStaff();
+      if (response.success) {
+        // Map API response to UI format
+        const mappedStaff = response.staff?.map(mapApiToUiStaff) || [];
+        setStaffList(mappedStaff);
+        setError(null);
+      } else {
+        setError(response.message || 'Failed to load staff members');
+      }
+    } catch (err) {
+      setError('An error occurred while loading staff members');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Handler for when new staff is added via modal
   const handleStaffAdded = (newStaff: StaffMember) => {
-    setStaffList([...mockStaffData]); // Refresh staff list
+    loadStaffList(); // Refresh staff list from API
     setShowAddModal(false); // Close modal
+  };
+
+  // Handler for activating staff
+  const handleActivateStaff = async (staffId: string) => {
+    setActionLoading(`activate-${staffId}`);
+    try {
+      const response = await activateStaff(staffId);
+      if (response.success) {
+        setError(null);
+        loadStaffList(); // Refresh the list
+      } else {
+        setError(response.message || 'Failed to activate staff member');
+      }
+    } catch (err) {
+      setError('An error occurred while activating staff member');
+      console.error(err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Handler for deactivating staff
+  const handleDeactivateStaff = async (staffId: string) => {
+    if (!window.confirm('Are you sure you want to deactivate this staff member?')) {
+      return;
+    }
+
+    setActionLoading(`deactivate-${staffId}`);
+    try {
+      const response = await deactivateStaff(staffId);
+      if (response.success) {
+        setError(null);
+        loadStaffList(); // Refresh the list
+      } else {
+        setError(response.message || 'Failed to deactivate staff member');
+      }
+    } catch (err) {
+      setError('An error occurred while deactivating staff member');
+      console.error(err);
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   // Helper: compute full years employed from date string
@@ -60,7 +191,7 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
   };
 
   // Derived department options
-  const departmentOptions = Array.from(new Set(mockStaffData.map(s => s.department))).filter(Boolean) as string[];
+  const departmentOptions = Array.from(new Set(staffList.map(s => s.department))).filter(Boolean) as string[];
 
   // Filter staff based on active filter, search term, department and years employed
   const filteredStaff = staffList.filter(staff => {
@@ -70,11 +201,10 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
       activeFilter === 'active' ? staff.status === 'Active' : // Show only active
       staff.status === 'Inactive'; // Show only inactive
 
-    // Check if staff matches search term (name, email, ID, or department)
+    // Check if staff matches search term (name, email, or department)
     const matchesSearch = searchTerm === '' ||
       `${staff.firstName} ${staff.middleName} ${staff.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
       staff.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      staff.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       staff.department.toLowerCase().includes(searchTerm.toLowerCase());
 
     // Check department filter
@@ -99,11 +229,11 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
         staff={selectedStaff} // Pass selected staff data
         onBack={() => { // Handler to go back to list view
           setSelectedStaff(null); // Clear selection
-          setStaffList([...mockStaffData]); // Refresh staff list
+          loadStaffList(); // Refresh staff list from API
         }}
         onUpdate={(updatedStaff) => { // Handler for staff updates
           setSelectedStaff(updatedStaff); // Update selected staff
-          setStaffList([...mockStaffData]); // Refresh staff list
+          loadStaffList(); // Refresh staff list from API
         }}
       />
     );
@@ -156,7 +286,7 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
             </div>
             <div>
               <p className="text-muted" style={{ fontSize: '0.75rem' }}>Total Staff</p>
-              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{mockStaffData.length}</p>
+              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{staffList.length}</p>
             </div>
           </div>
         </div>
@@ -192,7 +322,7 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
             </div>
             <div>
               <p className="text-muted" style={{ fontSize: '0.75rem' }}>Departments</p>
-              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>8</p>
+              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{departmentOptions.length}</p>
             </div>
           </div>
         </div>
@@ -285,7 +415,7 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
               <div className="flex items-start gap-4">
                 {/* Staff Avatar */}
                 <div className="avatar" style={{ width: '3.5rem', height: '3.5rem', fontSize: '1rem' }}>
-                  {staff.firstName[0]}{staff.lastName[0]} {/* Initials */}
+                  {staff.avatar || `${staff.firstName[0]}${staff.lastName[0]}`} {/* Initials */}
                 </div>
                 {/* Staff Information */}
                 <div className="flex-1">
@@ -303,6 +433,37 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
                       <span className={`badge ${staff.status === 'Active' ? 'badge-success' : 'badge-secondary'}`}>
                         {staff.status}
                       </span>
+                      {staff.status === 'Active' ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent card click event
+                            handleDeactivateStaff(staff.id);
+                          }}
+                          disabled={actionLoading === `deactivate-${staff.id}`}
+                          className="btn btn-xs btn-warning text-white"
+                        >
+                          {actionLoading === `deactivate-${staff.id}` ? (
+                            <span className="loading loading-spinner loading-xs"></span>
+                          ) : (
+                            'Deactivate'
+                          )}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent card click event
+                            handleActivateStaff(staff.id);
+                          }}
+                          disabled={actionLoading === `activate-${staff.id}`}
+                          className="btn btn-xs btn-success text-white"
+                        >
+                          {actionLoading === `activate-${staff.id}` ? (
+                            <span className="loading loading-spinner loading-xs"></span>
+                          ) : (
+                            'Activate'
+                          )}
+                        </button>
+                      )}
                       {isStaffOnActiveOffDay(staff) && (
                         <span className="badge" style={{ backgroundColor: '#fef3c7', color: '#b45309', fontSize: '0.7rem' }}>
                           On Off Day
@@ -322,11 +483,7 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
                     </div>
                     <div className="flex items-center gap-2">
                       <MapPin className="w-3 h-3 text-muted" />
-                      <span className="text-xs text-muted">{staff.stateOfOrigin}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-3 h-3 text-muted" />
-                      <span className="text-xs text-muted">{staff.id}</span>
+                      <span className="text-xs text-muted">{staff.email}</span>
                     </div>
                   </div>
                 </div>
