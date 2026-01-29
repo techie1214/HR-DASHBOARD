@@ -29,27 +29,17 @@ export const systemApi = {
       const response = await axios.get(Endpoint.CHECK_INITIALIZATION_STATUS);
       console.log('API Response:', response.data);
 
-      // Extract the isInitialized value from the new response format
-      const isInitialized = response.data.data?.isInitialized || false;
+      // Extract values from the actual response format
+      const { schemaExists, systemInitialized, readyForInitialization, readyForCompleteSetup } = response.data.data || {};
 
-      // Determine the appropriate readiness state based on the new response
-      if (isInitialized) {
-        return {
-          schemaExists: true,
-          systemInitialized: true,
-          readyForInitialization: false,
-          readyForCompleteSetup: false,
-          message: "System is already initialized.",
-        };
-      } else {
-        return {
-          schemaExists: false,
-          systemInitialized: false,
-          readyForInitialization: false,
-          readyForCompleteSetup: true,
-          message: "System needs to be set up. Database schema and admin account required.",
-        };
-      }
+      // Determine the appropriate readiness state based on the actual response
+      return {
+        schemaExists: schemaExists || false,
+        systemInitialized: systemInitialized || false,
+        readyForInitialization: readyForInitialization || false,
+        readyForCompleteSetup: readyForCompleteSetup || false,
+        message: response.data.message || "System readiness check completed.",
+      };
     } catch (error) {
       console.error("Error checking system readiness:", error);
       // If there's an error, return a default response indicating system needs setup

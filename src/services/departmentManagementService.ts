@@ -1,30 +1,36 @@
 import axios from 'axios';
 import { API_ENDPOINT } from '../config/config';
 
-// Define interfaces for department management
+// Define the Department interface
 export interface Department {
-  id: string;
+  id: number;
   name: string;
-  description: string;
-  branch_id: string;
-  head_id?: string;
-  status: string;
+  code: string;
+  description?: string;
+  headUserId?: number;
+  parentId?: number;
+  level: number;
+  isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
+// Define request interfaces
 export interface CreateDepartmentRequest {
   name: string;
-  description: string;
-  branch_id: string;
+  code: string;
+  description?: string;
+  headUserId?: number;
+  parentId?: number;
 }
 
 export interface UpdateDepartmentRequest {
   name?: string;
+  code?: string;
   description?: string;
-  branch_id?: string;
-  head_id?: string;
-  status?: string;
+  headUserId?: number;
+  parentId?: number;
+  isActive?: boolean;
 }
 
 // Get all departments
@@ -38,7 +44,7 @@ export const getAllDepartments = async (): Promise<{ success: boolean; departmen
       };
     }
 
-    const response = await axios.get(`${API_ENDPOINT}/departments`, {
+    const response = await axios.get(`${API_ENDPOINT}/api/departments`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -65,7 +71,7 @@ export const getAllDepartments = async (): Promise<{ success: boolean; departmen
 };
 
 // Get department by ID
-export const getDepartmentById = async (departmentId: string): Promise<{ success: boolean; department?: Department; message?: string }> => {
+export const getDepartmentById = async (departmentId: number): Promise<{ success: boolean; department?: Department; message?: string }> => {
   try {
     const token = localStorage.getItem('authToken');
     if (!token) {
@@ -75,7 +81,7 @@ export const getDepartmentById = async (departmentId: string): Promise<{ success
       };
     }
 
-    const response = await axios.get(`${API_ENDPOINT}/departments/${departmentId}`, {
+    const response = await axios.get(`${API_ENDPOINT}/api/departments/${departmentId}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -101,7 +107,7 @@ export const getDepartmentById = async (departmentId: string): Promise<{ success
   }
 };
 
-// Create a new department
+// Create department
 export const createDepartment = async (departmentData: CreateDepartmentRequest): Promise<{ success: boolean; department?: Department; message?: string }> => {
   try {
     const token = localStorage.getItem('authToken');
@@ -112,7 +118,7 @@ export const createDepartment = async (departmentData: CreateDepartmentRequest):
       };
     }
 
-    const response = await axios.post(`${API_ENDPOINT}/departments`, departmentData, {
+    const response = await axios.post(`${API_ENDPOINT}/api/departments`, departmentData, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -121,7 +127,7 @@ export const createDepartment = async (departmentData: CreateDepartmentRequest):
 
     return {
       success: true,
-      department: response.data.department || response.data,
+      department: response.data.data?.department || response.data.department,
     };
   } catch (error: any) {
     console.error('Error creating department:', error);
@@ -138,8 +144,8 @@ export const createDepartment = async (departmentData: CreateDepartmentRequest):
   }
 };
 
-// Update an existing department
-export const updateDepartment = async (departmentId: string, departmentData: UpdateDepartmentRequest): Promise<{ success: boolean; department?: Department; message?: string }> => {
+// Update department
+export const updateDepartment = async (departmentId: number, departmentData: UpdateDepartmentRequest): Promise<{ success: boolean; department?: Department; message?: string }> => {
   try {
     const token = localStorage.getItem('authToken');
     if (!token) {
@@ -149,7 +155,7 @@ export const updateDepartment = async (departmentId: string, departmentData: Upd
       };
     }
 
-    const response = await axios.put(`${API_ENDPOINT}/departments/${departmentId}`, departmentData, {
+    const response = await axios.put(`${API_ENDPOINT}/api/departments/${departmentId}`, departmentData, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -158,7 +164,7 @@ export const updateDepartment = async (departmentId: string, departmentData: Upd
 
     return {
       success: true,
-      department: response.data.department || response.data,
+      department: response.data.data?.department || response.data.department,
     };
   } catch (error: any) {
     console.error('Error updating department:', error);
@@ -175,8 +181,8 @@ export const updateDepartment = async (departmentId: string, departmentData: Upd
   }
 };
 
-// Delete a department
-export const deleteDepartment = async (departmentId: string): Promise<{ success: boolean; message?: string }> => {
+// Delete department
+export const deleteDepartment = async (departmentId: number): Promise<{ success: boolean; message?: string }> => {
   try {
     const token = localStorage.getItem('authToken');
     if (!token) {
@@ -186,7 +192,7 @@ export const deleteDepartment = async (departmentId: string): Promise<{ success:
       };
     }
 
-    await axios.delete(`${API_ENDPOINT}/departments/${departmentId}`, {
+    await axios.delete(`${API_ENDPOINT}/api/departments/${departmentId}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },

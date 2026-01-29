@@ -30,18 +30,13 @@ const recruitmentMetrics = [
 ];
 
 // Main component function for recruitment view
-export function RecruitmentView() {
+export default function RecruitmentView() {
   // Main render return
   return (
     // Main container with vertical spacing
     <div className="space-y-6">
-      {/* Header Section with title and action buttons */}
-      <div className="flex items-center justify-between">
-        {/* Title and description */}
-        <div>
-          <h2>Recruitment</h2>
-          <p className="text-muted">Manage job openings and candidate applications</p>
-        </div>
+      {/* Header Section with action buttons */}
+      <div className="flex items-center justify-end">
         {/* Action buttons for filtering and posting jobs */}
         <div className="flex items-center gap-3">
           {/* Filter button */}

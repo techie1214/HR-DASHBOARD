@@ -231,8 +231,7 @@ const RoleManagementView = () => {
         </div>
       )}
 
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Role Management</h2>
+      <div className="flex justify-end items-center">
         <button
           onClick={() => {
             resetForm();
@@ -523,4 +522,4 @@ const RoleManagementView = () => {
   );
 };
 
-export { RoleManagementView };
+export default RoleManagementView ;

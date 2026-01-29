@@ -21,9 +21,9 @@ export const checkSystemReadiness = async (): Promise<{ ready?: boolean; initial
     const response = await axios.get(Endpoint.CHECK_INITIALIZATION_STATUS);
     console.log('API Response:', response.data);
 
-    // Extract the isInitialized value from the new response format
-    const isInitialized = response.data.data?.isInitialized || false;
-    return { ready: isInitialized, initialized: isInitialized };
+    // Extract the systemInitialized value from the actual response format
+    const systemInitialized = response.data.data?.systemInitialized || false;
+    return { ready: systemInitialized, initialized: systemInitialized };
   } catch (error) {
     console.error('Error checking system readiness:', error);
     // If there's a network error, check localStorage as a fallback

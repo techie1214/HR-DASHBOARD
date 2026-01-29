@@ -209,8 +209,7 @@ const BranchManagementView = () => {
         </div>
       )}
 
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Branch Management</h2>
+      <div className="flex justify-end items-center">
         <button
           onClick={() => {
             resetForm();

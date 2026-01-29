@@ -36,18 +36,13 @@ const upcomingReviews = [
 ];
 
 // Main component function for performance view
-export function PerformanceView() {
+export default function PerformanceView() {
   // Main render return
   return (
     // Main container with vertical spacing
     <div className="space-y-6">
       {/* Header Section with title and action buttons */}
       <div className="flex items-center justify-between">
-        {/* Title and description */}
-        <div>
-          <h2>Performance Management</h2>
-          <p className="text-muted">Track and manage employee performance reviews</p>
-        </div>
         {/* Action buttons for filtering and exporting */}
         <div className="flex items-center gap-3">
           {/* Filter button */}

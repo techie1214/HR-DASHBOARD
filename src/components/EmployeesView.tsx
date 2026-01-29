@@ -23,13 +23,8 @@ export function EmployeesView() {
   return (
     // Main container with vertical spacing
     <div className="space-y-6">
-      {/* Header Section with title and action buttons */}
-      <div className="flex items-center justify-between">
-        {/* Title and description */}
-        <div>
-          <h2>Employee Directory</h2>
-          <p className="text-muted">Manage and view all employee information</p>
-        </div>
+      {/* Header Section with action buttons */}
+      <div className="flex items-center justify-end">
         {/* Action buttons for export and adding employees */}
         <div className="flex items-center gap-3">
           {/* Export button */}

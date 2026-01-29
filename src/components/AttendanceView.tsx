@@ -5,14 +5,12 @@
 import { Calendar, Clock, TrendingUp, TrendingDown, UserCheck, Download, Building, Filter, Search } from "lucide-react";
 // Import AttendanceChart component for visualization
 import { AttendanceChart } from "./AttendanceChart";
-// Import React useState hook for state managementg
+// Import React useState hook for state management
 import { useState } from 'react';
-// Import data functions and mock data from staffData module
-import { getAttendanceData, getAttendanceMetrics, mockStaffData } from '../data/staffData';
 // Import branch data constants
 import { BRANCHES } from '../data/branchData';
-// Import attendance data functions
-import { getAttendanceRecords, getMonthlyStat } from '../data/attendanceData';
+// Import attendance service hook
+import { useAttendanceService } from '../services/useAttendanceService';
 
 // Interface defining the structure of staff attendance records
 interface StaffAttendanceRecord {
@@ -43,16 +41,44 @@ export function AttendanceView() {
   // State for showing/hiding filter panel
   const [showFilters, setShowFilters] = useState(false);
 
-  // Get staff data from mock data
-  const staffData = mockStaffData;
-  // Get attendance data for all staff
-  const staffAttendanceData: StaffAttendanceRecord[] = getAttendanceData();
-  // Get attendance metrics summary
-  const metrics = getAttendanceMetrics();
-  // Get today's attendance records
-  const todayAttendanceRecords = getAttendanceRecords();
-  // Get monthly attendance statistics
-  const monthlyStats = getMonthlyStat();
+  // Use attendance service hook to get data from backend
+  const {
+    attendanceRecords: todayAttendanceRecords,
+    staffAttendanceData,
+    monthlyStats,
+    attendanceMetrics: metrics,
+    loading,
+    recordsLoading,
+    staffDataLoading,
+    monthlyStatsLoading,
+    metricsLoading,
+    error,
+    recordsError,
+    staffDataError,
+    monthlyStatsError,
+    metricsError,
+    refreshData
+  } = useAttendanceService();
+
+  // If loading, show a loading indicator
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        <span className="ml-3">Loading attendance data...</span>
+      </div>
+    );
+  }
+
+  // If there's an error, show an error message
+  if (error) {
+    return (
+      <div className="alert alert-error">
+        <p>Error loading attendance data: {error}</p>
+        <button className="btn btn-sm" onClick={refreshData}>Retry</button>
+      </div>
+    );
+  }
 
   // Calculate active branches from attendance records or fall back to branch list
   const attendanceBranchSet = new Set<string>(staffAttendanceData.map(r => (r.branch ? r.branch : '')).filter(Boolean));
@@ -86,22 +112,16 @@ export function AttendanceView() {
   // Main render return
   return (
     <div className="space-y-6">
-      {/* Header section with title and action buttons */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2>Attendance Tracking</h2>
-          <p className="text-muted">Monitor employee attendance and work hours</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button className="btn btn-outline">
-            <Filter className="w-4 h-4 mr-2" />
-            Filter
-          </button>
-          <button className="btn btn-primary">
-            <Download className="w-4 h-4 mr-2" />
-            Export
-          </button>
-        </div>
+      {/* Action buttons section */}
+      <div className="flex items-center justify-end gap-3">
+        <button className="btn btn-outline">
+          <Filter className="w-4 h-4 mr-2" />
+          Filter
+        </button>
+        <button className="btn btn-primary">
+          <Download className="w-4 h-4 mr-2" />
+          Export
+        </button>
       </div>
 
       {/* Statistics Cards */}
@@ -181,53 +201,65 @@ export function AttendanceView() {
           </div>
         </div>
         <div style={{ overflowX: 'auto' }}>
-          <table className="table">
-            <thead className="table-header">
-              <tr>
-                <th className="table-header-cell">Employee</th>
-                <th className="table-header-cell">Check In</th>
-                <th className="table-header-cell">Check Out</th>
-                <th className="table-header-cell">Hours</th>
-                <th className="table-header-cell">Status</th>
-                <th className="table-header-cell right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {todayAttendanceRecords.map((record) => (
-                <tr key={record.id} className="table-row">
-                  <td className="table-cell">
-                    <div className="employee-info">
-                      <div className="avatar">{record.name.split(' ').map(n => n[0]).join('')}</div>
-                      <div className="employee-details">
-                        <span className="employee-name">{record.name}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="table-cell">{record.checkIn}</td>
-                  <td className="table-cell">{record.checkOut}</td>
-                  <td className="table-cell">{record.hours}</td>
-                  <td className="table-cell">
-                    <span className={`badge ${
-                      record.status === 'Present' ? 'badge-default' :
-                      record.status === 'Late' ? 'badge-secondary' :
-                      'badge-secondary'
-                    }`} style={{
-                      backgroundColor: record.status === 'Present' ? '#16a34a' :
-                                     record.status === 'Late' ? '#f59e0b' :
-                                     record.status === 'Absent' ? '#dc2626' :
-                                     '#94a3b8',
-                      color: '#ffffff'
-                    }}>
-                      {record.status}
-                    </span>
-                  </td>
-                  <td className="table-cell right">
-                    <button className="btn btn-sm btn-ghost">View Details</button>
-                  </td>
+          {recordsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mr-3"></div>
+              <span>Loading today's attendance records...</span>
+            </div>
+          ) : recordsError ? (
+            <div className="alert alert-warning p-4 m-4">
+              <p>{recordsError}</p>
+              <button className="btn btn-sm" onClick={refreshData}>Retry</button>
+            </div>
+          ) : (
+            <table className="table">
+              <thead className="table-header">
+                <tr>
+                  <th className="table-header-cell">Employee</th>
+                  <th className="table-header-cell">Check In</th>
+                  <th className="table-header-cell">Check Out</th>
+                  <th className="table-header-cell">Hours</th>
+                  <th className="table-header-cell">Status</th>
+                  <th className="table-header-cell right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {todayAttendanceRecords.map((record) => (
+                  <tr key={record.id} className="table-row">
+                    <td className="table-cell">
+                      <div className="employee-info">
+                        <div className="avatar">{record.name.split(' ').map(n => n[0]).join('')}</div>
+                        <div className="employee-details">
+                          <span className="employee-name">{record.name}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="table-cell">{record.checkIn}</td>
+                    <td className="table-cell">{record.checkOut}</td>
+                    <td className="table-cell">{record.hours}</td>
+                    <td className="table-cell">
+                      <span className={`badge ${
+                        record.status === 'Present' ? 'badge-default' :
+                        record.status === 'Late' ? 'badge-secondary' :
+                        'badge-secondary'
+                      }`} style={{
+                        backgroundColor: record.status === 'Present' ? '#16a34a' :
+                                       record.status === 'Late' ? '#f59e0b' :
+                                       record.status === 'Absent' ? '#dc2626' :
+                                       '#94a3b8',
+                        color: '#ffffff'
+                      }}>
+                        {record.status}
+                      </span>
+                    </td>
+                    <td className="table-cell right">
+                      <button className="btn btn-sm btn-ghost">View Details</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
@@ -238,33 +270,49 @@ export function AttendanceView() {
           <p className="text-muted">Attendance statistics for recent months</p>
         </div>
         <div className="p-6">
-          <div className="grid grid-cols-1 gap-4">
-            {monthlyStats.map((stat, index) => (
-              <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <p style={{ fontWeight: 500 }}>{stat.month}</p>
+          {monthlyStatsLoading ? (
+            <div className="py-8 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500 mr-3"></div>
+              <span>Loading monthly statistics...</span>
+            </div>
+          ) : monthlyStatsError ? (
+            <div className="py-8 text-center text-red-500">
+              Error loading monthly statistics: {monthlyStatsError}
+              <button className="btn btn-sm ml-3" onClick={refreshData}>Retry</button>
+            </div>
+          ) : monthlyStats.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4">
+              {monthlyStats.map((stat, index) => (
+                <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <p style={{ fontWeight: 500 }}>{stat.month}</p>
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <div className="text-right">
+                      <p className="text-muted">Present</p>
+                      <p style={{ fontWeight: 500 }}>{stat.present} days</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-muted">Absent</p>
+                      <p style={{ fontWeight: 500 }}>{stat.absent} days</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-muted">Late</p>
+                      <p style={{ fontWeight: 500 }}>{stat.late} days</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-muted">Leaves</p>
+                      <p style={{ fontWeight: 500 }}>{stat.leaves} days</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-6">
-                  <div className="text-right">
-                    <p className="text-muted">Present</p>
-                    <p style={{ fontWeight: 500 }}>{stat.present} days</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-muted">Absent</p>
-                    <p style={{ fontWeight: 500 }}>{stat.absent} days</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-muted">Late</p>
-                    <p style={{ fontWeight: 500 }}>{stat.late} days</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-muted">Leaves</p>
-                    <p style={{ fontWeight: 500 }}>{stat.leaves} days</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted">
+              No monthly statistics available
+            </div>
+          )}
         </div>
       </div>
       {/* Second Stats Overview Section */}
@@ -433,66 +481,78 @@ export function AttendanceView() {
               Showing {filteredData.length} staff members for {dateRange === 'month' ? 'November 2024' : dateRange}
             </p>
           </div>
-          <div className="table-container">
-            <table className="table">
-              <thead className="table-header">
-                <tr>
-                  <th className="table-header-cell">S/N</th>
-                  <th className="table-header-cell">Full Name</th>
-                  <th className="table-header-cell">Department</th>
-                  <th className="table-header-cell">Present</th>
-                  <th className="table-header-cell">Early</th>
-                  <th className="table-header-cell">Late</th>
-                  <th className="table-header-cell">Permitted</th>
-                  <th className="table-header-cell">Absent</th>
-                  <th className="table-header-cell">Off</th>
-                  <th className="table-header-cell">Leave</th>
-                  <th className="table-header-cell">Avg. Time</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredData.map((record, index) => (
-                  <tr key={record.id} className="table-row">
-                    <td className="table-cell">{index + 1}</td>
-                    <td className="table-cell">
-                      <div>
-                        <p style={{ fontWeight: 500 }}>{record.fullName}</p>
-                        <p className="text-xs text-muted">{record.id}</p>
-                      </div>
-                    </td>
-                    <td className="table-cell">{record.department}</td>
-                    <td className="table-cell">
-                      <span className="badge badge-success">{record.present}</span>
-                    </td>
-                    <td className="table-cell">
-                      <span style={{ color: '#16a34a', fontWeight: 500 }}>{record.early}</span>
-                    </td>
-                    <td className="table-cell">
-                      <span style={{ color: record.late > 3 ? '#dc2626' : '#f59e0b', fontWeight: 500 }}>
-                        {record.late}
-                      </span>
-                    </td>
-                    <td className="table-cell">{record.permitted}</td>
-                    <td className="table-cell">
-                      <span style={{ color: record.absent > 0 ? '#dc2626' : '#64748b', fontWeight: 500 }}>
-                        {record.absent}
-                      </span>
-                    </td>
-                    <td className="table-cell">{record.offDays}</td>
-                    <td className="table-cell">{record.leaveDays}</td>
-                    <td className="table-cell">
-                      <span style={{ fontWeight: 500 }}>{record.averageTime}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {/* Empty State */}
-          {filteredData.length === 0 && (
-            <div className="p-8 flex flex-col items-center justify-center">
-              <Clock className="w-12 h-12" style={{ color: '#e5e7eb' }} />
-              <p className="text-muted" style={{ marginTop: '0.5rem' }}>No attendance records found</p>
+          {staffDataLoading ? (
+            <div className="p-8 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500 mr-3"></div>
+              <span>Loading staff attendance data...</span>
+            </div>
+          ) : staffDataError ? (
+            <div className="p-8 text-center text-red-500">
+              Error loading staff attendance data: {staffDataError}
+              <button className="btn btn-sm ml-3" onClick={refreshData}>Retry</button>
+            </div>
+          ) : (
+            <div className="table-container">
+              {filteredData.length > 0 ? (
+                <table className="table">
+                  <thead className="table-header">
+                    <tr>
+                      <th className="table-header-cell">S/N</th>
+                      <th className="table-header-cell">Full Name</th>
+                      <th className="table-header-cell">Department</th>
+                      <th className="table-header-cell">Present</th>
+                      <th className="table-header-cell">Early</th>
+                      <th className="table-header-cell">Late</th>
+                      <th className="table-header-cell">Permitted</th>
+                      <th className="table-header-cell">Absent</th>
+                      <th className="table-header-cell">Off</th>
+                      <th className="table-header-cell">Leave</th>
+                      <th className="table-header-cell">Avg. Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredData.map((record, index) => (
+                      <tr key={record.id} className="table-row">
+                        <td className="table-cell">{index + 1}</td>
+                        <td className="table-cell">
+                          <div>
+                            <p style={{ fontWeight: 500 }}>{record.fullName}</p>
+                            <p className="text-xs text-muted">{record.id}</p>
+                          </div>
+                        </td>
+                        <td className="table-cell">{record.department}</td>
+                        <td className="table-cell">
+                          <span className="badge badge-success">{record.present}</span>
+                        </td>
+                        <td className="table-cell">
+                          <span style={{ color: '#16a34a', fontWeight: 500 }}>{record.early}</span>
+                        </td>
+                        <td className="table-cell">
+                          <span style={{ color: record.late > 3 ? '#dc2626' : '#f59e0b', fontWeight: 500 }}>
+                            {record.late}
+                          </span>
+                        </td>
+                        <td className="table-cell">{record.permitted}</td>
+                        <td className="table-cell">
+                          <span style={{ color: record.absent > 0 ? '#dc2626' : '#64748b', fontWeight: 500 }}>
+                            {record.absent}
+                          </span>
+                        </td>
+                        <td className="table-cell">{record.offDays}</td>
+                        <td className="table-cell">{record.leaveDays}</td>
+                        <td className="table-cell">
+                          <span style={{ fontWeight: 500 }}>{record.averageTime}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="p-8 flex flex-col items-center justify-center">
+                  <Clock className="w-12 h-12" style={{ color: '#e5e7eb' }} />
+                  <p className="text-muted" style={{ marginTop: '0.5rem' }}>No attendance records found</p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -502,79 +562,101 @@ export function AttendanceView() {
           {/* Monthly Summary Card */}
           <div className="card p-4">
             <h3 style={{ marginBottom: '1rem' }}>Monthly Summary</h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Total Working Days</span>
-                <span style={{ fontWeight: 600 }}>{metrics.totalWorkingDays}</span>
+            {metricsLoading ? (
+              <div className="py-4 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500 mr-3"></div>
+                <span>Loading metrics...</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Total Present</span>
-                <span style={{ fontWeight: 600, color: '#16a34a' }}>{metrics.totalPresent}</span>
+            ) : metricsError ? (
+              <div className="py-4 text-center text-red-500">
+                Error loading metrics: {metricsError}
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Total Early</span>
-                <span style={{ fontWeight: 600, color: '#16a34a' }}>{metrics.totalEarly}</span>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted">Total Working Days</span>
+                  <span style={{ fontWeight: 600 }}>{metrics.totalWorkingDays}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted">Total Present</span>
+                  <span style={{ fontWeight: 600, color: '#16a34a' }}>{metrics.totalPresent}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted">Total Early</span>
+                  <span style={{ fontWeight: 600, color: '#16a34a' }}>{metrics.totalEarly}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted">Total Late</span>
+                  <span style={{ fontWeight: 600, color: '#f59e0b' }}>{metrics.totalLate}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted">Total Absent</span>
+                  <span style={{ fontWeight: 600, color: '#dc2626' }}>{metrics.totalAbsent}</span>
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Total Late</span>
-                <span style={{ fontWeight: 600, color: '#f59e0b' }}>{metrics.totalLate}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted">Total Absent</span>
-                <span style={{ fontWeight: 600, color: '#dc2626' }}>{metrics.totalAbsent}</span>
-              </div>
-            </div>
+            )}
           </div>
           {/* Performance Metrics Card */}
           <div className="card p-4">
             <h3 style={{ marginBottom: '1rem' }}>Performance Metrics</h3>
-            <div className="space-y-3">
-              {/* Punctuality Rate */}
-              <div>
-                <div className="flex items-center justify-between" style={{ marginBottom: '0.5rem' }}>
-                  <span className="text-muted">Punctuality Rate</span>
-                  <span style={{ fontWeight: 600 }}>
-                    {metrics.totalPresent > 0 ? ((metrics.totalEarly / metrics.totalPresent) * 100).toFixed(1) : 0}%
-                  </span>
+            {metricsLoading ? (
+              <div className="py-4 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500 mr-3"></div>
+                <span>Loading metrics...</span>
+              </div>
+            ) : metricsError ? (
+              <div className="py-4 text-center text-red-500">
+                Error loading metrics: {metricsError}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* Punctuality Rate */}
+                <div>
+                  <div className="flex items-center justify-between" style={{ marginBottom: '0.5rem' }}>
+                    <span className="text-muted">Punctuality Rate</span>
+                    <span style={{ fontWeight: 600 }}>
+                      {metrics.totalPresent > 0 ? ((metrics.totalEarly / metrics.totalPresent) * 100).toFixed(1) : 0}%
+                    </span>
+                  </div>
+                  <div className="progress-bar">
+                    <div
+                      className="progress-fill"
+                      style={{ width: `${metrics.totalPresent > 0 ? (metrics.totalEarly / metrics.totalPresent) * 100 : 0}%`, backgroundColor: '#16a34a' }}
+                    ></div>
+                  </div>
                 </div>
-                <div className="progress-bar">
-                  <div
-                    className="progress-fill"
-                    style={{ width: `${metrics.totalPresent > 0 ? (metrics.totalEarly / metrics.totalPresent) * 100 : 0}%`, backgroundColor: '#16a34a' }}
-                  ></div>
+                {/* Late Arrival Rate */}
+                <div>
+                  <div className="flex items-center justify-between" style={{ marginBottom: '0.5rem' }}>
+                    <span className="text-muted">Late Arrival Rate</span>
+                    <span style={{ fontWeight: 600 }}>
+                      {metrics.totalPresent > 0 ? ((metrics.totalLate / metrics.totalPresent) * 100).toFixed(1) : 0}%
+                    </span>
+                  </div>
+                  <div className="progress-bar">
+                    <div
+                      className="progress-fill"
+                      style={{ width: `${metrics.totalPresent > 0 ? (metrics.totalLate / metrics.totalPresent) * 100 : 0}%`, backgroundColor: '#f59e0b' }}
+                    ></div>
+                  </div>
+                </div>
+                {/* Absence Rate */}
+                <div>
+                  <div className="flex items-center justify-between" style={{ marginBottom: '0.5rem' }}>
+                    <span className="text-muted">Absence Rate</span>
+                    <span style={{ fontWeight: 600 }}>
+                      {staffAttendanceData.length > 0 ? ((metrics.totalAbsent / (staffAttendanceData.length * metrics.totalWorkingDays)) * 100).toFixed(1) : 0}%
+                    </span>
+                  </div>
+                  <div className="progress-bar">
+                    <div
+                      className="progress-fill"
+                      style={{ width: `${staffAttendanceData.length > 0 ? (metrics.totalAbsent / (staffAttendanceData.length * metrics.totalWorkingDays)) * 100 : 0}%`, backgroundColor: '#dc2626' }}
+                    ></div>
+                  </div>
                 </div>
               </div>
-              {/* Late Arrival Rate */}
-              <div>
-                <div className="flex items-center justify-between" style={{ marginBottom: '0.5rem' }}>
-                  <span className="text-muted">Late Arrival Rate</span>
-                  <span style={{ fontWeight: 600 }}>
-                    {metrics.totalPresent > 0 ? ((metrics.totalLate / metrics.totalPresent) * 100).toFixed(1) : 0}%
-                  </span>
-                </div>
-                <div className="progress-bar">
-                  <div
-                    className="progress-fill"
-                    style={{ width: `${metrics.totalPresent > 0 ? (metrics.totalLate / metrics.totalPresent) * 100 : 0}%`, backgroundColor: '#f59e0b' }}
-                  ></div>
-                </div>
-              </div>
-              {/* Absence Rate */}
-              <div>
-                <div className="flex items-center justify-between" style={{ marginBottom: '0.5rem' }}>
-                  <span className="text-muted">Absence Rate</span>
-                  <span style={{ fontWeight: 600 }}>
-                    {staffAttendanceData.length > 0 ? ((metrics.totalAbsent / (staffAttendanceData.length * metrics.totalWorkingDays)) * 100).toFixed(1) : 0}%
-                  </span>
-                </div>
-                <div className="progress-bar">
-                  <div
-                    className="progress-fill"
-                    style={{ width: `${staffAttendanceData.length > 0 ? (metrics.totalAbsent / (staffAttendanceData.length * metrics.totalWorkingDays)) * 100 : 0}%`, backgroundColor: '#dc2626' }}
-                  ></div>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

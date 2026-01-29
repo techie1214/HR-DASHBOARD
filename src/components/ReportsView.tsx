@@ -31,18 +31,13 @@ const scheduledReports = [
 ];
 
 // Main component function for reports view
-export function ReportsView() {
+export default function ReportsView() {
   // Main render return
   return (
     // Main container with vertical spacing
     <div className="space-y-6">
       {/* Header Section with title and custom report button */}
       <div className="flex items-center justify-between">
-        {/* Title and description */}
-        <div>
-          <h2>Reports & Analytics</h2>
-          <p className="text-muted">Generate and manage HR reports</p>
-        </div>
         {/* Custom report creation button */}
         <button className="btn btn-primary">
           <FileText className="w-4 h-4 mr-2" />

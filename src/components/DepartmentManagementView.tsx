@@ -183,8 +183,7 @@ const DepartmentManagementView = () => {
         </div>
       )}
 
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Department Management</h2>
+      <div className="flex justify-end items-center">
         <button
           onClick={() => {
             resetForm();

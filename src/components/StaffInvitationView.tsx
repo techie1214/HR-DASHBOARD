@@ -70,7 +70,7 @@ const StaffInvitationView = () => {
       }
       
       // Load departments
-      const departmentsResponse = await getAllDepartmentsService();
+      const departmentsResponse = await getAllDepartments();
       if (departmentsResponse.success) {
         setDepartments(departmentsResponse.departments || []);
       } else {
@@ -190,8 +190,7 @@ const StaffInvitationView = () => {
         </div>
       )}
 
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Staff Invitations</h2>
+      <div className="flex justify-end items-center">
         <button
           onClick={() => {
             resetForm();
@@ -407,4 +406,4 @@ const StaffInvitationView = () => {
   );
 };
 
-export { StaffInvitationView };
+export default StaffInvitationView;

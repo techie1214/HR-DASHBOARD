@@ -14,11 +14,12 @@ import { EmployeeTable } from "./components/EmployeeTable";
 import { LeaveManagementView } from "./components/LeaveManagementView";
 import { AttendanceView } from "./components/AttendanceView";
 import { EmployeesView } from "./components/EmployeesView";
-import { PerformanceView } from "./components/PerformanceView";
-import { RecruitmentView } from "./components/RecruitmentView";
-import { ReportsView } from "./components/ReportsView";
-import { StaffManagementView } from "./components/StaffManagementView";
-import { StaffInvitationView } from "./components/StaffInvitationView";
+import { DepartmentManagementView } from "./components/DepartmentManagementView";
+import PerformanceView from "./components/PerformanceView";
+import RecruitmentView from "./components/RecruitmentView";
+import ReportsView from "./components/ReportsView";
+// import  StaffManagementView  from "./components/StaffManagementView";
+import StaffInvitationView from "./components/StaffInvitationView";
 import { mockNotifications, mockStaffData } from "./data/staffData";
 import {
   LayoutDashboard,
@@ -35,20 +36,42 @@ import {
   PieChart,
   Building,
   Sun,
-  Shield
+  Shield,
+  User as UserIcon
 } from "lucide-react";
 import { Login } from "./components/Login";
-import { RoleManagementView } from "./components/RoleManagementView";
+import RoleManagementView from "./components/RoleManagementView";
 import SystemInitialization from "./components/SystemInitialization";
+import UserManagementView from "./components/UserManagementView";
 import { checkSystemReadiness } from "./services/apiServices";
 import { isAuthenticated, logout, getUserInfo, setupAxiosInterceptors } from "./services/authService";
 
 interface SidebarProps {
   activeView: string;
   onNavigate: (view: string) => void;
+  user?: {
+    name?: string;
+    email?: string;
+    avatarInitials?: string;
+  };
 }
 
-function Sidebar({ activeView, onNavigate }: SidebarProps) {
+function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
+  // Generate avatar initials from user name if available
+  const getAvatarInitials = () => {
+    if (user?.avatarInitials) return user.avatarInitials;
+    if (user?.name) {
+      const nameParts = user.name.trim().split(/\s+/);
+      if (nameParts.length >= 2) {
+        return (nameParts[0][0] + nameParts[1][0]).toUpperCase();
+      } else if (nameParts.length === 1) {
+        return nameParts[0][0].toUpperCase();
+      }
+    }
+    // Default initials if no name is available
+    return 'AU'; // Anonymous User
+  };
+
   return (
     <div className="sidebar">
       <div className="sidebar-header">
@@ -67,7 +90,7 @@ function Sidebar({ activeView, onNavigate }: SidebarProps) {
           <div className="sidebar-group-label">Main Menu</div>
           <ul className="sidebar-menu">
             <li className="sidebar-menu-item">
-              <button 
+              <button
                 onClick={() => onNavigate("dashboard")}
                 className={`sidebar-menu-button ${activeView === "dashboard" ? "active" : ""}`}
               >
@@ -76,7 +99,7 @@ function Sidebar({ activeView, onNavigate }: SidebarProps) {
               </button>
             </li>
             <li className="sidebar-menu-item">
-              <button 
+              <button
                 onClick={() => onNavigate("allstaff")}
                 className={`sidebar-menu-button ${activeView === "allstaff" ? "active" : ""}`}
               >
@@ -85,7 +108,7 @@ function Sidebar({ activeView, onNavigate }: SidebarProps) {
               </button>
             </li>
             <li className="sidebar-menu-item">
-              <button 
+              <button
                 onClick={() => onNavigate("offdays")}
                 className={`sidebar-menu-button ${activeView === "offdays" ? "active" : ""}`}
               >
@@ -94,7 +117,7 @@ function Sidebar({ activeView, onNavigate }: SidebarProps) {
               </button>
             </li>
             <li className="sidebar-menu-item">
-              <button 
+              <button
                 onClick={() => onNavigate("leave")}
                 className={`sidebar-menu-button ${activeView === "leave" ? "active" : ""}`}
               >
@@ -122,6 +145,15 @@ function Sidebar({ activeView, onNavigate }: SidebarProps) {
             </li>
             <li className="sidebar-menu-item">
               <button
+                onClick={() => onNavigate("departments")}
+                className={`sidebar-menu-button ${activeView === "departments" ? "active" : ""}`}
+              >
+                <Building className="w-4 h-4" />
+                <span>Department Management</span>
+              </button>
+            </li>
+            <li className="sidebar-menu-item">
+              <button
                 onClick={() => onNavigate("timemanagement")}
                 className={`sidebar-menu-button ${activeView === "timemanagement" ? "active" : ""}`}
               >
@@ -145,6 +177,15 @@ function Sidebar({ activeView, onNavigate }: SidebarProps) {
           <ul className="sidebar-menu">
             <li className="sidebar-menu-item">
               <button
+                onClick={() => onNavigate("usermanagement")}
+                className={`sidebar-menu-button ${activeView === "usermanagement" ? "active" : ""}`}
+              >
+                <UserIcon className="w-4 h-4" />
+                <span>User Management</span>
+              </button>
+            </li>
+            <li className="sidebar-menu-item">
+              <button
                 onClick={() => onNavigate("rolemanagement")}
                 className={`sidebar-menu-button ${activeView === "rolemanagement" ? "active" : ""}`}
               >
@@ -166,10 +207,14 @@ function Sidebar({ activeView, onNavigate }: SidebarProps) {
       </div>
       <div className="sidebar-footer">
         <div className="flex items-center gap-3">
-          <div className="avatar">AD</div>
+          <div className="avatar">{getAvatarInitials()}</div>
           <div className="flex-1">
-            <p className="text-sm" style={{ fontWeight: 500, color: "#0f172a" }}>Admin User</p>
-            <p className="text-xs" style={{ color: "#6b7280" }}>admin@company.com</p>
+            <p className="text-sm" style={{ fontWeight: 500, color: "#0f172a" }}>
+              {user?.name || 'Guest User'}
+            </p>
+            <p className="text-xs" style={{ color: "#6b7280" }}>
+              {user?.email || 'No email'}
+            </p>
           </div>
         </div>
       </div>
@@ -181,6 +226,7 @@ export default function App() {
   console.log('App component is rendering');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isSystemInitialized, setIsSystemInitialized] = useState<boolean|null>(null); // null = checking, true/false = result
+  const [user, setUser] = useState<{ name?: string; email?: string; avatarInitials?: string } | null>(null);
   const [activeView, setActiveView] = useState("dashboard");
   const [activeTab, setActiveTab] = useState("overview");
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
@@ -228,19 +274,42 @@ export default function App() {
     checkSystemInitialization();
   }, []);
 
-  // Check login status on mount
+  // Check login status and load user details only after system initialization is confirmed
   useEffect(() => {
-    const authenticated = isAuthenticated();
-    setIsLoggedIn(authenticated);
-  }, []);
+    if (isSystemInitialized === true) {
+      const authenticated = isAuthenticated();
+      setIsLoggedIn(authenticated);
+
+      // Load user details if authenticated
+      if (authenticated) {
+        const userInfo = getUserInfo();
+        if (userInfo) {
+          setUser({
+            name: userInfo.fullName || userInfo.name || userInfo.fullname || userInfo.username || userInfo.displayName || `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim(),
+            email: userInfo.email || userInfo.Email,
+          });
+        }
+      }
+    }
+  }, [isSystemInitialized]);
 
   const handleLogin = () => {
     setIsLoggedIn(true);
+
+    // Load user details after login
+    const userInfo = getUserInfo();
+    if (userInfo) {
+      setUser({
+        name: userInfo.fullName || userInfo.name || userInfo.fullname || userInfo.username || userInfo.displayName || `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim(),
+        email: userInfo.email || userInfo.Email,
+      });
+    }
   };
 
   const handleLogout = () => {
     logout();
     setIsLoggedIn(false);
+    setUser(null); // Clear user state on logout
   };
 
   // Handle global search with multiple categories
@@ -526,6 +595,9 @@ export default function App() {
       case "branches":
         return <BranchManagementView />;
 
+      case "departments":
+        return <DepartmentManagementView />;
+
       case "timemanagement":
         return <TimeManagementView />;
 
@@ -541,6 +613,8 @@ export default function App() {
       case "reports":
         return <ReportsView />;
 
+      case "usermanagement":
+        return <UserManagementView />;
       case "rolemanagement":
         return <RoleManagementView />;
       case "staffinvitation":
@@ -596,6 +670,11 @@ export default function App() {
           title: "Branch Management",
           subtitle: "Attendance reports and branch analytics"
         };
+      case "departments":
+        return {
+          title: "Department Management",
+          subtitle: "Manage organizational departments and structures"
+        };
       case "timemanagement":
         return {
           title: "Time Management",
@@ -620,6 +699,11 @@ export default function App() {
         return {
           title: "Reports & Analytics",
           subtitle: "Generate and manage HR reports"
+        };
+      case "usermanagement":
+        return {
+          title: "User Management",
+          subtitle: "Manage system users and their access rights"
         };
       case "rolemanagement":
         return {
@@ -648,8 +732,26 @@ export default function App() {
 
   console.log('isSystemInitialized value:', isSystemInitialized);
 
+  // If system initialization status is still being checked, show a loading state
+  if (isSystemInitialized === null) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        backgroundColor: '#f8fafc'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#2563eb' }}>HR Dashboard</div>
+          <div style={{ fontSize: '1rem', color: '#64748b' }}>Checking system status...</div>
+        </div>
+      </div>
+    );
+  }
+
   // If system is not initialized, show the SystemInitialization component
-  if (isSystemInitialized === false || isSystemInitialized === null) {
+  if (isSystemInitialized === false) {
     console.log('Showing SystemInitialization component');
     return <SystemInitialization onSystemInitialized={() => {
       // When system is initialized, refresh the readiness check
@@ -659,13 +761,14 @@ export default function App() {
     console.log('System is initialized, proceeding to login check');
   }
 
+  // Only check for login after system is confirmed initialized
   if (!isLoggedIn) {
     return <Login onLogin={handleLogin} />;
   }
 
   return (
     <div className="app-layout">
-      <Sidebar activeView={activeView} onNavigate={setActiveView} />
+      <Sidebar activeView={activeView} onNavigate={setActiveView} user={user} />
       <main className="main-content">
         {/* Header */}
         <header className="header">
