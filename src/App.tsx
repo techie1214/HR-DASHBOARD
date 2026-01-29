@@ -32,9 +32,11 @@ import {
   Menu,
   PieChart,
   Building,
-  Sun
+  Sun,
+  Shield
 } from "lucide-react";
 import { Login } from "./components/Login";
+import { RoleManagementView } from "./components/RoleManagementView";
 import SystemInitialization from "./components/SystemInitialization";
 import { checkSystemReadiness } from "./services/apiServices";
 import { isAuthenticated, logout, getUserInfo, setupAxiosInterceptors } from "./services/authService";
@@ -131,7 +133,16 @@ function Sidebar({ activeView, onNavigate }: SidebarProps) {
           <div className="sidebar-group-label">Settings</div>
           <ul className="sidebar-menu">
             <li className="sidebar-menu-item">
-              <button 
+              <button
+                onClick={() => onNavigate("rolemanagement")}
+                className={`sidebar-menu-button ${activeView === "rolemanagement" ? "active" : ""}`}
+              >
+                <Shield className="w-4 h-4" />
+                <span>Role Management</span>
+              </button>
+            </li>
+            <li className="sidebar-menu-item">
+              <button
                 onClick={() => onNavigate("settings")}
                 className={`sidebar-menu-button ${activeView === "settings" ? "active" : ""}`}
               >
@@ -519,6 +530,8 @@ export default function App() {
       case "reports":
         return <ReportsView />;
 
+      case "rolemanagement":
+        return <RoleManagementView />;
       case "settings":
         return (
           <div className="space-y-6">
@@ -594,6 +607,11 @@ export default function App() {
         return {
           title: "Reports & Analytics",
           subtitle: "Generate and manage HR reports"
+        };
+      case "rolemanagement":
+        return {
+          title: "Role Management",
+          subtitle: "Manage user roles and permissions"
         };
       case "settings":
         return {

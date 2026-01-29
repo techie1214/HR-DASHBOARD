@@ -55,22 +55,37 @@ export const login = async (credentials: LoginCredentials): Promise<LoginRespons
       },
     });
 
-    const { success, message, token, user } = response.data;
+    const { success, message, data } = response.data;
 
-    if (success && token) {
-      // Store the token securely in localStorage
-      secureSetItem('authToken', token);
+    if (success && data?.tokens?.accessToken) {
+      // Store the access token in localStorage
+      secureSetItem('authToken', data.tokens.accessToken);
 
       // Store user info if available
-      if (user) {
-        secureSetItem('userInfo', JSON.stringify(user));
+      if (data.user) {
+        secureSetItem('userInfo', JSON.stringify(data.user));
+      }
+
+      // Store permissions if available
+      if (data.permissions) {
+        secureSetItem('userPermissions', JSON.stringify(data.permissions));
       }
 
       // Set login status
       secureSetItem('isLoggedIn', 'true');
     }
 
-    return { success, message, token, user };
+    return {
+      success,
+      message,
+      token: data?.tokens?.accessToken,
+      user: data?.user ? {
+        id: data.user.id.toString(),
+        email: data.user.email,
+        name: data.user.fullName,
+        role: data.user.roleId?.toString() || ''
+      } : undefined
+    };
   } catch (error: any) {
     console.error('Login error:', error);
 
@@ -200,8 +215,8 @@ export const setupAxiosInterceptors = (): void => {
   axios.interceptors.response.use(
     (response) => response,
     (error) => {
-      if (error.response?.status === 401) {
-        // Token might be expired, log out the user
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        // Token might be expired or invalid, log out the user
         logout();
         window.location.href = '/'; // Redirect to login page
       }
