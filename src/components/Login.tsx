@@ -39,6 +39,7 @@ export function Login({ onLogin }: LoginProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
 
     if (!validateForm()) {
       return;
@@ -96,7 +97,14 @@ export function Login({ onLogin }: LoginProps) {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleSubmit(e);
+          }}
+          style={{ width: '100%' }}
+        >
           <div style={{ marginBottom: '1rem' }}>
             <label style={{
               display: 'block',
@@ -135,6 +143,7 @@ export function Login({ onLogin }: LoginProps) {
               }}
               required
               disabled={loading}
+              autoComplete="username"
             />
             {emailError && (
               <p style={{
@@ -182,6 +191,7 @@ export function Login({ onLogin }: LoginProps) {
               }}
               required
               disabled={loading}
+              autoComplete="current-password"
             />
           </div>
 
@@ -220,7 +230,7 @@ export function Login({ onLogin }: LoginProps) {
               }
             }}
             onMouseOut={(e) => {
-              if (!loading) {
+                if (!loading) {
                 (e.target as HTMLButtonElement).style.backgroundColor = '#2563eb';
               }
             }}

@@ -10,8 +10,8 @@ import { StaffMember, Education, Leave, OffDay, Document, isStaffOnActiveOffDay 
 import { StaffMember as ApiStaffMember } from '../services/staffManagementService';
 // Import StaffProfileView component for detailed staff information
 import { StaffProfileView } from './StaffProfileView';
-// Import AddStaffModal component for adding new staff members
-import { AddStaffModal } from './AddStaffModal';
+// Import StaffInvitationView component for inviting new staff members
+import StaffInvitationView from './StaffInvitationView';
 // Import staff management service
 import { getAllStaff, activateStaff, deactivateStaff } from '../services/staffManagementService';
 
@@ -27,8 +27,8 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
   const [minYearsFilter, setMinYearsFilter] = useState<number | ''>('');
   // State for selected staff member (for profile view)
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(initialSelectedStaff || null);
-  // State for showing add staff modal
-  const [showAddModal, setShowAddModal] = useState(false);
+  // State for showing staff invitation view
+  const [showStaffInvitation, setShowStaffInvitation] = useState(false);
   // State for staff list (from API)
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   // State for loading
@@ -130,10 +130,10 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
     }
   };
 
-  // Handler for when new staff is added via modal
-  const handleStaffAdded = (newStaff: StaffMember) => {
+  // Handler for when staff invitation is completed
+  const handleStaffInvited = () => {
     loadStaffList(); // Refresh staff list from API
-    setShowAddModal(false); // Close modal
+    setShowStaffInvitation(false); // Close invitation view
   };
 
   // Handler for activating staff
@@ -242,9 +242,9 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
   // Main render return for staff directory view
   return (
     <div className="space-y-6" style={{ position: 'relative' }}>
-      {/* Floating Action Button for adding new staff */}
+      {/* Floating Action Button for inviting new staff */}
       <button
-        onClick={() => setShowAddModal(true)} // Open add staff modal
+        onClick={() => setShowStaffInvitation(true)} // Open staff invitation view
         style={{
           position: 'fixed', // Fixed positioning
           bottom: '2rem', // 2rem from bottom
@@ -273,7 +273,7 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
           e.currentTarget.style.transform = 'scale(1)'; // Original scale
         }}
       >
-        <Plus className="w-6 h-6" /> {/* Plus icon for add action */}
+        <Plus className="w-6 h-6" /> {/* Plus icon for invite action */}
       </button>
 
       {/* Header Statistics Cards */}
@@ -500,12 +500,55 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
         )}
       </div>
 
-      {/* Add Staff Modal */}
-      <AddStaffModal
-        isOpen={showAddModal} // Control modal visibility
-        onClose={() => setShowAddModal(false)} // Handler to close modal
-        onSuccess={handleStaffAdded} // Handler for successful staff addition
-      />
+      {/* Staff Invitation View */}
+      {showStaffInvitation && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          zIndex: 50,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '0.5rem',
+            width: '90%',
+            maxWidth: '800px',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}>
+            <div style={{
+              padding: '1rem',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h2 style={{ margin: 0 }}>Invite New Staff</h2>
+              <button
+                onClick={() => setShowStaffInvitation(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  padding: '0.25rem'
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div style={{ padding: '1rem' }}>
+              <StaffInvitationView onSuccess={handleStaffInvited} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

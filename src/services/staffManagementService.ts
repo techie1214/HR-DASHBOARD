@@ -2,105 +2,14 @@ import axios from 'axios';
 import { API_ENDPOINT } from '../config/config';
 import { Role } from './roleManagementService';
 import { Branch } from './branchManagementService';
+import { Department } from './departmentManagementService';
 import {
   StaffMember,
   CreateStaffRequest,
   UpdateStaffRequest,
   StaffInvitation,
-  StaffInvitationRequest,
-  Department
+  StaffInvitationRequest
 } from './apiInterfaces';
-
-// Define interfaces for staff management
-export interface StaffMember {
-  id: string;
-  user_id: number;
-  employee_id: string;
-  designation: string;
-  department: string;
-  branch_id: number;
-  joining_date: string;
-  employment_type: string;
-  reporting_manager_id?: number;
-  work_mode: string;
-  bank_name?: string;
-  bank_account_number?: string;
-  bank_ifsc_code?: string;
-  tax_identification_number?: string;
-  base_salary: number;
-  pay_grade?: string;
-  pension_insurance_id?: string;
-  emergency_contact_name?: string;
-  emergency_contact_phone?: string;
-  emergency_contact_relationship?: string;
-  date_of_birth: string;
-  gender: string;
-  current_address_id?: number;
-  permanent_address_id?: number;
-  primary_skills?: string;
-  work_email: string;
-  personal_email: string;
-  phone_number: string;
-  marital_status: string;
-  highest_qualification?: string;
-  university_school?: string;
-  status?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateStaffRequest {
-  user_id: number;
-  employee_id: string;
-  designation: string;
-  department: string;
-  branch_id: number;
-  joining_date: string;
-  employment_type: string;
-  reporting_manager_id?: number;
-  work_mode: string;
-  bank_name?: string;
-  bank_account_number?: string;
-  bank_ifsc_code?: string;
-  tax_identification_number?: string;
-  base_salary: number;
-  pay_grade?: string;
-  pension_insurance_id?: string;
-  emergency_contact_name?: string;
-  emergency_contact_phone?: string;
-  emergency_contact_relationship?: string;
-  date_of_birth: string;
-  gender: string;
-  current_address_id?: number;
-  permanent_address_id?: number;
-  primary_skills?: string;
-  work_email: string;
-  personal_email: string;
-  phone_number: string;
-  marital_status: string;
-  highest_qualification?: string;
-  university_school?: string;
-}
-
-export interface UpdateStaffRequest {
-  employee_id?: string;
-  designation?: string;
-  department?: string;
-  branch_id?: number;
-  employment_type?: string;
-  reporting_manager_id?: number;
-  work_mode?: string;
-  bank_name?: string;
-  base_salary?: number;
-  pay_grade?: string;
-  emergency_contact_name?: string;
-  emergency_contact_phone?: string;
-  primary_skills?: string;
-  work_email?: string;
-  phone_number?: string;
-  marital_status?: string;
-  status?: string;
-}
 
 // Define interfaces for staff invitation
 export interface StaffInvitation {
@@ -140,7 +49,7 @@ export interface StaffMemberRequest {
   salary: number;
 }
 
-export interface StaffMember {
+export interface StaffMemberExtended {
   id: string;
   firstName: string;
   lastName: string;
@@ -180,8 +89,10 @@ export const validateStaffData = (staffData: CreateStaffRequest | StaffMemberReq
     errors.push('Last name is required');
   }
 
-  if (!staffData.work_email || !validateEmail(staffData.work_email)) {
-    errors.push('Valid work email is required');
+  // Check for email depending on the type of object
+  const email = 'work_email' in staffData ? staffData.work_email : staffData.email;
+  if (!email || !validateEmail(email)) {
+    errors.push('Valid email is required');
   }
 
   if ('phone' in staffData && staffData.phone && !validatePhone(staffData.phone)) {
@@ -863,3 +774,4 @@ export const deleteStaff = async (staffId: string): Promise<{ success: boolean; 
     };
   }
 };
+

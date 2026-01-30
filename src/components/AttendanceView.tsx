@@ -82,7 +82,7 @@ export function AttendanceView() {
 
   // Calculate active branches from attendance records or fall back to branch list
   const attendanceBranchSet = new Set<string>(staffAttendanceData.map(r => (r.branch ? r.branch : '')).filter(Boolean));
-  const computedActiveBranches = attendanceBranchSet.size > 0 ? attendanceBranchSet.size : BRANCHES.length;
+  const computedActiveBranches = attendanceBranchSet.size > 0 ? attendanceBranchSet.size : branches.length;
 
   // Filter attendance data based on search, status, and branch filters
   const filteredData = staffAttendanceData.filter(record => {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { NotificationPanel } from "./components/NotificationPanel";
 import { AllStaffView } from "./components/AllStaffView";
 import { BranchManagementView } from "./components/BranchManagementView";
@@ -19,7 +19,6 @@ import PerformanceView from "./components/PerformanceView";
 import RecruitmentView from "./components/RecruitmentView";
 import ReportsView from "./components/ReportsView";
 // import  StaffManagementView  from "./components/StaffManagementView";
-import StaffInvitationView from "./components/StaffInvitationView";
 import { mockNotifications, mockStaffData } from "./data/staffData";
 import {
   LayoutDashboard,
@@ -161,15 +160,6 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 <span>Time Management</span>
               </button>
             </li>
-            <li className="sidebar-menu-item">
-              <button
-                onClick={() => onNavigate("staffinvitation")}
-                className={`sidebar-menu-button ${activeView === "staffinvitation" ? "active" : ""}`}
-              >
-                <UserPlus className="w-4 h-4" />
-                <span>Staff Invitation</span>
-              </button>
-            </li>
           </ul>
         </div>
         <div className="sidebar-group">
@@ -227,6 +217,7 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isSystemInitialized, setIsSystemInitialized] = useState<boolean|null>(null); // null = checking, true/false = result
   const [user, setUser] = useState<{ name?: string; email?: string; avatarInitials?: string } | null>(null);
+  const prevIsLoggedIn = useRef<boolean | null>(null);
   const [activeView, setActiveView] = useState("dashboard");
   const [activeTab, setActiveTab] = useState("overview");
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
@@ -278,38 +269,60 @@ export default function App() {
   useEffect(() => {
     if (isSystemInitialized === true) {
       const authenticated = isAuthenticated();
-      setIsLoggedIn(authenticated);
 
-      // Load user details if authenticated
-      if (authenticated) {
-        const userInfo = getUserInfo();
-        if (userInfo) {
-          setUser({
-            name: userInfo.fullName || userInfo.name || userInfo.fullname || userInfo.username || userInfo.displayName || `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim(),
-            email: userInfo.email || userInfo.Email,
-          });
+      // Only update state if it has actually changed
+      prevIsLoggedIn.current = prevIsLoggedIn.current ?? !authenticated; // Initialize if undefined
+
+      if (prevIsLoggedIn.current !== authenticated) {
+        setIsLoggedIn(authenticated);
+        prevIsLoggedIn.current = authenticated;
+
+        // Load user details if authenticated
+        if (authenticated) {
+          const userInfo = getUserInfo();
+          if (userInfo) {
+            setUser({
+              name: userInfo.fullName || userInfo.name || userInfo.fullname || userInfo.username || userInfo.displayName || `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim(),
+              email: userInfo.email || userInfo.Email,
+            });
+          }
+        } else {
+          // Clear user data when logging out
+          setUser(null);
         }
       }
+      // If isLoggedIn is already correct, don't update it to prevent re-renders
     }
   }, [isSystemInitialized]);
 
   const handleLogin = () => {
-    setIsLoggedIn(true);
+    const authenticated = isAuthenticated();
 
-    // Load user details after login
-    const userInfo = getUserInfo();
-    if (userInfo) {
-      setUser({
-        name: userInfo.fullName || userInfo.name || userInfo.fullname || userInfo.username || userInfo.displayName || `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim(),
-        email: userInfo.email || userInfo.Email,
-      });
+    // Only update state if the authentication status has actually changed
+    if (prevIsLoggedIn.current !== authenticated) {
+      setIsLoggedIn(authenticated);
+      prevIsLoggedIn.current = authenticated;
+
+      // Load user details after login
+      const userInfo = getUserInfo();
+      if (userInfo) {
+        setUser({
+          name: userInfo.fullName || userInfo.name || userInfo.fullname || userInfo.username || userInfo.displayName || `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim(),
+          email: userInfo.email || userInfo.Email,
+        });
+      }
     }
   };
 
   const handleLogout = () => {
     logout();
-    setIsLoggedIn(false);
-    setUser(null); // Clear user state on logout
+
+    // Only update state if the authentication status has actually changed
+    if (prevIsLoggedIn.current !== false) {
+      setIsLoggedIn(false);
+      prevIsLoggedIn.current = false;
+      setUser(null); // Clear user state on logout
+    }
   };
 
   // Handle global search with multiple categories
@@ -617,8 +630,6 @@ export default function App() {
         return <UserManagementView />;
       case "rolemanagement":
         return <RoleManagementView />;
-      case "staffinvitation":
-        return <StaffInvitationView />;
       case "settings":
         return (
           <div className="space-y-6">
@@ -709,11 +720,6 @@ export default function App() {
         return {
           title: "Role Management",
           subtitle: "Manage user roles and permissions"
-        };
-      case "staffinvitation":
-        return {
-          title: "Staff Invitation",
-          subtitle: "Invite new staff members to join the system"
         };
       case "settings":
         return {

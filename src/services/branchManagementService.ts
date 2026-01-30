@@ -16,8 +16,8 @@ export interface Branch {
   location_radius_meters: number;
   attendance_mode: string;
   status: string;
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CreateBranchRequest {
@@ -231,4 +231,4 @@ export const deleteBranch = async (branchId: string): Promise<{ success: boolean
       message: error.response?.data?.message || error.message || 'Failed to delete branch',
     };
   }
-};
+};  

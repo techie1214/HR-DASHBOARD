@@ -484,7 +484,7 @@ const RoleManagementView = () => {
                     <td className="table-cell font-medium">{role.name}</td>
                     <td className="table-cell">{role.description}</td>
                     <td className="table-cell">{role.permissions.length}</td>
-                    <td className="table-cell">{new Date(role.createdAt).toLocaleDateString()}</td>
+                    <td className="table-cell">{role.created_at ? new Date(role.created_at).toLocaleDateString() : 'N/A'}</td>
                     <td className="table-cell">
                       <div className="flex space-x-2">
                         <button

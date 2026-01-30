@@ -14,7 +14,11 @@ import {
 import { getAllBranches as getAllBranchesService } from '../services/branchManagementService';
 import { getAllDepartments } from '../services/departmentManagementService';
 
-const StaffInvitationView = () => {
+interface StaffInvitationViewProps {
+  onSuccess?: () => void;
+}
+
+const StaffInvitationView: React.FC<StaffInvitationViewProps> = ({ onSuccess }) => {
   const [invitations, setInvitations] = useState<StaffInvitation[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -105,6 +109,9 @@ const StaffInvitationView = () => {
         setInvitations([...invitations, response.invitation!]);
         resetForm();
         loadData(); // Refresh the list
+        if (onSuccess) {
+          onSuccess();
+        }
       } else {
         setError(response.message || 'Failed to invite staff');
       }

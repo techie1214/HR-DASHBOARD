@@ -13,8 +13,8 @@ export interface Role {
   name: string;
   description: string;
   permissions: Permission[];
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CreateRoleRequest {

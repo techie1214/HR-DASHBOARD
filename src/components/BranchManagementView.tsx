@@ -33,6 +33,9 @@ const BranchManagementView = () => {
   const [branchAttendanceMode, setBranchAttendanceMode] = useState('branch_based');
   const [branchStatus, setBranchStatus] = useState('active');
 
+  // Location state
+  const [loadingLocation, setLoadingLocation] = useState(false);
+
   // Load branches on component mount
   useEffect(() => {
     loadBranches();
@@ -41,7 +44,7 @@ const BranchManagementView = () => {
   const loadBranches = async () => {
     try {
       setLoading(true);
-      
+
       // Load branches
       const branchesResponse = await getAllBranches();
       if (branchesResponse.success) {
@@ -55,6 +58,41 @@ const BranchManagementView = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported by your browser');
+      return;
+    }
+
+    setLoadingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        // Format coordinates as expected by the backend (assuming it expects a specific format)
+        const coordinateString = `${longitude},${latitude}`; // Adjust format as needed
+        setBranchLocationCoordinates(coordinateString);
+        setLoadingLocation(false);
+      },
+      (error) => {
+        setLoadingLocation(false);
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            setError('Location access denied. Please enable location services and try again.');
+            break;
+          case error.POSITION_UNAVAILABLE:
+            setError('Location information is unavailable.');
+            break;
+          case error.TIMEOUT:
+            setError('The request to get location timed out.');
+            break;
+          default:
+            setError('An unknown error occurred while getting location.');
+            break;
+        }
+      }
+    );
   };
 
   const handleCreateBranch = async () => {
@@ -164,6 +202,7 @@ const BranchManagementView = () => {
     setShowEditForm(false);
     setEditingBranch(null);
     setError(null);
+    setLoadingLocation(false);
   };
 
   const handleEditClick = (branch: Branch) => {
@@ -182,6 +221,7 @@ const BranchManagementView = () => {
     setBranchStatus(branch.status);
     setShowEditForm(true);
     setError(null);
+    setLoadingLocation(false);
   };
 
   if (loading) {
@@ -332,16 +372,26 @@ const BranchManagementView = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="branchLocationCoordinates" className="block text-sm font-medium mb-1">Location Coordinates</label>
-                <input
-                  type="text"
-                  id="branchLocationCoordinates"
-                  value={branchLocationCoordinates}
-                  onChange={(e) => setBranchLocationCoordinates(e.target.value)}
-                  className="input w-full"
-                  placeholder="Enter coordinates (e.g., POINT(3.3869 6.4458))"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    id="branchLocationCoordinates"
+                    value={branchLocationCoordinates}
+                    onChange={(e) => setBranchLocationCoordinates(e.target.value)}
+                    className="input w-full"
+                    placeholder="Enter coordinates (e.g., POINT(3.3869 6.4458))"
+                  />
+                  <button
+                    type="button"
+                    onClick={getCurrentLocation}
+                    className="btn btn-secondary whitespace-nowrap"
+                    disabled={loadingLocation}
+                  >
+                    {loadingLocation ? 'Getting...' : 'Get My Location'}
+                  </button>
+                </div>
               </div>
-              
+
               <div>
                 <label htmlFor="branchLocationRadius" className="block text-sm font-medium mb-1">Location Radius (meters)</label>
                 <input
@@ -514,16 +564,26 @@ const BranchManagementView = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="editBranchLocationCoordinates" className="block text-sm font-medium mb-1">Location Coordinates</label>
-                <input
-                  type="text"
-                  id="editBranchLocationCoordinates"
-                  value={branchLocationCoordinates}
-                  onChange={(e) => setBranchLocationCoordinates(e.target.value)}
-                  className="input w-full"
-                  placeholder="Enter coordinates (e.g., POINT(3.3869 6.4458))"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    id="editBranchLocationCoordinates"
+                    value={branchLocationCoordinates}
+                    onChange={(e) => setBranchLocationCoordinates(e.target.value)}
+                    className="input w-full"
+                    placeholder="Enter coordinates (e.g., POINT(3.3869 6.4458))"
+                  />
+                  <button
+                    type="button"
+                    onClick={getCurrentLocation}
+                    className="btn btn-secondary whitespace-nowrap"
+                    disabled={loadingLocation}
+                  >
+                    {loadingLocation ? 'Getting...' : 'Get My Location'}
+                  </button>
+                </div>
               </div>
-              
+
               <div>
                 <label htmlFor="editBranchLocationRadius" className="block text-sm font-medium mb-1">Location Radius (meters)</label>
                 <input
@@ -619,7 +679,7 @@ const BranchManagementView = () => {
                         {branch.status.charAt(0).toUpperCase() + branch.status.slice(1)}
                       </span>
                     </td>
-                    <td className="table-cell">{new Date(branch.createdAt).toLocaleDateString()}</td>
+                    <td className="table-cell">{branch.created_at ? new Date(branch.created_at).toLocaleDateString() : 'N/A'}</td>
                     <td className="table-cell">
                       <div className="flex space-x-2">
                         <button

@@ -24,9 +24,7 @@ const DepartmentManagementView = () => {
   // Form data
   const [departmentName, setDepartmentName] = useState('');
   const [departmentDescription, setDepartmentDescription] = useState('');
-  const [departmentBranchId, setDepartmentBranchId] = useState('');
-  const [departmentHeadId, setDepartmentHeadId] = useState('');
-  const [departmentStatus, setDepartmentStatus] = useState('active');
+  const [departmentBranchId, setDepartmentBranchId] = useState<number | ''>('');
 
   // Load departments and branches on component mount
   useEffect(() => {
@@ -61,7 +59,7 @@ const DepartmentManagementView = () => {
   };
 
   const handleCreateDepartment = async () => {
-    if (!departmentName.trim() || !departmentBranchId.trim()) {
+    if (!departmentName.trim() || departmentBranchId === '') {
       setError('Department name and branch are required');
       return;
     }
@@ -69,7 +67,7 @@ const DepartmentManagementView = () => {
     const departmentData: CreateDepartmentRequest = {
       name: departmentName,
       description: departmentDescription,
-      branch_id: departmentBranchId
+      branch_id: Number(departmentBranchId)
     };
 
     try {
@@ -88,7 +86,7 @@ const DepartmentManagementView = () => {
   };
 
   const handleUpdateDepartment = async () => {
-    if (!editingDepartment || !departmentName.trim() || !departmentBranchId.trim()) {
+    if (!editingDepartment || !departmentName.trim() || departmentBranchId === '') {
       setError('Department name and branch are required');
       return;
     }
@@ -96,9 +94,7 @@ const DepartmentManagementView = () => {
     const departmentData: UpdateDepartmentRequest = {
       name: departmentName,
       description: departmentDescription,
-      branch_id: departmentBranchId,
-      head_id: departmentHeadId,
-      status: departmentStatus
+      branch_id: Number(departmentBranchId)
     };
 
     try {
@@ -139,8 +135,6 @@ const DepartmentManagementView = () => {
     setDepartmentName('');
     setDepartmentDescription('');
     setDepartmentBranchId('');
-    setDepartmentHeadId('');
-    setDepartmentStatus('active');
     setShowCreateForm(false);
     setShowEditForm(false);
     setEditingDepartment(null);
@@ -150,10 +144,8 @@ const DepartmentManagementView = () => {
   const handleEditClick = (department: Department) => {
     setEditingDepartment(department);
     setDepartmentName(department.name);
-    setDepartmentDescription(department.description);
-    setDepartmentBranchId(department.branch_id);
-    setDepartmentHeadId(department.head_id || '');
-    setDepartmentStatus(department.status || 'active');
+    setDepartmentDescription(department.description || '');
+    setDepartmentBranchId(department.branch_id || '');
     setShowEditForm(true);
     setError(null);
   };
@@ -225,50 +217,23 @@ const DepartmentManagementView = () => {
               />
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="departmentBranch" className="block text-sm font-medium mb-1">Branch *</label>
-                <select
-                  id="departmentBranch"
-                  value={departmentBranchId}
-                  onChange={(e) => setDepartmentBranchId(e.target.value)}
-                  className="input w-full"
-                >
-                  <option value="">Select a branch</option>
-                  {branches.map(branch => (
-                    <option key={branch.id} value={branch.id}>
-                      {branch.name} ({branch.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label htmlFor="departmentHead" className="block text-sm font-medium mb-1">Department Head</label>
-                <input
-                  type="text"
-                  id="departmentHead"
-                  value={departmentHeadId}
-                  onChange={(e) => setDepartmentHeadId(e.target.value)}
-                  className="input w-full"
-                  placeholder="Enter department head ID (optional)"
-                />
-              </div>
-            </div>
-            
             <div>
-              <label htmlFor="departmentStatus" className="block text-sm font-medium mb-1">Status</label>
+              <label htmlFor="departmentBranch" className="block text-sm font-medium mb-1">Branch *</label>
               <select
-                id="departmentStatus"
-                value={departmentStatus}
-                onChange={(e) => setDepartmentStatus(e.target.value)}
+                id="departmentBranch"
+                value={departmentBranchId}
+                onChange={(e) => setDepartmentBranchId(e.target.value ? Number(e.target.value) : '')}
                 className="input w-full"
               >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="closed">Closed</option>
+                <option value="">Select a branch</option>
+                {branches.map(branch => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name} ({branch.code})
+                  </option>
+                ))}
               </select>
             </div>
+            
             
             <div className="flex space-x-3 pt-2">
               <button
@@ -318,50 +283,23 @@ const DepartmentManagementView = () => {
               />
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="editDepartmentBranch" className="block text-sm font-medium mb-1">Branch *</label>
-                <select
-                  id="editDepartmentBranch"
-                  value={departmentBranchId}
-                  onChange={(e) => setDepartmentBranchId(e.target.value)}
-                  className="input w-full"
-                >
-                  <option value="">Select a branch</option>
-                  {branches.map(branch => (
-                    <option key={branch.id} value={branch.id}>
-                      {branch.name} ({branch.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label htmlFor="editDepartmentHead" className="block text-sm font-medium mb-1">Department Head</label>
-                <input
-                  type="text"
-                  id="editDepartmentHead"
-                  value={departmentHeadId}
-                  onChange={(e) => setDepartmentHeadId(e.target.value)}
-                  className="input w-full"
-                  placeholder="Enter department head ID (optional)"
-                />
-              </div>
-            </div>
-            
             <div>
-              <label htmlFor="editDepartmentStatus" className="block text-sm font-medium mb-1">Status</label>
+              <label htmlFor="editDepartmentBranch" className="block text-sm font-medium mb-1">Branch *</label>
               <select
-                id="editDepartmentStatus"
-                value={departmentStatus}
-                onChange={(e) => setDepartmentStatus(e.target.value)}
+                id="editDepartmentBranch"
+                value={departmentBranchId}
+                onChange={(e) => setDepartmentBranchId(e.target.value ? Number(e.target.value) : '')}
                 className="input w-full"
               >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="closed">Closed</option>
+                <option value="">Select a branch</option>
+                {branches.map(branch => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name} ({branch.code})
+                  </option>
+                ))}
               </select>
             </div>
+            
             
             <div className="flex space-x-3 pt-2">
               <button
@@ -393,8 +331,6 @@ const DepartmentManagementView = () => {
                   <th className="table-header-cell">Name</th>
                   <th className="table-header-cell">Description</th>
                   <th className="table-header-cell">Branch</th>
-                  <th className="table-header-cell">Head</th>
-                  <th className="table-header-cell">Status</th>
                   <th className="table-header-cell">Created</th>
                   <th className="table-header-cell">Actions</th>
                 </tr>
@@ -407,17 +343,9 @@ const DepartmentManagementView = () => {
                     <td className="table-cell">
                       {branches.find(b => b.id === department.branch_id)?.name || department.branch_id || '-'}
                     </td>
-                    <td className="table-cell">{department.head_id || '-'}</td>
                     <td className="table-cell">
-                      <span className={`badge ${
-                        department.status === 'active' ? 'badge-success' :
-                        department.status === 'inactive' ? 'badge-warning' :
-                        'badge-danger'
-                      }`}>
-                        {department.status ? department.status.charAt(0).toUpperCase() + department.status.slice(1) : 'Unknown'}
-                      </span>
+                      {department.created_at ? new Date(department.created_at).toLocaleDateString() : 'N/A'}
                     </td>
-                    <td className="table-cell">{new Date(department.createdAt).toLocaleDateString()}</td>
                     <td className="table-cell">
                       <div className="flex space-x-2">
                         <button
@@ -449,4 +377,5 @@ const DepartmentManagementView = () => {
   );
 };
 
+export default DepartmentManagementView;
 export { DepartmentManagementView };

@@ -372,7 +372,7 @@ export const getAttendanceSummary = async (
     const params = new URLSearchParams();
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
-    
+
     if (params.toString()) {
       url += `?${params.toString()}`;
     }

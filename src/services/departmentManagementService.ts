@@ -11,8 +11,8 @@ export interface Department {
   parentId?: number;
   level: number;
   isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // Define request interfaces
@@ -44,7 +44,7 @@ export const getAllDepartments = async (): Promise<{ success: boolean; departmen
       };
     }
 
-    const response = await axios.get(`${API_ENDPOINT}/api/departments`, {
+    const response = await axios.get(`${API_ENDPOINT}/departments`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -81,7 +81,7 @@ export const getDepartmentById = async (departmentId: number): Promise<{ success
       };
     }
 
-    const response = await axios.get(`${API_ENDPOINT}/api/departments/${departmentId}`, {
+    const response = await axios.get(`${API_ENDPOINT}/departments/${departmentId}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -118,7 +118,7 @@ export const createDepartment = async (departmentData: CreateDepartmentRequest):
       };
     }
 
-    const response = await axios.post(`${API_ENDPOINT}/api/departments`, departmentData, {
+    const response = await axios.post(`${API_ENDPOINT}/departments`, departmentData, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -155,7 +155,7 @@ export const updateDepartment = async (departmentId: number, departmentData: Upd
       };
     }
 
-    const response = await axios.put(`${API_ENDPOINT}/api/departments/${departmentId}`, departmentData, {
+    const response = await axios.put(`${API_ENDPOINT}/departments/${departmentId}`, departmentData, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -192,7 +192,7 @@ export const deleteDepartment = async (departmentId: number): Promise<{ success:
       };
     }
 
-    await axios.delete(`${API_ENDPOINT}/api/departments/${departmentId}`, {
+    await axios.delete(`${API_ENDPOINT}/departments/${departmentId}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
