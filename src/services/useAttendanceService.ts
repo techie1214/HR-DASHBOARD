@@ -4,6 +4,8 @@ import {
   getAttendanceSummary,
   getStaffAttendanceData,
   getMonthlyStats,
+  getGlobalAttendanceModeStatus,
+  updateGlobalAttendanceMode,
   AttendanceRecord,
   AttendanceSummary,
   DailyAttendanceRecord,
@@ -35,12 +37,17 @@ export const useAttendanceService = () => {
   const [staffDataLoading, setStaffDataLoading] = useState(true);
   const [monthlyStatsLoading, setMonthlyStatsLoading] = useState(true);
   const [metricsLoading, setMetricsLoading] = useState(true);
+  // State for attendance mode
+  const [attendanceMode, setAttendanceMode] = useState<string>('manual'); // Default mode
+  // Loading state for attendance mode
+  const [modeLoading, setModeLoading] = useState(true);
   // Error states
   const [error, setError] = useState<string | null>(null);
   const [recordsError, setRecordsError] = useState<string | null>(null);
   const [staffDataError, setStaffDataError] = useState<string | null>(null);
   const [monthlyStatsError, setMonthlyStatsError] = useState<string | null>(null);
   const [metricsError, setMetricsError] = useState<string | null>(null);
+  const [modeError, setModeError] = useState<string | null>(null);
 
   // Fetch attendance records from the backend
   const fetchAttendanceRecords = async () => {
@@ -161,6 +168,46 @@ export const useAttendanceService = () => {
     }
   };
 
+  // Fetch attendance mode from the backend
+  const fetchAttendanceMode = async () => {
+    setModeLoading(true);
+    setModeError(null);
+
+    try {
+      const result = await getGlobalAttendanceModeStatus();
+
+      if (result.success && result.mode) {
+        setAttendanceMode(result.mode);
+      } else {
+        setModeError(result.message || 'Failed to fetch attendance mode');
+      }
+    } catch (err: any) {
+      setModeError(err.message || 'An error occurred while fetching attendance mode');
+    } finally {
+      setModeLoading(false);
+    }
+  };
+
+  // Update attendance mode
+  const updateAttendanceMode = async (mode: string) => {
+    setModeLoading(true);
+    setModeError(null);
+
+    try {
+      const result = await updateGlobalAttendanceMode(mode);
+
+      if (result.success) {
+        setAttendanceMode(mode);
+      } else {
+        setModeError(result.message || 'Failed to update attendance mode');
+      }
+    } catch (err: any) {
+      setModeError(err.message || 'An error occurred while updating attendance mode');
+    } finally {
+      setModeLoading(false);
+    }
+  };
+
   // Refresh all data
   const refreshData = async () => {
     setLoading(true);
@@ -168,7 +215,8 @@ export const useAttendanceService = () => {
       fetchAttendanceRecords(),
       fetchStaffAttendanceData(),
       fetchMonthlyStats(),
-      fetchAttendanceMetrics()
+      fetchAttendanceMetrics(),
+      fetchAttendanceMode()
     ]);
     setLoading(false);
   };
@@ -183,20 +231,25 @@ export const useAttendanceService = () => {
     staffAttendanceData,
     monthlyStats,
     attendanceMetrics,
+    attendanceMode,
     loading,
     recordsLoading,
     staffDataLoading,
     monthlyStatsLoading,
     metricsLoading,
+    modeLoading,
     error,
     recordsError,
     staffDataError,
     monthlyStatsError,
     metricsError,
+    modeError,
     refreshData,
     fetchAttendanceRecords,
     fetchStaffAttendanceData,
     fetchMonthlyStats,
-    fetchAttendanceMetrics
+    fetchAttendanceMetrics,
+    fetchAttendanceMode,
+    updateAttendanceMode
   };
 };

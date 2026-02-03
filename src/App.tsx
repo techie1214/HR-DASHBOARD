@@ -18,6 +18,11 @@ import { DepartmentManagementView } from "./components/DepartmentManagementView"
 import PerformanceView from "./components/PerformanceView";
 import RecruitmentView from "./components/RecruitmentView";
 import ReportsView from "./components/ReportsView";
+import PayrollView from "./components/PayrollView";
+import AppraisalView from "./components/AppraisalView";
+import KPIView from "./components/KPIView";
+import HolidayManagementView from "./components/HolidayManagementView";
+import ShiftSchedulingView from "./components/ShiftSchedulingView";
 // import  StaffManagementView  from "./components/StaffManagementView";
 import { mockNotifications, mockStaffData } from "./data/staffData";
 import {
@@ -36,7 +41,11 @@ import {
   Building,
   Sun,
   Shield,
-  User as UserIcon
+  User as UserIcon,
+  DollarSign,
+  Award,
+  Target,
+  CalendarDays
 } from "lucide-react";
 import { Login } from "./components/Login";
 import RoleManagementView from "./components/RoleManagementView";
@@ -158,6 +167,51 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
               >
                 <Clock className="w-4 h-4" />
                 <span>Time Management</span>
+              </button>
+            </li>
+            <li className="sidebar-menu-item">
+              <button
+                onClick={() => onNavigate("payroll")}
+                className={`sidebar-menu-button ${activeView === "payroll" ? "active" : ""}`}
+              >
+                <DollarSign className="w-4 h-4" />
+                <span>Payroll</span>
+              </button>
+            </li>
+            <li className="sidebar-menu-item">
+              <button
+                onClick={() => onNavigate("appraisal")}
+                className={`sidebar-menu-button ${activeView === "appraisal" ? "active" : ""}`}
+              >
+                <Award className="w-4 h-4" />
+                <span>Appraisal</span>
+              </button>
+            </li>
+            <li className="sidebar-menu-item">
+              <button
+                onClick={() => onNavigate("kpi")}
+                className={`sidebar-menu-button ${activeView === "kpi" ? "active" : ""}`}
+              >
+                <Target className="w-4 h-4" />
+                <span>KPI</span>
+              </button>
+            </li>
+            <li className="sidebar-menu-item">
+              <button
+                onClick={() => onNavigate("holidays")}
+                className={`sidebar-menu-button ${activeView === "holidays" ? "active" : ""}`}
+              >
+                <CalendarDays className="w-4 h-4" />
+                <span>Holidays</span>
+              </button>
+            </li>
+            <li className="sidebar-menu-item">
+              <button
+                onClick={() => onNavigate("shiftscheduling")}
+                className={`sidebar-menu-button ${activeView === "shiftscheduling" ? "active" : ""}`}
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Shift Scheduling</span>
               </button>
             </li>
           </ul>
@@ -626,6 +680,21 @@ export default function App() {
       case "reports":
         return <ReportsView />;
 
+      case "payroll":
+        return <PayrollView />;
+
+      case "appraisal":
+        return <AppraisalView />;
+
+      case "kpi":
+        return <KPIView />;
+
+      case "holidays":
+        return <HolidayManagementView />;
+
+      case "shiftscheduling":
+        return <ShiftSchedulingView />;
+
       case "usermanagement":
         return <UserManagementView />;
       case "rolemanagement":
@@ -710,6 +779,31 @@ export default function App() {
         return {
           title: "Reports & Analytics",
           subtitle: "Generate and manage HR reports"
+        };
+      case "payroll":
+        return {
+          title: "Payroll Management",
+          subtitle: "Manage payroll runs and employee compensation"
+        };
+      case "appraisal":
+        return {
+          title: "Appraisal Management",
+          subtitle: "Manage employee performance evaluations"
+        };
+      case "kpi":
+        return {
+          title: "KPI Management",
+          subtitle: "Track and manage key performance indicators"
+        };
+      case "holidays":
+        return {
+          title: "Holiday Management",
+          subtitle: "Manage company holidays and non-working days"
+        };
+      case "shiftscheduling":
+        return {
+          title: "Shift Scheduling",
+          subtitle: "Manage employee shift assignments and schedules"
         };
       case "usermanagement":
         return {

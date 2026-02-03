@@ -752,3 +752,220 @@ export const getMonthlyStats = async (): Promise<{ success: boolean; stats?: Mon
     };
   }
 };
+
+// Define interfaces for shift timing
+export interface ShiftTiming {
+  id: number;
+  start_time: string; // HH:mm:ss
+  end_time: string; // HH:mm:ss
+  shift_name: string;
+  effective_from: string; // YYYY-MM-DD
+  effective_to?: string; // YYYY-MM-DD (optional)
+  override_branch_id?: number;
+  user_id?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Get all shift timings
+export const getAllShiftTimings = async (): Promise<{ success: boolean; shiftTimings?: ShiftTiming[]; message?: string }> => {
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      return {
+        success: false,
+        message: 'Authentication token not found. Please log in again.'
+      };
+    }
+
+    const response = await axios.get(`${API_ENDPOINT}/shift-timings`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    return {
+      success: true,
+      shiftTimings: response.data.data?.shiftTimings || response.data.shiftTimings || [],
+    };
+  } catch (error: any) {
+    console.error('Error fetching shift timings:', error);
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      return {
+        success: false,
+        message: 'Access denied. Please check your permissions or log in again.'
+      };
+    }
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Failed to fetch shift timings',
+    };
+  }
+};
+
+// Get shift timing by ID
+export const getShiftTimingById = async (timingId: number): Promise<{ success: boolean; shiftTiming?: ShiftTiming; message?: string }> => {
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      return {
+        success: false,
+        message: 'Authentication token not found. Please log in again.'
+      };
+    }
+
+    const response = await axios.get(`${API_ENDPOINT}/shift-timings/${timingId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    return {
+      success: true,
+      shiftTiming: response.data.data?.shiftTiming || response.data.shiftTiming,
+    };
+  } catch (error: any) {
+    console.error('Error fetching shift timing:', error);
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      return {
+        success: false,
+        message: 'Access denied. Please check your permissions or log in again.'
+      };
+    }
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Failed to fetch shift timing',
+    };
+  }
+};
+
+// Create shift timing
+export const createShiftTiming = async (timingData: {
+  start_time: string;
+  end_time: string;
+  shift_name: string;
+  effective_from: string;
+  effective_to?: string;
+  override_branch_id?: number;
+  user_id?: number;
+}): Promise<{ success: boolean; shiftTiming?: ShiftTiming; message?: string }> => {
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      return {
+        success: false,
+        message: 'Authentication token not found. Please log in again.'
+      };
+    }
+
+    const response = await axios.post(`${API_ENDPOINT}/shift-timings`, timingData, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    return {
+      success: true,
+      shiftTiming: response.data.data?.shiftTiming || response.data.shiftTiming,
+    };
+  } catch (error: any) {
+    console.error('Error creating shift timing:', error);
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      return {
+        success: false,
+        message: 'Access denied. Please check your permissions or log in again.'
+      };
+    }
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Failed to create shift timing',
+    };
+  }
+};
+
+// Update shift timing
+export const updateShiftTiming = async (
+  timingId: number,
+  updateData: {
+    start_time?: string;
+    end_time?: string;
+    shift_name?: string;
+    effective_from?: string;
+    effective_to?: string;
+    override_branch_id?: number;
+    user_id?: number;
+  }
+): Promise<{ success: boolean; shiftTiming?: ShiftTiming; message?: string }> => {
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      return {
+        success: false,
+        message: 'Authentication token not found. Please log in again.'
+      };
+    }
+
+    const response = await axios.put(`${API_ENDPOINT}/shift-timings/${timingId}`, updateData, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    return {
+      success: true,
+      shiftTiming: response.data.data?.shiftTiming || response.data.shiftTiming,
+    };
+  } catch (error: any) {
+    console.error('Error updating shift timing:', error);
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      return {
+        success: false,
+        message: 'Access denied. Please check your permissions or log in again.'
+      };
+    }
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Failed to update shift timing',
+    };
+  }
+};
+
+// Delete shift timing
+export const deleteShiftTiming = async (timingId: number): Promise<{ success: boolean; message?: string }> => {
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      return {
+        success: false,
+        message: 'Authentication token not found. Please log in again.'
+      };
+    }
+
+    await axios.delete(`${API_ENDPOINT}/shift-timings/${timingId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Shift timing deleted successfully',
+    };
+  } catch (error: any) {
+    console.error('Error deleting shift timing:', error);
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      return {
+        success: false,
+        message: 'Access denied. Please check your permissions or log in again.'
+      };
+    }
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Failed to delete shift timing',
+    };
+  }
+};

@@ -47,17 +47,21 @@ export function AttendanceView() {
     staffAttendanceData,
     monthlyStats,
     attendanceMetrics: metrics,
+    attendanceMode,
     loading,
     recordsLoading,
     staffDataLoading,
     monthlyStatsLoading,
     metricsLoading,
+    modeLoading,
     error,
     recordsError,
     staffDataError,
     monthlyStatsError,
     metricsError,
-    refreshData
+    modeError,
+    refreshData,
+    updateAttendanceMode
   } = useAttendanceService();
 
   // If loading, show a loading indicator
@@ -113,15 +117,35 @@ export function AttendanceView() {
   return (
     <div className="space-y-6">
       {/* Action buttons section */}
-      <div className="flex items-center justify-end gap-3">
-        <button className="btn btn-outline">
-          <Filter className="w-4 h-4 mr-2" />
-          Filter
-        </button>
-        <button className="btn btn-primary">
-          <Download className="w-4 h-4 mr-2" />
-          Export
-        </button>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          {/* Attendance Mode Toggle */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">Attendance Mode:</span>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={attendanceMode === 'automatic'}
+                onChange={(e) => updateAttendanceMode(e.target.checked ? 'automatic' : 'manual')}
+                disabled={modeLoading}
+              />
+              <span className="slider round"></span>
+            </label>
+            <span className="text-sm">
+              {modeLoading ? 'Updating...' : attendanceMode === 'automatic' ? 'Automatic' : 'Manual'}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button className="btn btn-outline">
+            <Filter className="w-4 h-4 mr-2" />
+            Filter
+          </button>
+          <button className="btn btn-primary">
+            <Download className="w-4 h-4 mr-2" />
+            Export
+          </button>
+        </div>
       </div>
 
       {/* Statistics Cards */}
@@ -662,4 +686,66 @@ export function AttendanceView() {
       </div>
     </div>
   );
+}
+
+// Add CSS for the toggle switch
+const toggleStyles = `
+  .switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+  }
+
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+  }
+
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+  }
+
+  input:checked + .slider {
+    background-color: #2196F3;
+  }
+
+  input:checked + .slider:before {
+    transform: translateX(26px);
+  }
+
+  .slider.round {
+    border-radius: 24px;
+  }
+
+  .slider.round:before {
+    border-radius: 50%;
+  }
+`;
+
+// Add the styles to the document
+if (!document.querySelector('#toggle-styles')) {
+  const styleElement = document.createElement('style');
+  styleElement.id = 'toggle-styles';
+  styleElement.textContent = toggleStyles;
+  document.head.appendChild(styleElement);
 }
