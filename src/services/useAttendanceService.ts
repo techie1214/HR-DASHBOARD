@@ -13,6 +13,16 @@ import {
   MonthlyStat
 } from './attendanceService';
 
+// Define the structure for attendance metrics
+interface AttendanceMetrics {
+  avgAttendanceRate: number;
+  totalPresent: number;
+  totalEarly: number;
+  totalLate: number;
+  totalAbsent: number;
+  totalWorkingDays: number;
+}
+
 
 // Custom hook for managing attendance data
 export const useAttendanceService = () => {

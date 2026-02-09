@@ -16,7 +16,7 @@ const data = [
 ];
 
 // Main component function for performance metrics
-export function PerformanceMetrics() {
+const PerformanceMetrics = () => {
   // Main render return
   return (
     // Card container with padding
@@ -46,3 +46,5 @@ export function PerformanceMetrics() {
     </div>
   );
 }
+
+export default PerformanceMetrics;

@@ -4,7 +4,7 @@
 // Import Lucide React icons for UI elements
 import { TrendingUp, Award, Target, Users, Star, Download, Filter } from "lucide-react";
 // Import PerformanceMetrics component for charts
-import { PerformanceMetrics } from "./PerformanceMetrics";
+import PerformanceMetrics from "./PerformanceMetrics";
 
 // Mock data for individual employee performance records
 const performanceData = [

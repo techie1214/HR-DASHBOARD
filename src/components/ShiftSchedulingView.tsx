@@ -13,7 +13,9 @@ import {
   deleteShiftTiming,
   ShiftTiming
 } from '../services/attendanceService';
-import { Calendar, Clock, User, Edit3, Trash2, Plus, Users, RotateCcw, Settings } from 'lucide-react';
+import { getAllStaff } from '../services/staffManagementService';
+import { getAllBranches } from '../services/branchManagementService';
+import { Calendar, Clock, User, Edit3, Trash2, Plus, Users, RotateCcw, Settings, Building } from 'lucide-react';
 
 const ShiftSchedulingView = () => {
   const [activeTab, setActiveTab] = useState<'scheduling' | 'templates'>('scheduling');
@@ -45,6 +47,12 @@ const ShiftSchedulingView = () => {
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [errorTemplates, setErrorTemplates] = useState<string | null>(null);
 
+  // State for staff members and branches
+  const [staffMembers, setStaffMembers] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+
   const resetForm = () => {
     setEmployeeId('');
     setShiftType('morning');
@@ -55,8 +63,34 @@ const ShiftSchedulingView = () => {
     setStatus('confirmed');
   };
 
-  // Load shift templates when component mounts and when active tab changes to templates
+  // Load staff members, branches, and shift templates when component mounts and when active tab changes to templates
   useEffect(() => {
+    const loadData = async () => {
+      setLoadingStaff(true);
+      setLoadingBranches(true);
+
+      try {
+        // Load staff members
+        const staffResponse = await getAllStaff();
+        if (staffResponse.success && staffResponse.staff) {
+          setStaffMembers(staffResponse.staff);
+        }
+
+        // Load branches
+        const branchesResponse = await getAllBranches();
+        if (branchesResponse.success && branchesResponse.branches) {
+          setBranches(branchesResponse.branches);
+        }
+      } catch (err) {
+        console.error('Error loading staff or branches:', err);
+      } finally {
+        setLoadingStaff(false);
+        setLoadingBranches(false);
+      }
+    };
+
+    loadData();
+
     if (activeTab === 'templates') {
       loadShiftTemplates();
     }
@@ -172,58 +206,6 @@ const ShiftSchedulingView = () => {
     } catch (err) {
       setErrorTemplates('An error occurred while updating shift template');
       console.error(err);
-    }
-  };
-
-
-  // Function to update an existing shift template
-  const handleUpdateShiftTemplate = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!editingShiftTemplate) return;
-
-    try {
-      const updatedTemplate = {
-        name: shiftTemplateName,
-        start_time: shiftTemplateStartTime,
-        end_time: shiftTemplateEndTime,
-        effective_from: shiftTemplateEffectiveFrom,
-        effective_to: shiftTemplateEffectiveTo || null,
-        user_id: shiftTemplateUserId,
-        override_branch_id: shiftTemplateBranchId,
-      };
-
-      const response = await updateShiftTiming(editingShiftTemplate.id, updatedTemplate);
-
-      if (response.success) {
-        setShowEditTemplateForm(false);
-        setEditingShiftTemplate(null);
-        resetTemplateForm();
-        loadShiftTemplates(); // Refresh the list
-      } else {
-        setErrorTemplates(response.message || 'Failed to update shift template');
-      }
-    } catch (err) {
-      setErrorTemplates('An error occurred while updating shift template');
-      console.error(err);
-    }
-  };
-
-  // Function to delete a shift template
-  const handleDeleteShiftTemplate = async (id: number) => {
-    if (window.confirm('Are you sure you want to delete this shift template?')) {
-      try {
-        const response = await deleteShiftTiming(id);
-
-        if (response.success) {
-          loadShiftTemplates(); // Refresh the list
-        } else {
-          setErrorTemplates(response.message || 'Failed to delete shift template');
-        }
-      } catch (err) {
-        setErrorTemplates('An error occurred while deleting shift template');
-        console.error(err);
-      }
     }
   };
 
@@ -911,12 +893,14 @@ const ShiftSchedulingView = () => {
                     className="input input-bordered w-full"
                     value={shiftTemplateUserId || ''}
                     onChange={(e) => setShiftTemplateUserId(e.target.value ? parseInt(e.target.value) : undefined)}
+                    disabled={loadingStaff}
                   >
                     <option value="">All Users</option>
                     {staffMembers.map(staff => (
                       <option key={staff.id} value={staff.id}>{staff.firstName} {staff.lastName}</option>
                     ))}
                   </select>
+                  {loadingStaff && <span className="text-xs text-muted">Loading staff...</span>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Override Branch (Optional)</label>
@@ -924,12 +908,14 @@ const ShiftSchedulingView = () => {
                     className="input input-bordered w-full"
                     value={shiftTemplateBranchId || ''}
                     onChange={(e) => setShiftTemplateBranchId(e.target.value ? parseInt(e.target.value) : undefined)}
+                    disabled={loadingBranches}
                   >
                     <option value="">All Branches</option>
                     {branches.map(branch => (
                       <option key={branch.id} value={branch.id}>{branch.name}</option>
                     ))}
                   </select>
+                  {loadingBranches && <span className="text-xs text-muted">Loading branches...</span>}
                 </div>
               </div>
 
@@ -1030,12 +1016,14 @@ const ShiftSchedulingView = () => {
                     className="input input-bordered w-full"
                     value={shiftTemplateUserId || ''}
                     onChange={(e) => setShiftTemplateUserId(e.target.value ? parseInt(e.target.value) : undefined)}
+                    disabled={loadingStaff}
                   >
                     <option value="">All Users</option>
                     {staffMembers.map(staff => (
                       <option key={staff.id} value={staff.id}>{staff.firstName} {staff.lastName}</option>
                     ))}
                   </select>
+                  {loadingStaff && <span className="text-xs text-muted">Loading staff...</span>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Override Branch (Optional)</label>
@@ -1043,12 +1031,14 @@ const ShiftSchedulingView = () => {
                     className="input input-bordered w-full"
                     value={shiftTemplateBranchId || ''}
                     onChange={(e) => setShiftTemplateBranchId(e.target.value ? parseInt(e.target.value) : undefined)}
+                    disabled={loadingBranches}
                   >
                     <option value="">All Branches</option>
                     {branches.map(branch => (
                       <option key={branch.id} value={branch.id}>{branch.name}</option>
                     ))}
                   </select>
+                  {loadingBranches && <span className="text-xs text-muted">Loading branches...</span>}
                 </div>
               </div>
 
