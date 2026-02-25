@@ -18,6 +18,7 @@ import ReportsView from "./components/ReportsView";
 import PayrollView from "./components/PayrollView";
 import AppraisalView from "./components/AppraisalView";
 import LeaveManagementView from "./components/LeaveManagementView";
+import LeaveAllocationView from "./components/LeaveAllocationView";
 import PerformanceMetrics from "./components/PerformanceMetrics";
 import { EmployeeTable } from "./components/EmployeeTable";
 import KPIView from "./components/KPIView";
@@ -135,6 +136,15 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
             </li>
             <li className="sidebar-menu-item">
               <button
+                onClick={() => onNavigate("leave-allocations")}
+                className={`sidebar-menu-button ${activeView === "leave-allocations" ? "active" : ""}`}
+              >
+                <CalendarDays className="w-4 h-4" />
+                <span>Leave Allocations</span>
+              </button>
+            </li>
+            <li className="sidebar-menu-item">
+              <button
                 onClick={() => onNavigate("attendance")}
                 className={`sidebar-menu-button ${activeView === "attendance" ? "active" : ""}`}
               >
@@ -160,7 +170,7 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 <span>Department Management</span>
               </button>
             </li>
-            <li className="sidebar-menu-item">
+            {/* <li className="sidebar-menu-item">
               <button
                 onClick={() => onNavigate("timemanagement")}
                 className={`sidebar-menu-button ${activeView === "timemanagement" ? "active" : ""}`}
@@ -168,8 +178,8 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 <Clock className="w-4 h-4" />
                 <span>Time Management</span>
               </button>
-            </li>
-            <li className="sidebar-menu-item">
+            </li> */}
+            {/* <li className="sidebar-menu-item">
               <button
                 onClick={() => onNavigate("payroll")}
                 className={`sidebar-menu-button ${activeView === "payroll" ? "active" : ""}`}
@@ -177,8 +187,8 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 <DollarSign className="w-4 h-4" />
                 <span>Payroll</span>
               </button>
-            </li>
-            <li className="sidebar-menu-item">
+            </li> */}
+            {/* <li className="sidebar-menu-item">
               <button
                 onClick={() => onNavigate("appraisal")}
                 className={`sidebar-menu-button ${activeView === "appraisal" ? "active" : ""}`}
@@ -186,8 +196,8 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 <Award className="w-4 h-4" />
                 <span>Appraisal</span>
               </button>
-            </li>
-            <li className="sidebar-menu-item">
+            </li> */}
+            {/* <li className="sidebar-menu-item">
               <button
                 onClick={() => onNavigate("kpi")}
                 className={`sidebar-menu-button ${activeView === "kpi" ? "active" : ""}`}
@@ -195,8 +205,8 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 <Target className="w-4 h-4" />
                 <span>KPI</span>
               </button>
-            </li>
-            <li className="sidebar-menu-item">
+            </li> */}
+            {/* <li className="sidebar-menu-item">
               <button
                 onClick={() => onNavigate("holidays")}
                 className={`sidebar-menu-button ${activeView === "holidays" ? "active" : ""}`}
@@ -204,8 +214,8 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 <CalendarDays className="w-4 h-4" />
                 <span>Holidays</span>
               </button>
-            </li>
-            <li className="sidebar-menu-item">
+            </li> */}
+            {/* <li className="sidebar-menu-item">
               <button
                 onClick={() => onNavigate("shiftscheduling")}
                 className={`sidebar-menu-button ${activeView === "shiftscheduling" ? "active" : ""}`}
@@ -213,7 +223,7 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 <Calendar className="w-4 h-4" />
                 <span>Shift Scheduling</span>
               </button>
-            </li>
+            </li> */}
           </ul>
         </div>
         <div className="sidebar-group">
@@ -655,6 +665,9 @@ export default function App() {
 
       case "leave":
         return <LeaveManagementView />;
+
+      case "leave-allocations":
+        return <LeaveAllocationView />;
 
       case "attendance":
         return <AttendanceView />;

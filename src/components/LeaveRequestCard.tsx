@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 // Import Lucide React icons for approve and decline buttons
 import { Check, X, Calendar } from "lucide-react";
 // Import leave management service
-import { getAllLeaveRequests, approveLeaveRequest, rejectLeaveRequest, LeaveRequest as LeaveRequestType } from '../services/leaveManagementService';
+import { getAllLeaveRequests, updateLeaveRequestStatus, LeaveRequest as LeaveRequestType } from '../services/leaveManagementService';
 
 // Define the interface for leave request items
 interface LeaveRequestItem {
@@ -90,10 +90,7 @@ const  LeaveRequestCard = () => {
       setLoading(true);
       setError(null);
 
-      const response = await approveLeaveRequest(requestId, {
-        status: 'approved',
-        approverComment: 'Approved by manager'
-      });
+      const response = await updateLeaveRequestStatus(requestId, 'approved', undefined);
 
       if (response.success) {
         // Update the local state to reflect the change
@@ -115,10 +112,7 @@ const  LeaveRequestCard = () => {
       setLoading(true);
       setError(null);
 
-      const response = await rejectLeaveRequest(requestId, {
-        status: 'rejected',
-        rejectionReason: 'Manager decision'
-      });
+      const response = await updateLeaveRequestStatus(requestId, 'rejected', 'Manager decision');
 
       if (response.success) {
         // Update the local state to reflect the change

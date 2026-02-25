@@ -418,10 +418,10 @@ export const getAllLeaveRequests = async (): Promise<{ success: boolean; leaveRe
       };
     }
 
-    console.log(`Fetching leave requests from: ${API_ENDPOINT}/leave/requests`);
+    console.log(`Fetching leave requests from: ${API_ENDPOINT}/leave`);
     console.log('Auth token present:', !!token);
 
-    const response = await axios.get(`${API_ENDPOINT}/leave/requests`, {
+    const response = await axios.get(`${API_ENDPOINT}/leave`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -753,8 +753,8 @@ export const deleteLeaveRequest = async (leaveRequestId: number): Promise<{ succ
   }
 };
 
-// Approve leave request
-export const approveLeaveRequest = async (leaveRequestId: number, approvalData: ApproveLeaveRequest): Promise<{ success: boolean; leaveRequest?: LeaveRequest; message?: string }> => {
+// Update leave request status (approve/reject)
+export const updateLeaveRequestStatus = async (leaveRequestId: number, status: 'approved' | 'rejected', reason?: string): Promise<{ success: boolean; leaveRequest?: any; message?: string }> => {
   try {
     const token = localStorage.getItem('authToken');
     if (!token) {
@@ -764,32 +764,43 @@ export const approveLeaveRequest = async (leaveRequestId: number, approvalData: 
       };
     }
 
-    const response = await axios.put(`${API_ENDPOINT}/leave/requests/${leaveRequestId}/approve`, approvalData, {
+    const payload: any = { status };
+    if (reason) {
+      payload.reason = reason;
+    }
+
+    console.log(`Updating leave request ${leaveRequestId} to ${status}:`, payload);
+
+    const response = await axios.put(`${API_ENDPOINT}/leave/${leaveRequestId}`, payload, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
 
-    // Handle different possible response formats
-    let leaveRequest = null;
-    if (response.data && typeof response.data === 'object') {
-      if (response.data.data && response.data.data.leaveRequest) {
-        leaveRequest = response.data.data.leaveRequest;
-      } else if (response.data.leaveRequest) {
-        leaveRequest = response.data.leaveRequest;
-      } else {
-        // If the response object itself is the leave request
-        leaveRequest = response.data;
-      }
+    console.log('Update leave request response:', response.data);
+
+    if (response.data?.success && response.data?.data?.leaveRequest) {
+      return {
+        success: true,
+        leaveRequest: response.data.data.leaveRequest,
+        message: status === 'approved' ? 'Leave request approved successfully' : 'Leave request rejected successfully'
+      };
     }
 
     return {
       success: true,
-      leaveRequest: leaveRequest,
+      leaveRequest: response.data,
+      message: status === 'approved' ? 'Leave request approved successfully' : 'Leave request rejected successfully'
     };
   } catch (error: any) {
-    console.error('Error approving leave request:', error);
+    console.error(`Error ${status === 'approved' ? 'approving' : 'rejecting'} leave request:`, error);
+    if (error.response?.status === 400) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Invalid request data'
+      };
+    }
     if (error.response?.status === 401 || error.response?.status === 403) {
       return {
         success: false,
@@ -798,57 +809,7 @@ export const approveLeaveRequest = async (leaveRequestId: number, approvalData: 
     }
     return {
       success: false,
-      message: error.response?.data?.message || error.message || 'Failed to approve leave request',
-    };
-  }
-};
-
-// Reject leave request
-export const rejectLeaveRequest = async (leaveRequestId: number, rejectionData: RejectLeaveRequest): Promise<{ success: boolean; leaveRequest?: LeaveRequest; message?: string }> => {
-  try {
-    const token = localStorage.getItem('authToken');
-    if (!token) {
-      return {
-        success: false,
-        message: 'Authentication token not found. Please log in again.'
-      };
-    }
-
-    const response = await axios.put(`${API_ENDPOINT}/leave/requests/${leaveRequestId}/reject`, rejectionData, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    // Handle different possible response formats
-    let leaveRequest = null;
-    if (response.data && typeof response.data === 'object') {
-      if (response.data.data && response.data.data.leaveRequest) {
-        leaveRequest = response.data.data.leaveRequest;
-      } else if (response.data.leaveRequest) {
-        leaveRequest = response.data.leaveRequest;
-      } else {
-        // If the response object itself is the leave request
-        leaveRequest = response.data;
-      }
-    }
-
-    return {
-      success: true,
-      leaveRequest: leaveRequest,
-    };
-  } catch (error: any) {
-    console.error('Error rejecting leave request:', error);
-    if (error.response?.status === 401 || error.response?.status === 403) {
-      return {
-        success: false,
-        message: 'Access denied. Please check your permissions or log in again.'
-      };
-    }
-    return {
-      success: false,
-      message: error.response?.data?.message || error.message || 'Failed to reject leave request',
+      message: error.response?.data?.message || error.message || `Failed to ${status === 'approved' ? 'approve' : 'reject'} leave request`
     };
   }
 };

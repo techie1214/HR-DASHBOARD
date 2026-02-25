@@ -8,9 +8,7 @@ import { Search, Calendar, Download, Filter, Check, X, Clock, User, Building, Fi
 // Import leave management service
 import {
   getAllLeaveRequests,
-  getLeaveRequestById,
-  approveLeaveRequest,
-  rejectLeaveRequest,
+  updateLeaveRequestStatus,
   getUserLeaveBalance,
   createLeaveType,
   getAllLeaveTypes,
@@ -73,10 +71,15 @@ const LeaveManagementView = () => {
   const [loading, setLoading] = useState(true);
   // State for error messages
   const [error, setError] = useState<string | null>(null);
+  // State for success messages
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   // State for leave requests from API
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   // State for leave balances from API
   const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([]);
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20);
   // State for create leave type form
   const [createLeaveTypeForm, setCreateLeaveTypeForm] = useState({
     name: '',
@@ -107,8 +110,10 @@ const LeaveManagementView = () => {
         setLoading(true);
         setError(null);
 
+        console.log('Fetching leave types...');
         // Fetch leave types first
         const typesResponse = await getAllLeaveTypes();
+        console.log('Leave types response:', typesResponse);
         if (typesResponse.success && typesResponse.leaveTypes) {
           // Transform API response to match our UI interface
           const transformedTypes = typesResponse.leaveTypes.map((type: any) => ({
@@ -118,7 +123,7 @@ const LeaveManagementView = () => {
             icon: getLeaveTypeIcon(type.name), // Use a helper function to get appropriate icon
             description: type.description || `${type.days_per_year} days per year`
           }));
-          
+
           setLeaveTypes(transformedTypes);
         } else {
           console.warn('Failed to fetch leave types from API:', typesResponse.message);
@@ -126,37 +131,51 @@ const LeaveManagementView = () => {
           setLeaveTypes([]);
         }
 
+        console.log('Fetching leave requests...');
         // Fetch leave requests
         const requestsResponse = await getAllLeaveRequests();
+        console.log('Leave requests response:', requestsResponse);
         let transformedRequests = [];
 
         if (requestsResponse.success && requestsResponse.leaveRequests) {
+          console.log('Transforming', requestsResponse.leaveRequests.length, 'leave requests');
+          console.log('Sample raw request:', requestsResponse.leaveRequests[0]);
+          
           // Transform API response to match our UI interface
-          transformedRequests = requestsResponse.leaveRequests.map(req => ({
-            id: req.id.toString(), // Convert to string to match interface
-            staffId: req.userId.toString(),
-            staffName: `User ${req.userId}`, // In a real app, you'd fetch user details
-            department: 'General', // In a real app, you'd fetch department details
-            branch: 'Main Office', // In a real app, you'd fetch branch details
-            leaveType: req.leaveTypeId === 1 ? 'Annual' :
-                      req.leaveTypeId === 2 ? 'Sick' :
-                      req.leaveTypeId === 3 ? 'Emergency' :
-                      req.leaveTypeId === 4 ? 'Maternity' :
-                      req.leaveTypeId === 5 ? 'Paternity' :
-                      req.leaveTypeId === 6 ? 'Unpaid' : 'Bereaved',
-            startDate: req.startDate,
-            endDate: req.endDate,
-            duration: calculateDuration(req.startDate, req.endDate),
-            reason: req.reason,
-            status: req.status === 'approved' ? 'Approved' :
-                   req.status === 'rejected' ? 'Declined' : 'Pending',
-            requestDate: req.createdAt,
-            approvedBy: req.approverComment ? 'Manager' : undefined, // In a real app, you'd get approver name
-            approvalDate: req.updatedAt,
-            declineReason: req.rejectionReason,
-            coveringStaff: undefined // In a real app, you'd get covering staff info
-          }));
+          transformedRequests = requestsResponse.leaveRequests.map(req => {
+            const rawStatus = req.status;
+            // Backend uses 'submitted' for pending requests, 'cancelled' for cancelled
+            const transformedStatus = 
+                   req.status === 'approved' ? 'Approved' :
+                   req.status === 'rejected' ? 'Declined' :
+                   req.status === 'submitted' ? 'Pending' :  // 'submitted' = pending approval
+                   req.status === 'cancelled' ? 'Declined' :  // 'cancelled' treated as declined
+                   'Active';
+            
+            console.log(`Request ${req.id}: raw status="${rawStatus}" -> transformed="${transformedStatus}"`);
+            
+            return {
+              id: req.id.toString(),
+              staffId: req.user_id?.toString() || req.userId?.toString(),
+              staffName: req.user_name || `User ${req.user_id}`,
+              department: 'General',
+              branch: 'Main Office',
+              leaveType: req.leave_type_name || req.leaveTypeName || 'Unknown',
+              startDate: req.start_date || req.startDate,
+              endDate: req.end_date || req.endDate,
+              duration: req.days_requested || calculateDuration(req.start_date || req.startDate, req.end_date || req.endDate),
+              reason: req.reason,
+              status: transformedStatus,
+              requestDate: req.created_at || req.createdAt,
+              approvedBy: req.reviewed_by ? 'Manager' : undefined,
+              approvalDate: req.reviewed_at || req.updatedAt,
+              declineReason: req.rejection_reason || req.rejectionReason,
+              coveringStaff: undefined
+            };
+          });
 
+          console.log('Transformed requests:', transformedRequests.length);
+          console.log('Pending requests:', transformedRequests.filter(r => r.status === 'Pending').length);
           setLeaveRequests(transformedRequests);
         } else {
           console.warn('Failed to fetch leave requests from API:', requestsResponse.message);
@@ -281,7 +300,18 @@ const LeaveManagementView = () => {
     return matchesSearch && matchesStatus && matchesLeaveType && matchesDepartment;
   });
 
-  // Calculate statistics from all leave requests
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedRequests = filteredRequests.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterStatus, filterLeaveType, selectedDepartment]);
+
+  // Calculate statistics from ALL leave requests (not filtered)
   const totalRequests = leaveRequests.length;
   const approvedCount = leaveRequests.filter(r => r.status === 'Approved').length;
   const declinedCount = leaveRequests.filter(r => r.status === 'Declined').length;
@@ -305,50 +335,39 @@ const LeaveManagementView = () => {
   const confirmApproval = async () => {
     if (!selectedRequest || !approvalAction) return;
 
-    // Validate annual leave duration limit (7 days max per request)
-    if (approvalAction === 'approve' && selectedRequest.leaveType === 'Annual' && selectedRequest.duration > 7) {
-      alert('Annual leave requests cannot exceed 7 days. Please ask the employee to split the request.');
-      return;
-    }
-
     try {
       setLoading(true);
       const requestId = parseInt(selectedRequest.id);
 
-      if (approvalAction === 'approve') {
-        // Approve the leave request
-        const response = await approveLeaveRequest(requestId, {
-          status: 'approved',
-          approverComment: 'Approved by HR Manager'
-        });
+      console.log(`${approvalAction === 'approve' ? 'Approving' : 'Rejecting'} leave request ${requestId}`);
 
-        if (response.success) {
-          // Update the local state to reflect the change
-          setLeaveRequests(prev => prev.map(req =>
-            req.id === selectedRequest.id
-              ? { ...req, status: 'Approved', approvedBy: 'HR Manager', approvalDate: new Date().toISOString() }
-              : req
-          ));
-        } else {
-          throw new Error(response.message || 'Failed to approve leave request');
-        }
-      } else if (approvalAction === 'decline') {
-        // Reject the leave request
-        const response = await rejectLeaveRequest(requestId, {
-          status: 'rejected',
-          rejectionReason: declineReason
-        });
+      // Use the new updateLeaveRequestStatus function
+      const response = await updateLeaveRequestStatus(
+        requestId,
+        approvalAction === 'approve' ? 'approved' : 'rejected',
+        approvalAction === 'decline' ? declineReason : undefined
+      );
 
-        if (response.success) {
-          // Update the local state to reflect the change
-          setLeaveRequests(prev => prev.map(req =>
-            req.id === selectedRequest.id
-              ? { ...req, status: 'Declined', declineReason: declineReason }
-              : req
-          ));
-        } else {
-          throw new Error(response.message || 'Failed to reject leave request');
-        }
+      console.log('Update response:', response);
+
+      if (response.success) {
+        // Update the local state to reflect the change
+        setLeaveRequests(prev => prev.map(req =>
+          req.id === selectedRequest.id
+            ? { 
+                ...req, 
+                status: approvalAction === 'approve' ? 'Approved' : 'Declined',
+                approvedBy: approvalAction === 'approve' ? 'HR Manager' : undefined,
+                approvalDate: approvalAction === 'approve' ? new Date().toISOString() : undefined,
+                declineReason: approvalAction === 'decline' ? declineReason : undefined
+              }
+            : req
+        ));
+        
+        setSuccessMessage(response.message || `Leave request ${approvalAction === 'approve' ? 'approved' : 'rejected'} successfully`);
+        setTimeout(() => setSuccessMessage(null), 3000);
+      } else {
+        throw new Error(response.message || 'Failed to process leave request');
       }
 
       // Close modal and reset state
@@ -356,9 +375,10 @@ const LeaveManagementView = () => {
       setSelectedRequest(null);
       setApprovalAction(null);
       setDeclineReason('');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error processing leave request:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred while processing the request');
+      setError(err.message || 'An error occurred while processing the request');
+      setTimeout(() => setError(null), 5000);
     } finally {
       setLoading(false);
     }
@@ -737,9 +757,10 @@ const LeaveManagementView = () => {
             <div>
               <h3 style={{ marginBottom: '0.25rem' }}>Leave Requests</h3>
               <p className="text-muted" style={{ fontSize: '0.875rem' }}>
-                Showing {filteredRequests.length} of {totalRequests} requests
+                Showing {startIndex + 1} to {Math.min(endIndex, filteredRequests.length)} of {filteredRequests.length} requests
                 {/* Show active filter indicator */}
                 {filterStatus !== 'all' && <span style={{ color: '#2563eb', fontWeight: 500 }}> · {filterStatus}</span>}
+                {filteredRequests.length !== totalRequests && <span style={{ color: '#059669', fontWeight: 500 }}> (filtered from {totalRequests} total)</span>}
               </p>
             </div>
           </div>
@@ -758,10 +779,10 @@ const LeaveManagementView = () => {
                 <th className="table-header-cell right">Actions</th>
               </tr>
             </thead>
-            {/* Table body with filtered requests */}
+            {/* Table body with paginated requests */}
             <tbody>
-              {/* Map through filtered requests to create table rows */}
-              {filteredRequests.map((request) => {
+              {/* Map through paginated requests to create table rows */}
+              {paginatedRequests.map((request) => {
                 // Find leave type information for styling
                 const leaveTypeInfo = leaveTypes.find(t => t.type === request.leaveType);
                 return (
@@ -866,6 +887,61 @@ const LeaveManagementView = () => {
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t flex items-center justify-between">
+            <div className="text-sm text-muted">
+              Page {currentPage} of {totalPages} ({filteredRequests.length} requests)
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              
+              {/* Page number buttons */}
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`px-3 py-1 border rounded ${
+                      currentPage === pageNum
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+              
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+        
         {filteredRequests.length === 0 && (
           <div className="p-12 flex flex-col items-center justify-center">
             <div className="icon-wrapper" style={{ backgroundColor: '#f3f4f6', width: '4rem', height: '4rem' }}>
