@@ -1,111 +1,101 @@
 // This component displays a comprehensive staff directory view
 // It provides filtering, searching, and detailed staff profile access
 
-// Import React hooks for state management and side effects
 import { useState, useEffect } from 'react';
-// Import Lucide React icons for UI elements
-import { Search, Users, UserX, Plus, X, Check, Upload, Calendar, Briefcase, GraduationCap, Phone, MapPin, FileText, Clock } from 'lucide-react';
-// Import staff data types and mock data from staffData module
-import { StaffMember, Education, Leave, OffDay, Document, isStaffOnActiveOffDay } from '../data/staffData';
+import { Search, Users, UserX, Plus, Mail, Phone, MapPin, Briefcase, Calendar, UserCheck, X } from 'lucide-react';
+import { StaffMember, isStaffOnActiveOffDay } from '../data/staffData';
 import { StaffMember as ApiStaffMember } from '../services/staffManagementService';
-// Import StaffProfileView component for detailed staff information
 import { StaffProfileView } from './StaffProfileView';
-// Import StaffInvitationView component for inviting new staff members
 import StaffInvitationView from './StaffInvitationView';
-// Import staff management service
 import { getAllStaff, activateStaff, deactivateStaff } from '../services/staffManagementService';
 
-// Main component function for displaying all staff
+// Color palettes for staff cards based on department (dynamically assigned)
+const departmentColorPalette = [
+  { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-800', icon: 'text-blue-600', avatarBg: 'bg-blue-100', avatarText: 'text-blue-700' },
+  { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-800', icon: 'text-green-600', avatarBg: 'bg-green-100', avatarText: 'text-green-700' },
+  { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', icon: 'text-amber-600', avatarBg: 'bg-amber-100', avatarText: 'text-amber-700' },
+  { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-800', icon: 'text-purple-600', avatarBg: 'bg-purple-100', avatarText: 'text-purple-700' },
+  { bg: 'bg-pink-50', border: 'border-pink-200', text: 'text-pink-800', icon: 'text-pink-600', avatarBg: 'bg-pink-100', avatarText: 'text-pink-700' },
+  { bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-800', icon: 'text-indigo-600', avatarBg: 'bg-indigo-100', avatarText: 'text-indigo-700' },
+  { bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-800', icon: 'text-teal-600', avatarBg: 'bg-teal-100', avatarText: 'text-teal-700' },
+  { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-800', icon: 'text-orange-600', avatarBg: 'bg-orange-100', avatarText: 'text-orange-700' },
+];
+
+// Get color scheme for a department based on hash
+const getDepartmentColorIndex = (department: string): number => {
+  if (!department || department === 'N/A') return 0;
+  let hash = 0;
+  for (let i = 0; i < department.length; i++) {
+    hash = ((hash << 5) - hash) + department.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return Math.abs(hash) % departmentColorPalette.length;
+};
+
 export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: StaffMember | null }) {
-  // State for active filter (all, active, inactive)
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('all');
-  // State for search term input
   const [searchTerm, setSearchTerm] = useState('');
-  // State for department filter
   const [departmentFilter, setDepartmentFilter] = useState<string>('');
-  // State for minimum years employed filter (leave empty for no filter)
   const [minYearsFilter, setMinYearsFilter] = useState<number | ''>('');
-  // State for selected staff member (for profile view)
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(initialSelectedStaff || null);
-  // State for showing staff invitation view
   const [showStaffInvitation, setShowStaffInvitation] = useState(false);
-  // State for staff list (from API)
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
-  // State for loading
   const [loading, setLoading] = useState(true);
-  // State for error
   const [error, setError] = useState<string | null>(null);
-  // State for action loading
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  // Effect to fetch staff list from API on component mount
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20);
+
   useEffect(() => {
     loadStaffList();
   }, []);
 
-  // Effect to update selectedStaff when initialSelectedStaff changes
   useEffect(() => {
     if (initialSelectedStaff) {
       setSelectedStaff(initialSelectedStaff);
     }
   }, [initialSelectedStaff]);
 
-  // Function to map API staff member to UI staff member format
   const mapApiToUiStaff = (apiStaff: ApiStaffMember): StaffMember => {
-    // Parse the full name into first, middle, and last names
     const fullNameParts = apiStaff.full_name ? apiStaff.full_name.split(' ') : [];
     const firstName = fullNameParts[0] || 'N/A';
     const lastName = fullNameParts.length > 1 ? fullNameParts[fullNameParts.length - 1] : apiStaff.employee_id || 'N/A';
     const middleName = fullNameParts.length > 2 ? fullNameParts.slice(1, -1).join(' ') : '';
 
     return {
-      id: apiStaff.id.toString(), // Convert to string as expected by UI
-      firstName: firstName,
-      middleName: middleName,
-      lastName: lastName,
-      dateOfBirth: 'N/A', // Not in API response
-      placeOfBirth: 'N/A', // Not in API response
-      gender: 'Male', // Default value
-      stateOfOrigin: 'N/A', // Not in API response
-      lga: 'N/A', // Not in API response
-
-      // Contact Details
-      phoneNumber: 'N/A', // Not in API response
+      id: apiStaff.id.toString(),
+      firstName,
+      middleName,
+      lastName,
+      dateOfBirth: apiStaff.date_of_birth || 'N/A',
+      placeOfBirth: 'N/A',
+      gender: apiStaff.gender || 'Male',
+      stateOfOrigin: 'N/A',
+      lga: 'N/A',
+      phoneNumber: apiStaff.phone_number || 'N/A',
       email: apiStaff.email || apiStaff.work_email || apiStaff.personal_email || 'N/A',
-      address: 'N/A', // Not in API response
-
-      // Education section - initialize as empty
+      address: 'N/A',
       education: [],
-
-      // Employment Details
       department: apiStaff.department || 'N/A',
       departmentRole: apiStaff.designation || 'N/A',
-      branchType: 'Single', // Default value
-      jobStatus: 'Permanent', // Default value
+      branchType: 'Single',
+      jobStatus: apiStaff.employment_type || 'Permanent',
       dateEmployed: apiStaff.joining_date || 'N/A',
-      branches: [], // Initialize as empty
-
-      // Guardian Details - initialize with defaults
+      branches: [],
       guardianFirstName: 'N/A',
       guardianLastName: 'N/A',
       guardianDOB: 'N/A',
-      guardianPhone: 'N/A',
+      guardianPhone: apiStaff.emergency_contact_phone || 'N/A',
       guardianEmail: 'N/A',
       guardianAddress: 'N/A',
       guardianBusinessName: 'N/A',
       guardianBusinessAddress: 'N/A',
-
-      // Leave and Off Days - initialize as empty
       leaves: [],
       offDays: [],
-
-      // Documents - initialize as empty
       documents: [],
-
-      // Status
-      status: (apiStaff.status as 'Active' | 'Inactive') || 'Active',
-
-      // Avatar - generate from name initials
+      status: (apiStaff.status === 'active' ? 'Active' : 'Inactive'),
       avatar: `${firstName.charAt(0)}${lastName.charAt(0)}`
     };
   };
@@ -115,7 +105,6 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
       setLoading(true);
       const response = await getAllStaff();
       if (response.success) {
-        // Map API response to UI format
         const mappedStaff = response.staff?.map(mapApiToUiStaff) || [];
         setStaffList(mappedStaff);
         setError(null);
@@ -130,20 +119,18 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
     }
   };
 
-  // Handler for when staff invitation is completed
   const handleStaffInvited = () => {
-    loadStaffList(); // Refresh staff list from API
-    setShowStaffInvitation(false); // Close invitation view
+    loadStaffList();
+    setShowStaffInvitation(false);
   };
 
-  // Handler for activating staff
   const handleActivateStaff = async (staffId: string) => {
     setActionLoading(`activate-${staffId}`);
     try {
       const response = await activateStaff(staffId);
       if (response.success) {
         setError(null);
-        loadStaffList(); // Refresh the list
+        loadStaffList();
       } else {
         setError(response.message || 'Failed to activate staff member');
       }
@@ -155,18 +142,16 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
     }
   };
 
-  // Handler for deactivating staff
   const handleDeactivateStaff = async (staffId: string) => {
     if (!window.confirm('Are you sure you want to deactivate this staff member?')) {
       return;
     }
-
     setActionLoading(`deactivate-${staffId}`);
     try {
       const response = await deactivateStaff(staffId);
       if (response.success) {
         setError(null);
-        loadStaffList(); // Refresh the list
+        loadStaffList();
       } else {
         setError(response.message || 'Failed to deactivate staff member');
       }
@@ -178,7 +163,6 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
     }
   };
 
-  // Helper: compute full years employed from date string
   const computeYearsEmployed = (dateStr?: string | null) => {
     if (!dateStr) return 0;
     const start = new Date(dateStr);
@@ -190,140 +174,126 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
     return years >= 0 ? years : 0;
   };
 
-  // Derived department options
   const departmentOptions = Array.from(new Set(staffList.map(s => s.department))).filter(Boolean) as string[];
 
   // Filter staff based on active filter, search term, department and years employed
   const filteredStaff = staffList.filter(staff => {
-    // Check if staff matches the active filter
     const matchesFilter =
-      activeFilter === 'all' ? true : // Show all if 'all' selected
-      activeFilter === 'active' ? staff.status === 'Active' : // Show only active
-      staff.status === 'Inactive'; // Show only inactive
+      activeFilter === 'all' ? true :
+      activeFilter === 'active' ? staff.status === 'Active' :
+      staff.status === 'Inactive';
 
-    // Check if staff matches search term (name, email, or department)
     const matchesSearch = searchTerm === '' ||
       `${staff.firstName} ${staff.middleName} ${staff.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
       staff.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       staff.department.toLowerCase().includes(searchTerm.toLowerCase());
 
-    // Check department filter
     const matchesDepartment = departmentFilter === '' || staff.department === departmentFilter;
-
-    // Check years employed (min)
     const staffYears = computeYearsEmployed(staff.dateEmployed);
     const matchesYears = minYearsFilter === '' || staffYears >= (minYearsFilter as number);
 
-    // Return true only if all conditions match
     return matchesFilter && matchesSearch && matchesDepartment && matchesYears;
   });
 
-  // Calculate counts for active and inactive staff
+  // Calculate counts for active and inactive staff (from full list, not filtered)
+  const totalStaff = staffList.length;
   const activeCount = staffList.filter(s => s.status === 'Active').length;
   const inactiveCount = staffList.filter(s => s.status === 'Inactive').length;
 
-  // If a staff member is selected, show their profile view
+  // Pagination calculation
+  const totalPages = Math.ceil(filteredStaff.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedStaff = filteredStaff.slice(startIndex, endIndex);
+
   if (selectedStaff) {
     return (
       <StaffProfileView
-        staff={selectedStaff} // Pass selected staff data
-        onBack={() => { // Handler to go back to list view
-          setSelectedStaff(null); // Clear selection
-          loadStaffList(); // Refresh staff list from API
+        staff={selectedStaff}
+        onBack={() => {
+          setSelectedStaff(null);
+          loadStaffList();
         }}
-        onUpdate={(updatedStaff) => { // Handler for staff updates
-          setSelectedStaff(updatedStaff); // Update selected staff
-          loadStaffList(); // Refresh staff list from API
+        onUpdate={(updatedStaff) => {
+          setSelectedStaff(updatedStaff);
+          loadStaffList();
         }}
       />
     );
   }
 
-  // Main render return for staff directory view
   return (
     <div className="space-y-6" style={{ position: 'relative' }}>
-      {/* Floating Action Button for inviting new staff */}
+      {/* Floating Action Button */}
       <button
-        onClick={() => setShowStaffInvitation(true)} // Open staff invitation view
+        onClick={() => setShowStaffInvitation(true)}
+        className="btn btn-primary"
         style={{
-          position: 'fixed', // Fixed positioning
-          bottom: '2rem', // 2rem from bottom
-          right: '2rem', // 2rem from right
-          width: '3.5rem', // 56px width
-          height: '3.5rem', // 56px height
-          borderRadius: '50%', // Circular shape
-          backgroundColor: '#2563eb', // Blue background
-          border: 'none', // No border
-          color: 'white', // White text/icon
-          fontSize: '1.5rem', // Large font size
-          cursor: 'pointer', // Pointer cursor
-          display: 'flex', // Flexbox layout
-          alignItems: 'center', // Center vertically
-          justifyContent: 'center', // Center horizontally
-          boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)', // Blue shadow
-          zIndex: 40, // High z-index for overlay
-          transition: 'all 0.2s ease' // Smooth transitions
+          position: 'fixed',
+          bottom: '2rem',
+          right: '2rem',
+          width: '3.5rem',
+          height: '3.5rem',
+          borderRadius: '50%',
+          padding: 0,
+          boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+          zIndex: 40
         }}
-        onMouseEnter={(e) => { // Hover effect
-          e.currentTarget.style.boxShadow = '0 8px 20px rgba(37, 99, 235, 0.4)'; // Darker shadow
-          e.currentTarget.style.transform = 'scale(1.1)'; // Slight scale up
+        onMouseEnter={(e) => {
+          e.currentTarget.style.boxShadow = '0 8px 20px rgba(37, 99, 235, 0.4)';
+          e.currentTarget.style.transform = 'scale(1.1)';
         }}
-        onMouseLeave={(e) => { // Hover exit effect
-          e.currentTarget.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)'; // Original shadow
-          e.currentTarget.style.transform = 'scale(1)'; // Original scale
+        onMouseLeave={(e) => {
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
+          e.currentTarget.style.transform = 'scale(1)';
         }}
       >
-        <Plus className="w-6 h-6" /> {/* Plus icon for invite action */}
+        <Plus className="w-6 h-6" />
       </button>
 
       {/* Header Statistics Cards */}
       <div className="grid grid-cols-1 md-grid-cols-2 lg-grid-cols-4 gap-6">
         {/* Total Staff Card */}
-        <div className="card p-4">
-          <div className="flex items-center gap-3">
-            <div className="icon-wrapper" style={{ backgroundColor: '#eff6ff' }}>
-              <Users className="w-5 h-5" style={{ color: '#2563eb' }} />
-            </div>
-            <div>
-              <p className="text-muted" style={{ fontSize: '0.75rem' }}>Total Staff</p>
-              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{staffList.length}</p>
-            </div>
+        <div className="stats-card">
+          <div className="stats-card-content">
+            <div className="stats-card-title">Total Staff</div>
+            <div className="stats-card-value">{totalStaff}</div>
+          </div>
+          <div className="stats-card-icon bg-blue">
+            <Users className="w-6 h-6 text-white" />
           </div>
         </div>
+
         {/* Active Staff Card */}
-        <div className="card p-4">
-          <div className="flex items-center gap-3">
-            <div className="icon-wrapper" style={{ backgroundColor: '#f0fdf4' }}>
-              <Users className="w-5 h-5" style={{ color: '#16a34a' }} />
-            </div>
-            <div>
-              <p className="text-muted" style={{ fontSize: '0.75rem' }}>Active</p>
-              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{activeCount}</p>
-            </div>
+        <div className="stats-card">
+          <div className="stats-card-content">
+            <div className="stats-card-title">Active</div>
+            <div className="stats-card-value">{activeCount}</div>
+          </div>
+          <div className="stats-card-icon bg-green">
+            <UserCheck className="w-6 h-6 text-white" />
           </div>
         </div>
+
         {/* Inactive Staff Card */}
-        <div className="card p-4">
-          <div className="flex items-center gap-3">
-            <div className="icon-wrapper" style={{ backgroundColor: '#fef2f2' }}>
-              <UserX className="w-5 h-5" style={{ color: '#dc2626' }} />
-            </div>
-            <div>
-              <p className="text-muted" style={{ fontSize: '0.75rem' }}>Inactive</p>
-              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{inactiveCount}</p>
-            </div>
+        <div className="stats-card">
+          <div className="stats-card-content">
+            <div className="stats-card-title">Inactive</div>
+            <div className="stats-card-value">{inactiveCount}</div>
+          </div>
+          <div className="stats-card-icon bg-orange">
+            <UserX className="w-6 h-6 text-white" />
           </div>
         </div>
+
         {/* Departments Card */}
-        <div className="card p-4">
-          <div className="flex items-center gap-3">
-            <div className="icon-wrapper" style={{ backgroundColor: '#fef3c7' }}>
-              <Briefcase className="w-5 h-5" style={{ color: '#f59e0b' }} />
-            </div>
-            <div>
-              <p className="text-muted" style={{ fontSize: '0.75rem' }}>Departments</p>
-              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{departmentOptions.length}</p>
-            </div>
+        <div className="stats-card">
+          <div className="stats-card-content">
+            <div className="stats-card-title">Departments</div>
+            <div className="stats-card-value">{departmentOptions.length}</div>
+          </div>
+          <div className="stats-card-icon bg-purple">
+            <Briefcase className="w-6 h-6 text-white" />
           </div>
         </div>
       </div>
@@ -331,26 +301,24 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
       {/* Search and Filter Controls */}
       <div className="card p-4">
         <div className="flex items-center justify-between gap-4 flex-wrap">
-          {/* Search Input */}
           <div className="input-wrapper" style={{ width: 'auto', flex: 1, minWidth: '250px' }}>
             <div className="input-icon">
               <Search className="w-4 h-4" />
             </div>
             <input
               type="text"
-              placeholder="Search by name, email, ID, or department..."
+              placeholder="Search by name, email, or department..."
               className="input input-with-icon"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          {/* Filter Buttons + Department & Years Filters */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               className={`btn btn-sm ${activeFilter === 'all' ? 'btn-primary' : 'btn-outline'}`}
               onClick={() => setActiveFilter('all')}
             >
-              All ({staffList.length})
+              All ({totalStaff})
             </button>
             <button
               className={`btn btn-sm ${activeFilter === 'active' ? 'btn-primary' : 'btn-outline'}`}
@@ -365,7 +333,6 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
               Inactive ({inactiveCount})
             </button>
 
-            {/* Department filter select */}
             <select
               className="input input-sm"
               value={departmentFilter}
@@ -378,7 +345,6 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
               ))}
             </select>
 
-            {/* Minimum years employed filter */}
             <input
               type="number"
               className="input input-sm"
@@ -397,104 +363,178 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
 
       {/* Staff List Display */}
       <div className="card">
-        {/* Staff List Header */}
         <div className="p-4 border-b">
           <h3>Staff Directory</h3>
           <p className="text-muted" style={{ marginTop: '0.25rem' }}>
-            Showing {filteredStaff.length} of {staffList.length} staff members
+            Showing {paginatedStaff.length} of {filteredStaff.length} staff members{totalPages > 1 ? ` (Page ${currentPage} of ${totalPages})` : ''}
           </p>
         </div>
-        {/* Staff Grid */}
+
         <div className="staff-grid">
-          {filteredStaff.map((staff) => (
-            <div
-              key={staff.id} // Unique key for React rendering
-              className="staff-card"
-              onClick={() => setSelectedStaff(staff)} // Click handler to view profile
-            >
-              <div className="flex items-start gap-4">
-                {/* Staff Avatar */}
-                <div className="avatar" style={{ width: '3.5rem', height: '3.5rem', fontSize: '1rem' }}>
-                  {staff.avatar || `${staff.firstName[0]}${staff.lastName[0]}`} {/* Initials */}
-                </div>
-                {/* Staff Information */}
-                <div className="flex-1">
-                  {/* Name and Status */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p style={{ fontWeight: 600, marginBottom: '0.125rem' }}>
-                        {staff.firstName} {staff.middleName} {staff.lastName}
-                      </p>
-                      <p className="text-muted" style={{ fontSize: '0.8125rem', marginBottom: '0.25rem' }}>
-                        {staff.departmentRole}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className={`badge ${staff.status === 'Active' ? 'badge-success' : 'badge-secondary'}`}>
-                        {staff.status}
-                      </span>
-                      {staff.status === 'Active' ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent card click event
-                            handleDeactivateStaff(staff.id);
-                          }}
-                          disabled={actionLoading === `deactivate-${staff.id}`}
-                          className="btn btn-xs btn-warning text-white"
-                        >
-                          {actionLoading === `deactivate-${staff.id}` ? (
-                            <span className="loading loading-spinner loading-xs"></span>
-                          ) : (
-                            'Deactivate'
-                          )}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent card click event
-                            handleActivateStaff(staff.id);
-                          }}
-                          disabled={actionLoading === `activate-${staff.id}`}
-                          className="btn btn-xs btn-success text-white"
-                        >
-                          {actionLoading === `activate-${staff.id}` ? (
-                            <span className="loading loading-spinner loading-xs"></span>
-                          ) : (
-                            'Activate'
-                          )}
-                        </button>
-                      )}
-                      {isStaffOnActiveOffDay(staff) && (
-                        <span className="badge" style={{ backgroundColor: '#fef3c7', color: '#b45309', fontSize: '0.7rem' }}>
-                          On Off Day
-                        </span>
-                      )}
-                    </div>
+          {paginatedStaff.map((staff) => {
+            const colorIndex = getDepartmentColorIndex(staff.department);
+            const colors = departmentColorPalette[colorIndex];
+
+            return (
+              <div
+                key={staff.id}
+                className={`staff-card ${colors.bg} ${colors.border}`}
+                style={{
+                  borderLeft: `4px solid`,
+                  borderLeftColor: `var(--${colors.text?.split('-')[1]}-500)`
+                }}
+                onClick={() => setSelectedStaff(staff)}
+              >
+                <div className="flex items-start gap-4">
+                  {/* Staff Avatar */}
+                  <div
+                    className={`avatar ${colors.avatarBg} ${colors.avatarText}`}
+                    style={{ width: '3.5rem', height: '3.5rem', fontSize: '1rem' }}
+                  >
+                    {staff.avatar || `${staff.firstName[0]}${staff.lastName[0]}`}
                   </div>
-                  {/* Staff Details Grid */}
-                  <div className="staff-info-grid">
-                    <div className="flex items-center gap-2">
-                      <Briefcase className="w-3 h-3 text-muted" />
-                      <span className="text-xs text-muted">{staff.department}</span>
+
+                  {/* Staff Information */}
+                  <div className="flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className={colors.text} style={{ fontWeight: 600, marginBottom: '0.125rem' }}>
+                          {staff.firstName} {staff.middleName} {staff.lastName}
+                        </p>
+                        <p className="text-muted" style={{ fontSize: '0.8125rem', marginBottom: '0.25rem' }}>
+                          {staff.departmentRole}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-1">
+                        <span className={`badge ${staff.status === 'Active' ? 'badge-success' : 'badge-secondary'}`}>
+                          {staff.status}
+                        </span>
+
+                        {staff.status === 'Active' ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeactivateStaff(staff.id);
+                            }}
+                            disabled={actionLoading === `deactivate-${staff.id}`}
+                            className="btn btn-xs"
+                            style={{ backgroundColor: '#f59e0b', color: 'white' }}
+                          >
+                            {actionLoading === `deactivate-${staff.id}` ? (
+                              <span className="loading loading-spinner loading-xs"></span>
+                            ) : (
+                              'Deactivate'
+                            )}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleActivateStaff(staff.id);
+                            }}
+                            disabled={actionLoading === `activate-${staff.id}`}
+                            className="btn btn-xs"
+                            style={{ backgroundColor: '#16a34a', color: 'white' }}
+                          >
+                            {actionLoading === `activate-${staff.id}` ? (
+                              <span className="loading loading-spinner loading-xs"></span>
+                            ) : (
+                              'Activate'
+                            )}
+                          </button>
+                        )}
+
+                        {isStaffOnActiveOffDay(staff) && (
+                          <span
+                            className="badge"
+                            style={{ backgroundColor: '#fef3c7', color: '#b45309', fontSize: '0.7rem' }}
+                          >
+                            On Off Day
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Phone className="w-3 h-3 text-muted" />
-                      <span className="text-xs text-muted">{staff.phoneNumber}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-3 h-3 text-muted" />
-                      <span className="text-xs text-muted">{staff.email}</span>
+
+                    {/* Staff Details Grid */}
+                    <div className="staff-info-grid">
+                      <div className={`flex items-center gap-2 ${colors.icon}`}>
+                        <Briefcase className="w-3 h-3" />
+                        <span className="text-xs" style={{ color: 'inherit' }}>{staff.department}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-muted">
+                        <Mail className="w-3 h-3" />
+                        <span className="text-xs">{staff.email}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-muted">
+                        <Phone className="w-3 h-3" />
+                        <span className="text-xs">{staff.phoneNumber}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t flex items-center justify-between">
+            <div className="text-sm text-muted">
+              Showing {startIndex + 1} to {Math.min(endIndex, filteredStaff.length)} of {filteredStaff.length} staff members
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`px-3 py-1 border rounded ${
+                      currentPage === pageNum
+                        ? 'bg-blue-500 text-white'
+                        : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage >= totalPages}
+                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Empty State */}
         {filteredStaff.length === 0 && (
           <div className="p-8 flex flex-col items-center justify-center">
-            <Users className="w-12 h-12" style={{ color: '#e5e7eb' }} />
+            <div className="avatar" style={{ width: '4rem', height: '4rem', marginBottom: '1rem' }}>
+              <Users className="w-8 h-8" />
+            </div>
             <p className="text-muted" style={{ marginTop: '0.5rem' }}>No staff members found</p>
           </div>
         )}
@@ -502,48 +542,35 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
 
       {/* Staff Invitation View */}
       {showStaffInvitation && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          zIndex: 50,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '0.5rem',
-            width: '90%',
-            maxWidth: '800px',
-            maxHeight: '90vh',
-            overflowY: 'auto'
-          }}>
-            <div style={{
-              padding: '1rem',
-              borderBottom: '1px solid #e5e7eb',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
+        <div
+          className="notification-overlay"
+          onClick={() => setShowStaffInvitation(false)}
+        >
+          <div
+            className="card"
+            style={{
+              width: '90%',
+              maxWidth: '800px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: 0
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="p-4 border-b"
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            >
               <h2 style={{ margin: 0 }}>Invite New Staff</h2>
               <button
+                className="btn btn-ghost btn-icon"
                 onClick={() => setShowStaffInvitation(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                  padding: '0.25rem'
-                }}
+                style={{ width: '2rem', height: '2rem' }}
               >
-                ×
+                <X className="w-4 h-4" />
               </button>
             </div>
-            <div style={{ padding: '1rem' }}>
+            <div className="p-4">
               <StaffInvitationView onSuccess={handleStaffInvited} />
             </div>
           </div>
