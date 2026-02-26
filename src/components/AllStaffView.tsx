@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { Search, Users, UserX, Plus, Mail, Phone, MapPin, Briefcase, Calendar, UserCheck, X } from 'lucide-react';
 import { StaffMember, isStaffOnActiveOffDay } from '../data/staffData';
 import { StaffMember as ApiStaffMember } from '../services/staffManagementService';
-import { StaffProfileView } from './StaffProfileView';
+import { StaffProfileView } from './StaffProfileViewSimple';
 import StaffInvitationView from './StaffInvitationView';
 import { getAllStaff, activateStaff, deactivateStaff } from '../services/staffManagementService';
 
@@ -47,10 +47,12 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   useEffect(() => {
     loadStaffList();
-  }, []);
+  }, [currentPage, activeFilter, departmentFilter]);
 
   useEffect(() => {
     if (initialSelectedStaff) {
@@ -103,10 +105,34 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
   const loadStaffList = async () => {
     try {
       setLoading(true);
-      const response = await getAllStaff();
+      
+      // Build filters object
+      const filters: { status?: string; department?: string; search?: string } = {};
+      if (activeFilter !== 'all') {
+        filters.status = activeFilter === 'active' ? 'active' : 'inactive';
+      }
+      if (departmentFilter) {
+        filters.department = departmentFilter;
+      }
+      if (searchTerm) {
+        filters.search = searchTerm;
+      }
+
+      const response = await getAllStaff(currentPage, itemsPerPage, filters);
       if (response.success) {
         const mappedStaff = response.staff?.map(mapApiToUiStaff) || [];
         setStaffList(mappedStaff);
+        
+        // Update pagination info
+        if (response.pagination) {
+          setTotalItems(response.pagination.totalItems);
+          setTotalPages(response.pagination.totalPages);
+        } else {
+          // Fallback if no pagination data
+          setTotalItems(mappedStaff.length);
+          setTotalPages(Math.ceil(mappedStaff.length / itemsPerPage));
+        }
+        
         setError(null);
       } else {
         setError(response.message || 'Failed to load staff members');
@@ -176,35 +202,18 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
 
   const departmentOptions = Array.from(new Set(staffList.map(s => s.department))).filter(Boolean) as string[];
 
-  // Filter staff based on active filter, search term, department and years employed
-  const filteredStaff = staffList.filter(staff => {
-    const matchesFilter =
-      activeFilter === 'all' ? true :
-      activeFilter === 'active' ? staff.status === 'Active' :
-      staff.status === 'Inactive';
+  // Since filtering is done server-side, filteredStaff is just the current page of staffList
+  const filteredStaff = staffList;
 
-    const matchesSearch = searchTerm === '' ||
-      `${staff.firstName} ${staff.middleName} ${staff.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      staff.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      staff.department.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesDepartment = departmentFilter === '' || staff.department === departmentFilter;
-    const staffYears = computeYearsEmployed(staff.dateEmployed);
-    const matchesYears = minYearsFilter === '' || staffYears >= (minYearsFilter as number);
-
-    return matchesFilter && matchesSearch && matchesDepartment && matchesYears;
-  });
-
-  // Calculate counts for active and inactive staff (from full list, not filtered)
-  const totalStaff = staffList.length;
+  // Calculate counts for active and inactive staff (from full list - would need separate API call for accurate counts)
+  const totalStaff = totalItems; // Use total from API pagination
   const activeCount = staffList.filter(s => s.status === 'Active').length;
   const inactiveCount = staffList.filter(s => s.status === 'Inactive').length;
 
-  // Pagination calculation
-  const totalPages = Math.ceil(filteredStaff.length / itemsPerPage);
+  // Pagination calculation for display
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedStaff = filteredStaff.slice(startIndex, endIndex);
+  const paginatedStaff = filteredStaff; // Already paginated from API
 
   if (selectedStaff) {
     return (
@@ -482,11 +491,15 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
         {totalPages > 1 && (
           <div className="p-4 border-t flex items-center justify-between">
             <div className="text-sm text-muted">
-              Showing {startIndex + 1} to {Math.min(endIndex, filteredStaff.length)} of {filteredStaff.length} staff members
+              Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} staff members
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setCurrentPage(prev => Math.max(1, prev - 1));
+                }}
                 disabled={currentPage === 1}
                 className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -507,7 +520,11 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
                 return (
                   <button
                     key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentPage(pageNum);
+                    }}
                     className={`px-3 py-1 border rounded ${
                       currentPage === pageNum
                         ? 'bg-blue-500 text-white'
@@ -519,7 +536,11 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
                 );
               })}
               <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setCurrentPage(prev => Math.min(totalPages, prev + 1));
+                }}
                 disabled={currentPage >= totalPages}
                 className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >

@@ -55,30 +55,41 @@ const UserManagementView = () => {
   const loadUsersAndOptions = async () => {
     try {
       setLoading(true);
-      setError(null);
+      setError(null); // Clear any previous errors
 
       // Load users with pagination
       const usersResponse = await getAllUsers(currentPage, itemsPerPage);
       if (usersResponse.success) {
         setUsers(usersResponse.users || []);
-        setTotalUsers_count(usersResponse.total || 0);
+        // Use the total and totalPages from API
+        const total = usersResponse.total || 0;
+        const totalPages = usersResponse.totalPages || Math.ceil(total / itemsPerPage);
+        setTotalUsers_count(total);
+        console.log('Users loaded:', usersResponse.users?.length, 'Total:', total, 'Total Pages:', totalPages);
       } else {
         setError(usersResponse.message || 'Failed to load users');
       }
 
-      // Load roles
-      const rolesResponse = await getAllRoles();
-      if (rolesResponse.success) {
-        setRoles(rolesResponse.roles || []);
+      // Only reload roles, branches if not already loaded (optimization)
+      if (roles.length === 0) {
+        const rolesResponse = await getAllRoles();
+        if (rolesResponse.success) {
+          setRoles(rolesResponse.roles || []);
+        }
       }
 
-      // Load branches
-      const branchesResponse = await getAllBranches();
-      if (branchesResponse.success) {
-        setBranches(branchesResponse.branches || []);
+      if (branches.length === 0) {
+        const branchesResponse = await getAllBranches();
+        if (branchesResponse.success) {
+          setBranches(branchesResponse.branches || []);
+        }
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred while loading data');
+      const errorMessage = err.code === 'ERR_NETWORK' 
+        ? 'Network error: Unable to connect to server. Please ensure the backend is running.'
+        : err.message || 'An error occurred while loading data';
+      setError(errorMessage);
+      console.error('Load error:', err);
     } finally {
       setLoading(false);
     }
@@ -214,11 +225,20 @@ const UserManagementView = () => {
     setShowEditForm(true);
   };
 
-  // Calculate statistics
-  const totalUsers = users.length;
+  // Calculate statistics - use totalUsers_count for total, and calculate active/inactive from all users
+  const totalUsers = totalUsers_count; // Use API total, not page count
   const activeUsers = users.filter(u => u.isActive).length;
   const inactiveUsers = users.filter(u => !u.isActive).length;
   const adminUsers = users.filter(u => roles.find(r => r.id === u.roleId)?.name.toLowerCase().includes('admin')).length;
+  
+  // For accurate active/inactive counts, we'd need to fetch all users or get stats from API
+  // For now, show counts from current page but indicate it's partial data
+  const activeUsersDisplay = totalUsers_count > itemsPerPage 
+    ? `${activeUsers}+` // Show + to indicate there are more
+    : activeUsers;
+  const inactiveUsersDisplay = totalUsers_count > itemsPerPage
+    ? `${inactiveUsers}+`
+    : inactiveUsers;
 
   if (loading) {
     return (
@@ -258,53 +278,45 @@ const UserManagementView = () => {
         </div>
       )}
 
-      {/* Stats Cards - Compact design to fit all 4 on one line */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card p-3 cursor-pointer transition-all hover-lift">
-          <div className="flex items-center gap-2">
-            <div className="icon-wrapper" style={{ backgroundColor: '#dbeafe', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
-              <UserIcon className="w-3 h-3" style={{ color: '#2563eb' }} />
-            </div>
-            <div>
-              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Total Users</p>
-              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{totalUsers}</p>
-            </div>
+      {/* Stats Cards - Horizontal layout to save space */}
+      <div className="grid grid-cols-4 gap-4" style={{ maxWidth: '800px' }}>
+        <div className="card p-3 cursor-pointer transition-all hover-lift" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className="icon-wrapper" style={{ backgroundColor: '#dbeafe', width: '2.5rem', height: '2.5rem', borderRadius: '0.375rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <UserIcon className="w-4 h-4" style={{ color: '#2563eb' }} />
+          </div>
+          <div>
+            <p className="text-muted" style={{ fontSize: '0.7rem', lineHeight: '1', marginBottom: '0.25rem' }}>Total Users</p>
+            <p style={{ fontSize: '1.5rem', fontWeight: 600, lineHeight: '1' }}>{totalUsers}</p>
           </div>
         </div>
 
-        <div className="card p-3 cursor-pointer transition-all hover-lift">
-          <div className="flex items-center gap-2">
-            <div className="icon-wrapper" style={{ backgroundColor: '#dcfce7', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
-              <Check className="w-3 h-3" style={{ color: '#16a34a' }} />
-            </div>
-            <div>
-              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Active</p>
-              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{activeUsers}</p>
-            </div>
+        <div className="card p-3 cursor-pointer transition-all hover-lift" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className="icon-wrapper" style={{ backgroundColor: '#dcfce7', width: '2.5rem', height: '2.5rem', borderRadius: '0.375rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Check className="w-4 h-4" style={{ color: '#16a34a' }} />
+          </div>
+          <div>
+            <p className="text-muted" style={{ fontSize: '0.7rem', lineHeight: '1', marginBottom: '0.25rem' }}>Active</p>
+            <p style={{ fontSize: '1.5rem', fontWeight: 600, lineHeight: '1' }}>{activeUsersDisplay}</p>
           </div>
         </div>
 
-        <div className="card p-3 cursor-pointer transition-all hover-lift">
-          <div className="flex items-center gap-2">
-            <div className="icon-wrapper" style={{ backgroundColor: '#fef9c3', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
-              <X className="w-3 h-3" style={{ color: '#ca8a04' }} />
-            </div>
-            <div>
-              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Inactive</p>
-              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{inactiveUsers}</p>
-            </div>
+        <div className="card p-3 cursor-pointer transition-all hover-lift" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className="icon-wrapper" style={{ backgroundColor: '#fef9c3', width: '2.5rem', height: '2.5rem', borderRadius: '0.375rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <X className="w-4 h-4" style={{ color: '#ca8a04' }} />
+          </div>
+          <div>
+            <p className="text-muted" style={{ fontSize: '0.7rem', lineHeight: '1', marginBottom: '0.25rem' }}>Inactive</p>
+            <p style={{ fontSize: '1.5rem', fontWeight: 600, lineHeight: '1' }}>{inactiveUsersDisplay}</p>
           </div>
         </div>
 
-        <div className="card p-3 cursor-pointer transition-all hover-lift">
-          <div className="flex items-center gap-2">
-            <div className="icon-wrapper" style={{ backgroundColor: '#f3e8ff', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
-              <Shield className="w-3 h-3" style={{ color: '#9333ea' }} />
-            </div>
-            <div>
-              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Admins</p>
-              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{adminUsers}</p>
-            </div>
+        <div className="card p-3 cursor-pointer transition-all hover-lift" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className="icon-wrapper" style={{ backgroundColor: '#f3e8ff', width: '2.5rem', height: '2.5rem', borderRadius: '0.375rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Shield className="w-4 h-4" style={{ color: '#9333ea' }} />
+          </div>
+          <div>
+            <p className="text-muted" style={{ fontSize: '0.7rem', lineHeight: '1', marginBottom: '0.25rem' }}>Admins</p>
+            <p style={{ fontSize: '1.5rem', fontWeight: 600, lineHeight: '1' }}>{adminUsers}</p>
           </div>
         </div>
       </div>
@@ -645,32 +657,41 @@ const UserManagementView = () => {
         </div>
         
         {/* Pagination Controls */}
-        {totalUsers_count > itemsPerPage && (
+        {(totalUsers_count > itemsPerPage || users.length === itemsPerPage) && (
           <div className="p-4 border-t flex items-center justify-between">
             <div className="text-sm text-muted">
               Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalUsers_count)} of {totalUsers_count} users
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setCurrentPage(prev => Math.max(1, prev - 1));
+                }}
                 disabled={currentPage === 1}
                 className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Previous
               </button>
               {Array.from({ length: Math.min(5, Math.ceil(totalUsers_count / itemsPerPage)) }, (_, i) => {
-                const pageNum = currentPage <= 3 
-                  ? i + 1 
-                  : currentPage >= Math.ceil(totalUsers_count / itemsPerPage) - 2
-                    ? Math.ceil(totalUsers_count / itemsPerPage) - 4 + i
+                const totalPages = Math.ceil(totalUsers_count / itemsPerPage);
+                const pageNum = currentPage <= 3
+                  ? i + 1
+                  : currentPage >= totalPages - 2
+                    ? totalPages - 4 + i
                     : currentPage - 2 + i;
-                
-                if (pageNum < 1 || pageNum > Math.ceil(totalUsers_count / itemsPerPage)) return null;
-                
+
+                if (pageNum < 1 || pageNum > totalPages) return null;
+
                 return (
                   <button
                     key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentPage(pageNum);
+                    }}
                     className={`px-3 py-1 border rounded ${
                       currentPage === pageNum
                         ? 'bg-blue-500 text-white'
@@ -682,7 +703,11 @@ const UserManagementView = () => {
                 );
               })}
               <button
-                onClick={() => setCurrentPage(prev => Math.min(Math.ceil(totalUsers_count / itemsPerPage), prev + 1))}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setCurrentPage(prev => prev + 1);
+                }}
                 disabled={currentPage >= Math.ceil(totalUsers_count / itemsPerPage)}
                 className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >

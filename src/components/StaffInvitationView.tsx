@@ -1,35 +1,46 @@
 import React, { useState, useEffect } from 'react';
+import { X, Mail, User, Briefcase, Building, Send, RefreshCw, Trash2, Calendar, CheckCircle, Clock, XCircle } from 'lucide-react';
 import {
   inviteStaff,
   getAllStaffInvitations,
   getAvailableRolesForInvitation,
   resendStaffInvitation,
   revokeStaffInvitation,
-  StaffInvitation,
-  StaffInvitationRequest,
-  Role,
-  Branch,
-  Department
+  StaffInvitation as StaffInvitationType
 } from '../services/staffManagementService';
 import { getAllBranches as getAllBranchesService } from '../services/branchManagementService';
 import { getAllDepartments } from '../services/departmentManagementService';
 
 interface StaffInvitationViewProps {
   onSuccess?: () => void;
+  onClose?: () => void;
 }
 
-const StaffInvitationView: React.FC<StaffInvitationViewProps> = ({ onSuccess }) => {
+interface StaffInvitation {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  status: 'pending' | 'accepted' | 'expired' | 'cancelled';
+  roleName: string;
+  branchName: string;
+  departmentName: string;
+  invitedBy: string;
+  createdAt: string;
+  expiresAt: string;
+  acceptedAt?: string;
+}
+
+const StaffInvitationView: React.FC<StaffInvitationViewProps> = ({ onSuccess, onClose }) => {
   const [invitations, setInvitations] = useState<StaffInvitation[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
   // Form states
   const [showInviteForm, setShowInviteForm] = useState(false);
-
-  // Form data
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [personalEmail, setPersonalEmail] = useState('');
@@ -37,10 +48,11 @@ const StaffInvitationView: React.FC<StaffInvitationViewProps> = ({ onSuccess }) 
   const [branchId, setBranchId] = useState('');
   const [departmentId, setDepartmentId] = useState('');
 
-  // Action states
-  const [actionLoading, setActionLoading] = useState<string | null>(null); // Track which invitation is being acted upon
+  // Dropdowns
+  const [roles, setRoles] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
 
-  // Load data on component mount
   useEffect(() => {
     loadData();
   }, []);
@@ -48,39 +60,47 @@ const StaffInvitationView: React.FC<StaffInvitationViewProps> = ({ onSuccess }) 
   const loadData = async () => {
     try {
       setLoading(true);
-      
+      setError(null);
+
       // Load invitations
       const invitationsResponse = await getAllStaffInvitations();
-      if (invitationsResponse.success) {
-        setInvitations(invitationsResponse.invitations || []);
-      } else {
-        setError(invitationsResponse.message || 'Failed to load invitations');
+      if (invitationsResponse.success && invitationsResponse.invitations) {
+        const mappedInvitations: StaffInvitation[] = invitationsResponse.invitations.map((inv: any) => ({
+          id: inv.id?.toString() || inv.invitation_id?.toString(),
+          email: inv.email || inv.personal_email,
+          firstName: inv.first_name || inv.firstName,
+          lastName: inv.last_name || inv.lastName,
+          fullName: `${inv.first_name || inv.firstName || ''} ${inv.last_name || inv.lastName || ''}`.trim(),
+          status: (inv.status || 'pending') as 'pending' | 'accepted' | 'expired' | 'cancelled',
+          roleName: inv.role_name || inv.roleName || 'N/A',
+          branchName: inv.branch_name || inv.branchName || 'N/A',
+          departmentName: inv.department_name || inv.departmentName || 'N/A',
+          invitedBy: inv.invited_by_name || inv.invitedByName || 'System',
+          createdAt: inv.created_at || inv.createdAt,
+          expiresAt: inv.expires_at || inv.expiresAt,
+          acceptedAt: inv.accepted_at || inv.acceptedAt
+        }));
+        setInvitations(mappedInvitations);
       }
-      
+
       // Load roles
       const rolesResponse = await getAvailableRolesForInvitation();
-      if (rolesResponse.success) {
-        setRoles(rolesResponse.roles || []);
-      } else {
-        setError(rolesResponse.message || 'Failed to load roles');
+      if (rolesResponse.success && rolesResponse.roles) {
+        setRoles(rolesResponse.roles);
       }
-      
+
       // Load branches
       const branchesResponse = await getAllBranchesService();
-      if (branchesResponse.success) {
-        setBranches(branchesResponse.branches || []);
-      } else {
-        setError(branchesResponse.message || 'Failed to load branches');
+      if (branchesResponse.success && branchesResponse.branches) {
+        setBranches(branchesResponse.branches);
       }
-      
+
       // Load departments
       const departmentsResponse = await getAllDepartments();
-      if (departmentsResponse.success) {
-        setDepartments(departmentsResponse.departments || []);
-      } else {
-        setError(departmentsResponse.message || 'Failed to load departments');
+      if (departmentsResponse.success && departmentsResponse.departments) {
+        setDepartments(departmentsResponse.departments);
       }
-    } catch (err) {
+    } catch (err: any) {
       setError('An error occurred while loading data');
       console.error(err);
     } finally {
@@ -88,36 +108,40 @@ const StaffInvitationView: React.FC<StaffInvitationViewProps> = ({ onSuccess }) 
     }
   };
 
-  const handleInviteStaff = async () => {
+  const handleInviteStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
     if (!firstName.trim() || !lastName.trim() || !personalEmail.trim() || !roleId || !branchId || !departmentId) {
-      setError('All fields are required');
+      setError('All fields marked with * are required');
       return;
     }
 
-    const invitationData: StaffInvitationRequest = {
+    const invitationData = {
       firstName,
       lastName,
       personalEmail,
-      roleId,
-      branchId,
-      departmentId
+      roleId: parseInt(roleId),
+      branchId: parseInt(branchId),
+      departmentId: parseInt(departmentId)
     };
 
+    setActionLoading('invite');
     try {
       const response = await inviteStaff(invitationData);
       if (response.success) {
-        setInvitations([...invitations, response.invitation!]);
+        setSuccessMessage('Invitation sent successfully!');
+        setTimeout(() => setSuccessMessage(null), 3000);
         resetForm();
-        loadData(); // Refresh the list
-        if (onSuccess) {
-          onSuccess();
-        }
+        loadData();
+        if (onSuccess) onSuccess();
       } else {
-        setError(response.message || 'Failed to invite staff');
+        setError(response.message || 'Failed to send invitation');
       }
-    } catch (err) {
-      setError('An error occurred while inviting staff');
-      console.error(err);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to send invitation');
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -129,22 +153,21 @@ const StaffInvitationView: React.FC<StaffInvitationViewProps> = ({ onSuccess }) 
     setBranchId('');
     setDepartmentId('');
     setShowInviteForm(false);
-    setError(null);
   };
 
   const handleResendInvitation = async (invitationId: string) => {
-    setActionLoading(invitationId);
+    setActionLoading(`resend-${invitationId}`);
     try {
       const response = await resendStaffInvitation(invitationId);
       if (response.success) {
-        setError(null);
-        loadData(); // Refresh the list
+        setSuccessMessage('Invitation resent successfully!');
+        setTimeout(() => setSuccessMessage(null), 3000);
+        loadData();
       } else {
         setError(response.message || 'Failed to resend invitation');
       }
-    } catch (err) {
-      setError('An error occurred while resending the invitation');
-      console.error(err);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to resend invitation');
     } finally {
       setActionLoading(null);
     }
@@ -155,21 +178,47 @@ const StaffInvitationView: React.FC<StaffInvitationViewProps> = ({ onSuccess }) 
       return;
     }
 
-    setActionLoading(invitationId);
+    setActionLoading(`revoke-${invitationId}`);
     try {
       const response = await revokeStaffInvitation(invitationId);
       if (response.success) {
-        setError(null);
-        loadData(); // Refresh the list
+        setSuccessMessage('Invitation revoked successfully');
+        setTimeout(() => setSuccessMessage(null), 3000);
+        loadData();
       } else {
         setError(response.message || 'Failed to revoke invitation');
       }
-    } catch (err) {
-      setError('An error occurred while revoking the invitation');
-      console.error(err);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to revoke invitation');
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      pending: { bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-200', icon: Clock, label: 'Pending' },
+      accepted: { bg: 'bg-green-50', text: 'text-green-800', border: 'border-green-200', icon: CheckCircle, label: 'Accepted' },
+      expired: { bg: 'bg-red-50', text: 'text-red-800', border: 'border-red-200', icon: XCircle, label: 'Expired' },
+      cancelled: { bg: 'bg-gray-50', text: 'text-gray-800', border: 'border-gray-200', icon: XCircle, label: 'Cancelled' }
+    };
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+    const Icon = config.icon;
+    return (
+      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${config.bg} ${config.text} ${config.border}`}>
+        <Icon className="w-3 h-3" />
+        {config.label}
+      </span>
+    );
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-KE', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
   if (loading) {
@@ -182,13 +231,12 @@ const StaffInvitationView: React.FC<StaffInvitationViewProps> = ({ onSuccess }) 
 
   return (
     <div className="space-y-6">
+      {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg">
           <div className="flex">
             <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 001.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
+              <XCircle className="h-5 w-5 text-red-400" />
             </div>
             <div className="ml-3">
               <p className="text-sm text-red-700">{error}</p>
@@ -197,215 +245,338 @@ const StaffInvitationView: React.FC<StaffInvitationViewProps> = ({ onSuccess }) 
         </div>
       )}
 
-      <div className="flex justify-end items-center">
+      {/* Success Message */}
+      {successMessage && (
+        <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <CheckCircle className="h-5 w-5 text-green-400" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-green-700">{successMessage}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold" style={{ color: '#0f172a' }}>Staff Invitations</h2>
+          <p className="text-sm text-muted" style={{ marginTop: '0.25rem' }}>
+            Manage pending and accepted staff invitations
+          </p>
+        </div>
         <button
-          onClick={() => {
-            resetForm();
-            setShowInviteForm(true);
-          }}
+          type="button"
+          onClick={() => setShowInviteForm(true)}
           className="btn btn-primary"
         >
-          Invite New Staff
+          <Send className="w-4 h-4 mr-2" />
+          Send Invitation
         </button>
       </div>
 
-      {/* Invite Staff Form */}
+      {/* Invite Form Modal */}
       {showInviteForm && (
-        <div className="card p-6 mb-6">
-          <h3 className="text-lg font-medium mb-4">Invite New Staff Member</h3>
-          
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="firstName" className="block text-sm font-medium mb-1">First Name *</label>
-                <input
-                  type="text"
-                  id="firstName"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  className="input w-full"
-                  placeholder="Enter first name"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="lastName" className="block text-sm font-medium mb-1">Last Name *</label>
-                <input
-                  type="text"
-                  id="lastName"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  className="input w-full"
-                  placeholder="Enter last name"
-                />
-              </div>
-            </div>
-            
-            <div>
-              <label htmlFor="personalEmail" className="block text-sm font-medium mb-1">Personal Email *</label>
-              <input
-                type="email"
-                id="personalEmail"
-                value={personalEmail}
-                onChange={(e) => setPersonalEmail(e.target.value)}
-                className="input w-full"
-                placeholder="Enter personal email"
-              />
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label htmlFor="role" className="block text-sm font-medium mb-1">Role *</label>
-                <select
-                  id="role"
-                  value={roleId}
-                  onChange={(e) => setRoleId(e.target.value)}
-                  className="input w-full"
-                >
-                  <option value="">Select a role</option>
-                  {roles.map(role => (
-                    <option key={role.id} value={role.id}>
-                      {role.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label htmlFor="branch" className="block text-sm font-medium mb-1">Branch *</label>
-                <select
-                  id="branch"
-                  value={branchId}
-                  onChange={(e) => setBranchId(e.target.value)}
-                  className="input w-full"
-                >
-                  <option value="">Select a branch</option>
-                  {branches.map(branch => (
-                    <option key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label htmlFor="department" className="block text-sm font-medium mb-1">Department *</label>
-                <select
-                  id="department"
-                  value={departmentId}
-                  onChange={(e) => setDepartmentId(e.target.value)}
-                  className="input w-full"
-                >
-                  <option value="">Select a department</option>
-                  {departments.map(department => (
-                    <option key={department.id} value={department.id}>
-                      {department.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            
-            <div className="flex space-x-3 pt-2">
+        <div
+          className="notification-overlay"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 50,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          onClick={() => setShowInviteForm(false)}
+        >
+          <div
+            className="card"
+            style={{
+              width: '90%',
+              maxWidth: '600px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: 0
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="p-4 border-b"
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            >
+              <h3 className="text-lg font-semibold">Send Staff Invitation</h3>
               <button
-                onClick={handleInviteStaff}
-                className="btn btn-primary"
+                type="button"
+                onClick={() => setShowInviteForm(false)}
+                className="btn btn-ghost btn-icon"
+                style={{ width: '2rem', height: '2rem' }}
               >
-                Send Invitation
+                <X className="w-4 h-4" />
               </button>
-              <button
-                onClick={resetForm}
-                className="btn btn-outline"
-              >
-                Cancel
-              </button>
+            </div>
+            <div className="p-6">
+              <form onSubmit={handleInviteStaff} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ color: '#374151' }}>
+                      First Name *
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        className="input w-full"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        placeholder="John"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ color: '#374151' }}>
+                      Last Name *
+                    </label>
+                    <input
+                      type="text"
+                      className="input w-full"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Doe"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: '#374151' }}>
+                    Personal Email *
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-gray-400" />
+                    <input
+                      type="email"
+                      className="input w-full"
+                      value={personalEmail}
+                      onChange={(e) => setPersonalEmail(e.target.value)}
+                      placeholder="john.doe@gmail.com"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ color: '#374151' }}>
+                      Role *
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <Briefcase className="w-4 h-4 text-gray-400" />
+                      <select
+                        className="input w-full"
+                        value={roleId}
+                        onChange={(e) => setRoleId(e.target.value)}
+                        required
+                      >
+                        <option value="">Select Role</option>
+                        {roles.map(role => (
+                          <option key={role.id} value={role.id}>{role.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ color: '#374151' }}>
+                      Branch *
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <Building className="w-4 h-4 text-gray-400" />
+                      <select
+                        className="input w-full"
+                        value={branchId}
+                        onChange={(e) => setBranchId(e.target.value)}
+                        required
+                      >
+                        <option value="">Select Branch</option>
+                        {branches.map(branch => (
+                          <option key={branch.id} value={branch.id}>{branch.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ color: '#374151' }}>
+                      Department *
+                    </label>
+                    <select
+                      className="input w-full"
+                      value={departmentId}
+                      onChange={(e) => setDepartmentId(e.target.value)}
+                      required
+                    >
+                      <option value="">Select Department</option>
+                      {departments.map(dept => (
+                        <option key={dept.id} value={dept.id}>{dept.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => setShowInviteForm(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={actionLoading === 'invite'}
+                  >
+                    {actionLoading === 'invite' ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4 mr-2" />
+                        Send Invitation
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
       )}
 
       {/* Invitations List */}
-      <div className="card p-6">
-        <h3 className="text-lg font-medium mb-4">Pending Invitations</h3>
-        
-        {invitations.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th className="table-header-cell">Name</th>
-                  <th className="table-header-cell">Email</th>
-                  <th className="table-header-cell">Role</th>
-                  <th className="table-header-cell">Branch</th>
-                  <th className="table-header-cell">Department</th>
-                  <th className="table-header-cell">Status</th>
-                  <th className="table-header-cell">Expires</th>
-                  <th className="table-header-cell">Sent</th>
-                  <th className="table-header-cell">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invitations.map((invitation) => (
-                  <tr key={invitation.id} className="table-row">
-                    <td className="table-cell font-medium">{invitation.firstName} {invitation.lastName}</td>
-                    <td className="table-cell">{invitation.personalEmail}</td>
-                    <td className="table-cell">
-                      {roles.find(r => r.id === invitation.roleId)?.name || invitation.roleId}
-                    </td>
-                    <td className="table-cell">
-                      {branches.find(b => b.id === invitation.branchId)?.name || invitation.branchId}
-                    </td>
-                    <td className="table-cell">
-                      {departments.find(d => d.id === invitation.departmentId)?.name || invitation.departmentId}
-                    </td>
-                    <td className="table-cell">
-                      <span className={`badge ${
-                        invitation.status === 'pending' ? 'badge-warning' :
-                        invitation.status === 'accepted' ? 'badge-success' :
-                        'badge-danger'
-                      }`}>
-                        {invitation.status ? invitation.status.charAt(0).toUpperCase() + invitation.status.slice(1) : 'Unknown'}
+      <div className="card">
+        <div className="p-4 border-b">
+          <h3 className="text-lg font-medium">Invitation History</h3>
+          <p className="text-sm text-muted" style={{ marginTop: '0.25rem' }}>
+            {invitations.length} invitation{invitations.length !== 1 ? 's' : ''} found
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="table">
+            <thead className="table-header">
+              <tr>
+                <th className="table-header-cell">Candidate</th>
+                <th className="table-header-cell">Position</th>
+                <th className="table-header-cell">Status</th>
+                <th className="table-header-cell">Invited</th>
+                <th className="table-header-cell">Expires</th>
+                <th className="table-header-cell right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invitations.map((invitation) => (
+                <tr key={invitation.id} className="table-row">
+                  <td className="table-cell">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="avatar"
+                        style={{ width: '2.5rem', height: '2.5rem', fontSize: '0.875rem' }}
+                      >
+                        {invitation.firstName[0]}{invitation.lastName[0]}
+                      </div>
+                      <div>
+                        <p className="font-medium" style={{ fontSize: '0.875rem' }}>
+                          {invitation.fullName}
+                        </p>
+                        <p className="text-xs text-muted">{invitation.email}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="table-cell">
+                    <div>
+                      <p className="text-sm">{invitation.roleName}</p>
+                      <p className="text-xs text-muted">{invitation.departmentName}</p>
+                    </div>
+                  </td>
+                  <td className="table-cell">
+                    {getStatusBadge(invitation.status)}
+                  </td>
+                  <td className="table-cell">
+                    <div className="flex items-center gap-2 text-sm text-muted">
+                      <Calendar className="w-3 h-3" />
+                      {formatDate(invitation.createdAt)}
+                    </div>
+                  </td>
+                  <td className="table-cell">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Clock className="w-3 h-3 text-muted" />
+                      <span className={invitation.status === 'expired' ? 'text-red-600' : 'text-muted'}>
+                        {formatDate(invitation.expiresAt)}
                       </span>
-                    </td>
-                    <td className="table-cell">{new Date(invitation.expiresAt).toLocaleDateString()}</td>
-                    <td className="table-cell">{new Date(invitation.createdAt).toLocaleDateString()}</td>
-                    <td className="table-cell">
+                    </div>
+                  </td>
+                  <td className="table-cell right">
+                    <div className="flex items-center justify-end gap-2">
                       {invitation.status === 'pending' && (
-                        <div className="flex space-x-2">
+                        <>
                           <button
+                            type="button"
                             onClick={() => handleResendInvitation(invitation.id)}
-                            disabled={actionLoading === invitation.id}
+                            disabled={actionLoading?.startsWith('resend')}
                             className="btn btn-sm btn-outline"
                             title="Resend Invitation"
                           >
-                            {actionLoading === invitation.id ? (
-                              <span className="loading loading-spinner loading-xs"></span>
-                            ) : (
-                              'Resend'
-                            )}
+                            <RefreshCw className={`w-3 h-3 ${actionLoading === `resend-${invitation.id}` ? 'animate-spin' : ''}`} />
                           </button>
                           <button
+                            type="button"
                             onClick={() => handleRevokeInvitation(invitation.id)}
-                            disabled={actionLoading === invitation.id}
-                            className="btn btn-sm btn-error text-white"
+                            disabled={actionLoading?.startsWith('revoke')}
+                            className="btn btn-sm btn-outline red"
                             title="Revoke Invitation"
                           >
-                            Revoke
+                            <Trash2 className="w-3 h-3" />
                           </button>
-                        </div>
+                        </>
                       )}
-                      {invitation.status !== 'pending' && (
-                        <span className="text-gray-500 text-sm">N/A</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <p className="text-gray-500">No pending invitations. Send your first staff invitation to get started.</p>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {invitations.length === 0 && (
+          <div className="text-center py-12">
+            <div className="mx-auto w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mb-4">
+              <Mail className="w-8 h-8 text-blue-500" />
+            </div>
+            <h3 className="text-lg font-medium" style={{ color: '#0f172a', marginBottom: '0.5rem' }}>
+              No Invitations Yet
+            </h3>
+            <p className="text-muted" style={{ marginBottom: '1rem' }}>
+              Get started by sending your first staff invitation
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowInviteForm(true)}
+              className="btn btn-primary"
+            >
+              <Send className="w-4 h-4 mr-2" />
+              Send Invitation
+            </button>
           </div>
         )}
       </div>

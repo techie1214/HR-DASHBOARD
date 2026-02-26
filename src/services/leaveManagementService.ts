@@ -406,8 +406,22 @@ export const deleteLeaveType = async (leaveTypeId: number): Promise<{ success: b
   }
 };
 
-// Get all leave requests
-export const getAllLeaveRequests = async (): Promise<{ success: boolean; leaveRequests?: LeaveRequest[]; message?: string }> => {
+// Get all leave requests with pagination support
+export const getAllLeaveRequests = async (page: number = 1, limit: number = 20, filters?: {
+  status?: string;
+  leaveType?: string;
+  search?: string;
+}): Promise<{ 
+  success: boolean; 
+  leaveRequests?: LeaveRequest[]; 
+  pagination?: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+  };
+  message?: string 
+}> => {
   try {
     const token = localStorage.getItem('authToken');
     if (!token) {
@@ -418,10 +432,19 @@ export const getAllLeaveRequests = async (): Promise<{ success: boolean; leaveRe
       };
     }
 
-    console.log(`Fetching leave requests from: ${API_ENDPOINT}/leave`);
+    // Build query parameters
+    const params = new URLSearchParams();
+    params.append('page', page.toString());
+    params.append('limit', limit.toString());
+    
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.leaveType) params.append('leaveType', filters.leaveType);
+    if (filters?.search) params.append('search', filters.search);
+
+    console.log(`Fetching leave requests from: ${API_ENDPOINT}/leave?${params.toString()}`);
     console.log('Auth token present:', !!token);
 
-    const response = await axios.get(`${API_ENDPOINT}/leave`, {
+    const response = await axios.get(`${API_ENDPOINT}/leave?${params.toString()}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -433,39 +456,35 @@ export const getAllLeaveRequests = async (): Promise<{ success: boolean; leaveRe
 
     // Handle different possible response formats
     let leaveRequests = [];
-    if (Array.isArray(response.data)) {
-      // If response is directly an array
-      leaveRequests = response.data;
-      console.log('Parsed as direct array, count:', leaveRequests.length);
-    } else if (response.data && typeof response.data === 'object') {
-      // If response has a data wrapper
-      if (response.data.data && Array.isArray(response.data.data.leaveRequests)) {
-        leaveRequests = response.data.data.leaveRequests;
-        console.log('Parsed from response.data.data.leaveRequests, count:', leaveRequests.length);
-      } else if (response.data.leaveRequests && Array.isArray(response.data.leaveRequests)) {
-        leaveRequests = response.data.leaveRequests;
-        console.log('Parsed from response.data.leaveRequests, count:', leaveRequests.length);
-      } else if (response.data.data && Array.isArray(response.data.data)) {
-        // If data contains an array directly
-        leaveRequests = response.data.data;
-        console.log('Parsed from response.data.data array, count:', leaveRequests.length);
-      } else {
-        console.warn('Unexpected response format, attempting to use as-is:', response.data);
-        // If we still don't recognize the format, return empty array
-        leaveRequests = [];
+    let paginationData = undefined;
+    
+    if (response.data?.data) {
+      const data = response.data.data;
+      if (data.leaveRequests && Array.isArray(data.leaveRequests)) {
+        leaveRequests = data.leaveRequests;
+      } else if (Array.isArray(data)) {
+        leaveRequests = data;
       }
-    } else {
-      console.warn('Unexpected response data type:', typeof response.data);
-      leaveRequests = [];
+      // Extract pagination if available
+      if (data.pagination) {
+        paginationData = data.pagination;
+      }
+    } else if (response.data?.leaveRequests && Array.isArray(response.data.leaveRequests)) {
+      leaveRequests = response.data.leaveRequests;
+    } else if (Array.isArray(response.data)) {
+      leaveRequests = response.data;
     }
+
+    console.log('Parsed leave requests count:', leaveRequests.length);
 
     return {
       success: true,
       leaveRequests: leaveRequests,
+      pagination: paginationData,
     };
   } catch (error: any) {
     console.error('Error fetching leave requests:', error);
-    
+
     // More detailed error logging
     if (error.response) {
       console.error('Response error details:', {
@@ -477,7 +496,7 @@ export const getAllLeaveRequests = async (): Promise<{ success: boolean; leaveRe
     } else if (error.request) {
       console.error('Request error (no response):', error.request);
       console.warn('Backend server may not be running. Using demo data.');
-      
+
       // Return demo data when request fails (backend not running)
       return {
         success: true,

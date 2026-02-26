@@ -282,8 +282,22 @@ export const getAvailableRolesForInvitation = async (): Promise<{ success: boole
   }
 };
 
-// Get all staff members
-export const getAllStaff = async (): Promise<{ success: boolean; staff?: StaffMember[]; message?: string }> => {
+// Get all staff members with pagination support
+export const getAllStaff = async (page: number = 1, limit: number = 20, filters?: {
+  status?: string;
+  department?: string;
+  search?: string;
+}): Promise<{ 
+  success: boolean; 
+  staff?: StaffMember[]; 
+  pagination?: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+  };
+  message?: string 
+}> => {
   try {
     const token = localStorage.getItem('authToken');
     if (!token) {
@@ -293,7 +307,16 @@ export const getAllStaff = async (): Promise<{ success: boolean; staff?: StaffMe
       };
     }
 
-    const response = await axios.get(`${API_ENDPOINT}/staff`, {
+    // Build query parameters
+    const params = new URLSearchParams();
+    params.append('page', page.toString());
+    params.append('limit', limit.toString());
+    
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.department) params.append('department', filters.department);
+    if (filters?.search) params.append('search', filters.search);
+
+    const response = await axios.get(`${API_ENDPOINT}/staff?${params.toString()}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -301,26 +324,32 @@ export const getAllStaff = async (): Promise<{ success: boolean; staff?: StaffMe
     });
 
     // Handle different possible response structures
-    let staffData = response.data;
+    let responseData = response.data;
     if (response.data.data) {
-      staffData = response.data.data;
+      responseData = response.data.data;
     }
 
-    // Extract staff array from different possible field names
+    // Extract staff array and pagination
     let staffArray: StaffMember[] = [];
-    if (Array.isArray(staffData)) {
-      staffArray = staffData;
-    } else if (staffData.staff && Array.isArray(staffData.staff)) {
-      staffArray = staffData.staff;
-    } else if (staffData.data && Array.isArray(staffData.data)) {
-      staffArray = staffData.data;
-    } else if (staffData.results && Array.isArray(staffData.results)) {
-      staffArray = staffData.results;
+    let paginationData = undefined;
+    
+    if (responseData.staff && Array.isArray(responseData.staff)) {
+      staffArray = responseData.staff;
+    } else if (Array.isArray(responseData)) {
+      staffArray = responseData;
+    }
+    
+    // Extract pagination info
+    if (responseData.pagination) {
+      paginationData = responseData.pagination;
+    } else if (response.data.data?.pagination) {
+      paginationData = response.data.data.pagination;
     }
 
     return {
       success: true,
       staff: staffArray,
+      pagination: paginationData,
     };
   } catch (error: any) {
     console.error('Error fetching staff:', error);

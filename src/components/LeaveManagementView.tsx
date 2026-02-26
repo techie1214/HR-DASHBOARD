@@ -83,6 +83,8 @@ const LeaveManagementView = () => {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   // State for create leave type form
   const [createLeaveTypeForm, setCreateLeaveTypeForm] = useState({
     name: '',
@@ -106,7 +108,7 @@ const LeaveManagementView = () => {
     expiryRuleId: null
   });
 
-  // Load data from API when component mounts
+  // Load data from API when component mounts or filters change
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -135,28 +137,41 @@ const LeaveManagementView = () => {
         }
 
         console.log('Fetching leave requests...');
-        // Fetch leave requests
-        const requestsResponse = await getAllLeaveRequests();
+        
+        // Build filters object
+        const filters: { status?: string; leaveType?: string; search?: string } = {};
+        if (filterStatus !== 'all') {
+          filters.status = filterStatus;
+        }
+        if (filterLeaveType !== 'all') {
+          filters.leaveType = filterLeaveType;
+        }
+        if (searchTerm) {
+          filters.search = searchTerm;
+        }
+
+        // Fetch leave requests with pagination
+        const requestsResponse = await getAllLeaveRequests(currentPage, itemsPerPage, filters);
         console.log('Leave requests response:', requestsResponse);
         let transformedRequests = [];
 
         if (requestsResponse.success && requestsResponse.leaveRequests) {
           console.log('Transforming', requestsResponse.leaveRequests.length, 'leave requests');
           console.log('Sample raw request:', requestsResponse.leaveRequests[0]);
-          
+
           // Transform API response to match our UI interface
           transformedRequests = requestsResponse.leaveRequests.map(req => {
             const rawStatus = req.status;
             // Backend uses 'submitted' for pending requests, 'cancelled' for cancelled
-            const transformedStatus = 
+            const transformedStatus =
                    req.status === 'approved' ? 'Approved' :
                    req.status === 'rejected' ? 'Declined' :
                    req.status === 'submitted' ? 'Pending' :  // 'submitted' = pending approval
                    req.status === 'cancelled' ? 'Declined' :  // 'cancelled' treated as declined
                    'Active';
-            
+
             console.log(`Request ${req.id}: raw status="${rawStatus}" -> transformed="${transformedStatus}"`);
-            
+
             return {
               id: req.id.toString(),
               staffId: req.user_id?.toString() || req.userId?.toString(),
@@ -180,10 +195,20 @@ const LeaveManagementView = () => {
           console.log('Transformed requests:', transformedRequests.length);
           console.log('Pending requests:', transformedRequests.filter(r => r.status === 'Pending').length);
           setLeaveRequests(transformedRequests);
+          
+          // Update pagination info
+          if (requestsResponse.pagination) {
+            setTotalItems(requestsResponse.pagination.totalItems);
+            setTotalPages(requestsResponse.pagination.totalPages);
+          } else {
+            setTotalItems(transformedRequests.length);
+            setTotalPages(Math.ceil(transformedRequests.length / itemsPerPage));
+          }
         } else {
           console.warn('Failed to fetch leave requests from API:', requestsResponse.message);
-          // Set to empty array if API call fails
           setLeaveRequests([]);
+          setTotalItems(0);
+          setTotalPages(0);
         }
 
         // Fetch leave balances for current user (assuming user ID 1 for demo)
@@ -237,7 +262,7 @@ const LeaveManagementView = () => {
     };
 
     fetchData();
-  }, []);
+  }, [currentPage, filterStatus, filterLeaveType, searchTerm]);
 
   // Helper function to get appropriate icon for leave type
   const getLeaveTypeIcon = (typeName: string) => {
@@ -276,46 +301,21 @@ const LeaveManagementView = () => {
     return diffDays;
   };
 
-  // Filter leave requests based on search term, status, leave type, and department
-  const filteredRequests = leaveRequests.filter(request => {
-    // Check if request matches search term (name, ID, department, or reason)
-    const matchesSearch = searchTerm === '' ||
-      request.staffName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      request.staffId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      request.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      request.reason.toLowerCase().includes(searchTerm.toLowerCase());
+  // Since filtering is done server-side, filteredRequests is just the current page of leaveRequests
+  const filteredRequests = leaveRequests;
 
-    // Check if request matches status filter
-    const matchesStatus =
-      filterStatus === 'all' ? true :
-      filterStatus === 'approved' ? request.status === 'Approved' :
-      filterStatus === 'declined' ? request.status === 'Declined' :
-      filterStatus === 'active' ? request.status === 'Active' :
-      filterStatus === 'pending' ? request.status === 'Pending' :
-      true;
-
-    // Check if request matches leave type filter
-    const matchesLeaveType = filterLeaveType === 'all' || request.leaveType === filterLeaveType;
-    // Check if request matches department filter
-    const matchesDepartment = selectedDepartment === 'all' || request.department === selectedDepartment;
-
-    // Return true only if all filter conditions match
-    return matchesSearch && matchesStatus && matchesLeaveType && matchesDepartment;
-  });
-
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
+  // Calculate pagination for display
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedRequests = filteredRequests.slice(startIndex, endIndex);
+  const paginatedRequests = filteredRequests; // Already paginated from API
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, filterStatus, filterLeaveType, selectedDepartment]);
 
-  // Calculate statistics from ALL leave requests (not filtered)
-  const totalRequests = leaveRequests.length;
+  // Calculate statistics from API totals
+  const totalRequests = totalItems;
   const approvedCount = leaveRequests.filter(r => r.status === 'Approved').length;
   const declinedCount = leaveRequests.filter(r => r.status === 'Declined').length;
   const activeCount = leaveRequests.filter(r => r.status === 'Active').length;
@@ -960,17 +960,21 @@ const LeaveManagementView = () => {
         {totalPages > 1 && (
           <div className="p-4 border-t flex items-center justify-between">
             <div className="text-sm text-muted">
-              Page {currentPage} of {totalPages} ({filteredRequests.length} requests)
+              Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} leave requests
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setCurrentPage(prev => Math.max(1, prev - 1));
+                }}
                 disabled={currentPage === 1}
                 className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Previous
               </button>
-              
+
               {/* Page number buttons */}
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                 let pageNum;
@@ -983,11 +987,15 @@ const LeaveManagementView = () => {
                 } else {
                   pageNum = currentPage - 2 + i;
                 }
-                
+
                 return (
                   <button
                     key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentPage(pageNum);
+                    }}
                     className={`px-3 py-1 border rounded ${
                       currentPage === pageNum
                         ? 'bg-blue-600 text-white border-blue-600'
@@ -998,9 +1006,13 @@ const LeaveManagementView = () => {
                   </button>
                 );
               })}
-              
+
               <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setCurrentPage(prev => Math.min(totalPages, prev + 1));
+                }}
                 disabled={currentPage === totalPages}
                 className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >

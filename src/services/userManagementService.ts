@@ -38,7 +38,7 @@ export interface UpdateUserRequest {
 
 // Get all users
 // GET {{baseUrl}}/users
-export const getAllUsers = async (page?: number, limit?: number): Promise<{ success: boolean; users?: User[]; total?: number; page?: number; limit?: number; message?: string }> => {
+export const getAllUsers = async (page?: number, limit?: number): Promise<{ success: boolean; users?: User[]; total?: number; page?: number; limit?: number; totalPages?: number; message?: string }> => {
   try {
     const token = localStorage.getItem('authToken');
     if (!token) {
@@ -52,10 +52,10 @@ export const getAllUsers = async (page?: number, limit?: number): Promise<{ succ
     const params = new URLSearchParams();
     if (page !== undefined) params.append('page', page.toString());
     if (limit !== undefined) params.append('limit', limit.toString());
-    
+
     const queryString = params.toString();
     const url = `${API_ENDPOINT}/users${queryString ? '?' + queryString : ''}`;
-    
+
     console.log('Fetching users from:', url);
     const response = await axios.get(url, {
       headers: {
@@ -65,23 +65,33 @@ export const getAllUsers = async (page?: number, limit?: number): Promise<{ succ
     });
 
     console.log('Users response:', response.data);
-    
-    // Handle different response formats
+
+    // Handle the actual API response structure:
+    // { success: true, data: { users: [...], pagination: {...} } }
     let usersData = [];
     let total = 0;
-    
-    if (Array.isArray(response.data)) {
+    let totalPages = 1;
+    let currentPage = page || 1;
+
+    if (response.data?.data) {
+      const data = response.data.data;
+      
+      // Extract users array
+      if (data.users && Array.isArray(data.users)) {
+        usersData = data.users;
+      }
+      
+      // Extract pagination info
+      if (data.pagination) {
+        total = data.pagination.totalItems || data.pagination.total || 0;
+        totalPages = data.pagination.totalPages || 1;
+        currentPage = data.pagination.currentPage || page || 1;
+      } else if (data.total !== undefined) {
+        total = data.total;
+      }
+    } else if (Array.isArray(response.data)) {
       usersData = response.data;
       total = response.data.length;
-    } else if (response.data?.data?.users) {
-      usersData = response.data.data.users;
-      total = response.data.data.total || response.data.data.count || usersData.length;
-    } else if (response.data?.users) {
-      usersData = response.data.users;
-      total = response.data.total || response.data.count || usersData.length;
-    } else if (response.data?.data) {
-      usersData = response.data.data;
-      total = response.data.total || response.data.count || usersData.length;
     }
 
     // Map API response to User interface (handle snake_case to camelCase)
@@ -93,7 +103,7 @@ export const getAllUsers = async (page?: number, limit?: number): Promise<{ succ
       roleId: u.role_id || u.roleId || 0,
       branchId: u.branch_id || u.branchId || 0,
       departmentId: u.department_id || u.departmentId || 0,
-      isActive: u.is_active !== undefined ? u.is_active : (u.isActive !== undefined ? u.isActive : true),
+      isActive: u.status === 'active', // Use status field
       createdAt: u.created_at || u.createdAt || '',
       updatedAt: u.updated_at || u.updatedAt || ''
     }));
@@ -102,8 +112,9 @@ export const getAllUsers = async (page?: number, limit?: number): Promise<{ succ
       success: true,
       users: users,
       total: total,
-      page: response.data?.page || page || 1,
-      limit: response.data?.limit || limit || 20,
+      totalPages: totalPages,
+      page: currentPage,
+      limit: limit || 20,
     };
   } catch (error: any) {
     console.error('Error fetching users:', error);
