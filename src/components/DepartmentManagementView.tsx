@@ -9,18 +9,20 @@ import {
   UpdateDepartmentRequest
 } from '../services/departmentManagementService';
 import { getAllBranches, Branch } from '../services/branchManagementService';
+import { Building, Users, Plus, Edit3, Trash2, X, Check, AlertCircle, Briefcase } from 'lucide-react';
 
 const DepartmentManagementView = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
   // Form states
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
-  
+
   // Form data
   const [departmentName, setDepartmentName] = useState('');
   const [departmentDescription, setDepartmentDescription] = useState('');
@@ -34,7 +36,8 @@ const DepartmentManagementView = () => {
   const loadDepartmentsAndBranches = async () => {
     try {
       setLoading(true);
-      
+      setError(null);
+
       // Load departments
       const departmentsResponse = await getAllDepartments();
       if (departmentsResponse.success) {
@@ -42,7 +45,7 @@ const DepartmentManagementView = () => {
       } else {
         setError(departmentsResponse.message || 'Failed to load departments');
       }
-      
+
       // Load branches
       const branchesResponse = await getAllBranches();
       if (branchesResponse.success) {
@@ -73,9 +76,10 @@ const DepartmentManagementView = () => {
     try {
       const response = await createDepartment(departmentData);
       if (response.success) {
-        setDepartments([...departments, response.department!]);
+        setSuccessMessage('Department created successfully');
+        setTimeout(() => setSuccessMessage(null), 3000);
         resetForm();
-        loadDepartmentsAndBranches(); // Refresh the list
+        loadDepartmentsAndBranches();
       } else {
         setError(response.message || 'Failed to create department');
       }
@@ -100,9 +104,10 @@ const DepartmentManagementView = () => {
     try {
       const response = await updateDepartment(editingDepartment.id, departmentData);
       if (response.success) {
-        setDepartments(departments.map(d => d.id === editingDepartment.id ? {...response.department!, branch_id: response.department!.branch_id} : d));
+        setSuccessMessage('Department updated successfully');
+        setTimeout(() => setSuccessMessage(null), 3000);
         resetForm();
-        loadDepartmentsAndBranches(); // Refresh the list
+        loadDepartmentsAndBranches();
       } else {
         setError(response.message || 'Failed to update department');
       }
@@ -120,8 +125,9 @@ const DepartmentManagementView = () => {
     try {
       const response = await deleteDepartment(departmentId);
       if (response.success) {
-        setDepartments(departments.filter(d => d.id !== departmentId));
-        loadDepartmentsAndBranches(); // Refresh the list
+        setSuccessMessage('Department deleted successfully');
+        setTimeout(() => setSuccessMessage(null), 3000);
+        loadDepartmentsAndBranches();
       } else {
         setError(response.message || 'Failed to delete department');
       }
@@ -150,6 +156,12 @@ const DepartmentManagementView = () => {
     setError(null);
   };
 
+  // Calculate statistics
+  const totalDepartments = departments.length;
+  const itDepartments = departments.filter(d => d.name.toLowerCase().includes('it') || d.name.toLowerCase().includes('tech')).length;
+  const hrDepartments = departments.filter(d => d.name.toLowerCase().includes('hr') || d.name.toLowerCase().includes('human')).length;
+  const otherDepartments = totalDepartments - itDepartments - hrDepartments;
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -160,13 +172,26 @@ const DepartmentManagementView = () => {
 
   return (
     <div className="space-y-6">
-      {error && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+      {/* Success Message */}
+      {successMessage && (
+        <div className="bg-green-50 border-l-4 border-green-500 p-4">
           <div className="flex">
             <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 001.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
+              <Check className="h-5 w-5 text-green-400" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-green-700">{successMessage}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <AlertCircle className="h-5 w-5 text-red-400" />
             </div>
             <div className="ml-3">
               <p className="text-sm text-red-700">{error}</p>
@@ -175,7 +200,59 @@ const DepartmentManagementView = () => {
         </div>
       )}
 
-      <div className="flex justify-end items-center">
+      {/* Stats Cards - Compact design to fit all 4 on one line */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="card p-3 cursor-pointer transition-all hover-lift">
+          <div className="flex items-center gap-2">
+            <div className="icon-wrapper" style={{ backgroundColor: '#dbeafe', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
+              <Building className="w-3 h-3" style={{ color: '#2563eb' }} />
+            </div>
+            <div>
+              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Total Departments</p>
+              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{totalDepartments}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-3 cursor-pointer transition-all hover-lift">
+          <div className="flex items-center gap-2">
+            <div className="icon-wrapper" style={{ backgroundColor: '#dcfce7', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
+              <Briefcase className="w-3 h-3" style={{ color: '#16a34a' }} />
+            </div>
+            <div>
+              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>IT/Tech</p>
+              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{itDepartments}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-3 cursor-pointer transition-all hover-lift">
+          <div className="flex items-center gap-2">
+            <div className="icon-wrapper" style={{ backgroundColor: '#fef9c3', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
+              <Users className="w-3 h-3" style={{ color: '#ca8a04' }} />
+            </div>
+            <div>
+              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>HR/People</p>
+              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{hrDepartments}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-3 cursor-pointer transition-all hover-lift">
+          <div className="flex items-center gap-2">
+            <div className="icon-wrapper" style={{ backgroundColor: '#f3e8ff', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
+              <Building className="w-3 h-3" style={{ color: '#9333ea' }} />
+            </div>
+            <div>
+              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Other</p>
+              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{otherDepartments}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Action Bar */}
+      <div className="flex justify-end">
         <button
           onClick={() => {
             resetForm();
@@ -183,193 +260,229 @@ const DepartmentManagementView = () => {
           }}
           className="btn btn-primary"
         >
+          <Plus className="w-4 h-4 mr-2" />
           Create New Department
         </button>
       </div>
 
-      {/* Create Department Form */}
+      {/* Create Department Form Modal */}
       {showCreateForm && (
-        <div className="card p-6 mb-6">
-          <h3 className="text-lg font-medium mb-4">Create New Department</h3>
-          
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="departmentName" className="block text-sm font-medium mb-1">Department Name *</label>
-              <input
-                type="text"
-                id="departmentName"
-                value={departmentName}
-                onChange={(e) => setDepartmentName(e.target.value)}
-                className="input w-full"
-                placeholder="Enter department name"
-              />
+        <>
+          <div className="modal-overlay" onClick={() => resetForm()}></div>
+          <div className="modal">
+            <div className="modal-header">
+              <h3>Create New Department</h3>
+              <button className="btn btn-ghost btn-icon" style={{ width: '2rem', height: '2rem' }} onClick={() => resetForm()}>
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            
-            <div>
-              <label htmlFor="departmentDescription" className="block text-sm font-medium mb-1">Description</label>
-              <textarea
-                id="departmentDescription"
-                value={departmentDescription}
-                onChange={(e) => setDepartmentDescription(e.target.value)}
-                className="input w-full"
-                placeholder="Enter department description"
-                rows={3}
-              />
+            <div className="modal-content">
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="departmentName" className="block text-sm font-medium mb-1">Department Name *</label>
+                  <input
+                    type="text"
+                    id="departmentName"
+                    value={departmentName}
+                    onChange={(e) => setDepartmentName(e.target.value)}
+                    className="input w-full"
+                    placeholder="e.g., Engineering, Human Resources"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="departmentDescription" className="block text-sm font-medium mb-1">Description</label>
+                  <textarea
+                    id="departmentDescription"
+                    value={departmentDescription}
+                    onChange={(e) => setDepartmentDescription(e.target.value)}
+                    className="input w-full"
+                    placeholder="Enter department description"
+                    rows={3}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="departmentBranch" className="block text-sm font-medium mb-1">Branch *</label>
+                  <select
+                    id="departmentBranch"
+                    value={departmentBranchId}
+                    onChange={(e) => setDepartmentBranchId(e.target.value ? Number(e.target.value) : '')}
+                    className="input w-full"
+                    style={{ color: departmentBranchId ? '#1f2937' : '#6b7280' }}
+                  >
+                    <option value="">Select a branch</option>
+                    {branches.map(branch => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name} ({branch.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
-            
-            <div>
-              <label htmlFor="departmentBranch" className="block text-sm font-medium mb-1">Branch *</label>
-              <select
-                id="departmentBranch"
-                value={departmentBranchId}
-                onChange={(e) => setDepartmentBranchId(e.target.value ? Number(e.target.value) : '')}
-                className="input w-full"
-              >
-                <option value="">Select a branch</option>
-                {branches.map(branch => (
-                  <option key={branch.id} value={branch.id}>
-                    {branch.name} ({branch.code})
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            
-            <div className="flex space-x-3 pt-2">
-              <button
-                onClick={handleCreateDepartment}
-                className="btn btn-primary"
-              >
+            <div className="modal-footer">
+              <button className="btn btn-outline" onClick={() => resetForm()}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleCreateDepartment}>
+                <Check className="w-4 h-4 mr-2" />
                 Create Department
               </button>
-              <button
-                onClick={resetForm}
-                className="btn btn-outline"
-              >
-                Cancel
-              </button>
             </div>
           </div>
-        </div>
+        </>
       )}
 
-      {/* Edit Department Form */}
+      {/* Edit Department Form Modal */}
       {showEditForm && editingDepartment && (
-        <div className="card p-6 mb-6">
-          <h3 className="text-lg font-medium mb-4">Edit Department: {editingDepartment.name}</h3>
-          
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="editDepartmentName" className="block text-sm font-medium mb-1">Department Name *</label>
-              <input
-                type="text"
-                id="editDepartmentName"
-                value={departmentName}
-                onChange={(e) => setDepartmentName(e.target.value)}
-                className="input w-full"
-                placeholder="Enter department name"
-              />
+        <>
+          <div className="modal-overlay" onClick={() => resetForm()}></div>
+          <div className="modal">
+            <div className="modal-header">
+              <h3>Edit Department: {editingDepartment.name}</h3>
+              <button className="btn btn-ghost btn-icon" style={{ width: '2rem', height: '2rem' }} onClick={() => resetForm()}>
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            
-            <div>
-              <label htmlFor="editDepartmentDescription" className="block text-sm font-medium mb-1">Description</label>
-              <textarea
-                id="editDepartmentDescription"
-                value={departmentDescription}
-                onChange={(e) => setDepartmentDescription(e.target.value)}
-                className="input w-full"
-                placeholder="Enter department description"
-                rows={3}
-              />
+            <div className="modal-content">
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="editDepartmentName" className="block text-sm font-medium mb-1">Department Name *</label>
+                  <input
+                    type="text"
+                    id="editDepartmentName"
+                    value={departmentName}
+                    onChange={(e) => setDepartmentName(e.target.value)}
+                    className="input w-full"
+                    placeholder="Enter department name"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="editDepartmentDescription" className="block text-sm font-medium mb-1">Description</label>
+                  <textarea
+                    id="editDepartmentDescription"
+                    value={departmentDescription}
+                    onChange={(e) => setDepartmentDescription(e.target.value)}
+                    className="input w-full"
+                    placeholder="Enter department description"
+                    rows={3}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="editDepartmentBranch" className="block text-sm font-medium mb-1">Branch *</label>
+                  <select
+                    id="editDepartmentBranch"
+                    value={departmentBranchId}
+                    onChange={(e) => setDepartmentBranchId(e.target.value ? Number(e.target.value) : '')}
+                    className="input w-full"
+                    style={{ color: departmentBranchId ? '#1f2937' : '#6b7280' }}
+                  >
+                    <option value="">Select a branch</option>
+                    {branches.map(branch => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name} ({branch.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
-            
-            <div>
-              <label htmlFor="editDepartmentBranch" className="block text-sm font-medium mb-1">Branch *</label>
-              <select
-                id="editDepartmentBranch"
-                value={departmentBranchId}
-                onChange={(e) => setDepartmentBranchId(e.target.value ? Number(e.target.value) : '')}
-                className="input w-full"
-              >
-                <option value="">Select a branch</option>
-                {branches.map(branch => (
-                  <option key={branch.id} value={branch.id}>
-                    {branch.name} ({branch.code})
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            
-            <div className="flex space-x-3 pt-2">
-              <button
-                onClick={handleUpdateDepartment}
-                className="btn btn-primary"
-              >
+            <div className="modal-footer">
+              <button className="btn btn-outline" onClick={() => resetForm()}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleUpdateDepartment}>
+                <Check className="w-4 h-4 mr-2" />
                 Update Department
               </button>
-              <button
-                onClick={resetForm}
-                className="btn btn-outline"
-              >
-                Cancel
-              </button>
             </div>
           </div>
-        </div>
+        </>
       )}
 
-      {/* Departments List */}
-      <div className="card p-6">
-        <h3 className="text-lg font-medium mb-4">Existing Departments</h3>
-        
-        {departments.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th className="table-header-cell">Name</th>
-                  <th className="table-header-cell">Description</th>
-                  <th className="table-header-cell">Branch</th>
-                  <th className="table-header-cell">Created</th>
-                  <th className="table-header-cell">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {departments.map((department) => (
-                  <tr key={department.id} className="table-row">
-                    <td className="table-cell font-medium">{department.name}</td>
-                    <td className="table-cell">{department.description}</td>
-                    <td className="table-cell">
-                      {branches.find(b => b.id === department.branch_id)?.name || department.branch_id || '-'}
-                    </td>
-                    <td className="table-cell">
-                      {department.created_at ? new Date(department.created_at).toLocaleDateString() : 'N/A'}
-                    </td>
-                    <td className="table-cell">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleEditClick(department)}
-                          className="btn btn-sm btn-outline"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteDepartment(department.id)}
-                          className="btn btn-sm btn-outline btn-error"
-                        >
-                          Delete
-                        </button>
+      {/* Departments Table */}
+      <div className="card">
+        <div className="p-4 border-b">
+          <h3 className="text-lg font-medium">Existing Departments</h3>
+          <p className="text-muted text-sm">Showing {departments.length} department{departments.length !== 1 ? 's' : ''}</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="table">
+            <thead className="table-header">
+              <tr>
+                <th className="table-header-cell">Department</th>
+                <th className="table-header-cell">Description</th>
+                <th className="table-header-cell">Branch</th>
+                <th className="table-header-cell">Created</th>
+                <th className="table-header-cell right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {departments.map((department) => (
+                <tr key={department.id} className="table-row">
+                  <td className="table-cell">
+                    <div className="flex items-center gap-3">
+                      <div className="avatar" style={{ width: '2.5rem', height: '2.5rem', fontSize: '0.75rem', backgroundColor: '#dbeafe' }}>
+                        <Building className="w-3 h-3 text-blue-600" />
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <p className="text-gray-500">No departments found. Create your first department to get started.</p>
+                      <div>
+                        <p style={{ fontWeight: 500, fontSize: '0.875rem' }}>{department.name}</p>
+                        <p className="text-xs text-muted">ID: {typeof department.id === 'string' ? department.id.slice(0, 8) : department.id}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="table-cell">
+                    <p className="text-sm" style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {department.description || '—'}
+                    </p>
+                  </td>
+                  <td className="table-cell">
+                    {branches.find(b => b.id === department.branch_id)?.name || (
+                      <span className="text-muted">No branch assigned</span>
+                    )}
+                  </td>
+                  <td className="table-cell">
+                    {department.created_at ? new Date(department.created_at).toLocaleDateString() : 'N/A'}
+                  </td>
+                  <td className="table-cell right">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => handleEditClick(department)}
+                        className="btn btn-sm btn-outline"
+                      >
+                        <Edit3 className="w-3 h-3 mr-1" />
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteDepartment(department.id)}
+                        className="btn btn-sm btn-outline red"
+                      >
+                        <Trash2 className="w-3 h-3 mr-1" />
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {departments.length === 0 && (
+          <div className="text-center py-12">
+            <div className="mx-auto w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mb-4">
+              <Building className="w-8 h-8 text-blue-500" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-1">No Departments Yet</h3>
+            <p className="text-gray-500 mb-4">Get started by creating your first department</p>
+            <button
+              onClick={() => {
+                resetForm();
+                setShowCreateForm(true);
+              }}
+              className="btn btn-primary"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create Department
+            </button>
           </div>
         )}
       </div>

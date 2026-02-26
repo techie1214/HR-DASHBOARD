@@ -52,6 +52,7 @@ import { Login } from "./components/Login";
 import RoleManagementView from "./components/RoleManagementView";
 import SystemInitialization from "./components/SystemInitialization";
 import UserManagementView from "./components/UserManagementView";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { checkSystemReadiness } from "./services/apiServices";
 import { isAuthenticated, logout, getUserInfo, setupAxiosInterceptors } from "./services/authService";
 
@@ -866,10 +867,14 @@ export default function App() {
   // If system is not initialized, show the SystemInitialization component
   if (isSystemInitialized === false) {
     console.log('Showing SystemInitialization component');
-    return <SystemInitialization onSystemInitialized={() => {
-      // When system is initialized, refresh the readiness check
-      checkSystemInitialization();
-    }} />;
+    return (
+      <ErrorBoundary>
+        <SystemInitialization onSystemInitialized={() => {
+          // When system is initialized, refresh the readiness check
+          checkSystemInitialization();
+        }} />
+      </ErrorBoundary>
+    );
   } else {
     console.log('System is initialized, proceeding to login check');
   }

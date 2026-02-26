@@ -868,6 +868,64 @@ export const getUserLeaveBalance = async (userId: number): Promise<{ success: bo
   }
 };
 
+// Cancel leave request (change from approved to cancelled)
+export const cancelLeaveRequest = async (leaveRequestId: number): Promise<{ success: boolean; leaveRequest?: any; message?: string }> => {
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      return {
+        success: false,
+        message: 'Authentication token not found. Please log in again.'
+      };
+    }
+
+    const payload = { status: 'cancelled' };
+
+    console.log(`Cancelling leave request ${leaveRequestId}`);
+
+    const response = await axios.put(`${API_ENDPOINT}/leave/${leaveRequestId}`, payload, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    console.log('Cancel leave request response:', response.data);
+
+    if (response.data?.success && response.data?.data?.leaveRequest) {
+      return {
+        success: true,
+        leaveRequest: response.data.data.leaveRequest,
+        message: 'Leave request cancelled successfully'
+      };
+    }
+
+    return {
+      success: true,
+      leaveRequest: response.data,
+      message: 'Leave request cancelled successfully'
+    };
+  } catch (error: any) {
+    console.error('Error cancelling leave request:', error);
+    if (error.response?.status === 400) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Invalid request data'
+      };
+    }
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      return {
+        success: false,
+        message: 'Access denied. Please check your permissions or log in again.'
+      };
+    }
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Failed to cancel leave request'
+    };
+  }
+};
+
 // Get leave calendar
 export const getLeaveCalendar = async (): Promise<{ success: boolean; leaveEvents?: any[]; message?: string }> => {
   try {

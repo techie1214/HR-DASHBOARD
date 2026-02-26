@@ -57,6 +57,7 @@ function ReadinessCheck({
 }) {
   const [loading, setLoading] = useState(true);
   const [readiness, setReadiness] = useState<SystemReadiness | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     checkSystemReadiness();
@@ -64,6 +65,7 @@ function ReadinessCheck({
 
   const checkSystemReadiness = async () => {
     setLoading(true);
+    setError(null);
     try {
       // Use the systemApi to check readiness
       const result = await systemApi.checkReadiness();
@@ -71,6 +73,7 @@ function ReadinessCheck({
       onReady(result);
     } catch (error) {
       console.error("Failed to check readiness", error);
+      setError("Failed to check system readiness. Please refresh the page to try again.");
     } finally {
       setLoading(false);
     }
@@ -85,6 +88,25 @@ function ReadinessCheck({
           </div>
           <h2 style={styles.loadingTitle}>Checking System Status</h2>
           <p style={styles.loadingSubtitle}>Please wait while we verify the system readiness...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.card}>
+          <div style={styles.errorBox}>
+            <AlertTriangle style={styles.errorIcon} />
+            <div style={styles.errorText}>{error}</div>
+          </div>
+          <button
+            onClick={checkSystemReadiness}
+            style={styles.primaryButton}
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
@@ -171,10 +193,12 @@ function CompleteSetupWizard({ onComplete }: { onComplete: () => void }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [migrationStatus, setMigrationStatus] = useState<"idle" | "running" | "success" | "error">("idle");
   const [migrationMessage, setMigrationMessage] = useState("");
+  const [initError, setInitError] = useState<string | null>(null);
 
   const runMigrations = async () => {
     setMigrationStatus("running");
     setMigrationMessage("Running database migrations...");
+    setInitError(null);
 
     try {
       const result = await systemApi.runMigrations();
@@ -187,19 +211,24 @@ function CompleteSetupWizard({ onComplete }: { onComplete: () => void }) {
         setMigrationMessage(result.message);
       }
     } catch (error) {
+      console.error("Migration error:", error);
       setMigrationStatus("error");
-      setMigrationMessage("Failed to run migrations. Please try again.");
+      setMigrationMessage("Failed to run migrations. Please check your connection and try again.");
     }
   };
 
   const handleAdminCreated = async (data: AdminFormData) => {
+    setInitError(null);
     try {
       const result = await systemApi.initializeComplete(data);
       if (result.success) {
         onComplete();
+      } else {
+        setInitError(result.message);
       }
     } catch (error) {
       console.error("Failed to initialize system", error);
+      setInitError("Failed to initialize system. Please check your connection and try again.");
     }
   };
 
@@ -288,7 +317,7 @@ function CompleteSetupWizard({ onComplete }: { onComplete: () => void }) {
                 <p style={styles.stepSubtitle}>Set up your administrator account</p>
               </div>
             </div>
-            <AdminForm onSubmit={handleAdminCreated} />
+            <AdminForm onSubmit={handleAdminCreated} error={initError} />
           </div>
         )}
       </div>
@@ -298,14 +327,20 @@ function CompleteSetupWizard({ onComplete }: { onComplete: () => void }) {
 
 // Initialize Admin Only (when schema exists)
 function InitializeAdmin({ onComplete }: { onComplete: () => void }) {
+  const [initError, setInitError] = useState<string | null>(null);
+
   const handleAdminCreated = async (data: AdminFormData) => {
+    setInitError(null);
     try {
       const result = await systemApi.initializeAdmin(data);
       if (result.success) {
         onComplete();
+      } else {
+        setInitError(result.message);
       }
     } catch (error) {
       console.error("Failed to create admin", error);
+      setInitError("Failed to create admin. Please check your connection and try again.");
     }
   };
 
@@ -317,6 +352,12 @@ function InitializeAdmin({ onComplete }: { onComplete: () => void }) {
           <h1 style={styles.adminTitle}>Create Super Admin</h1>
           <p style={styles.adminSubtitle}>Initialize your system by creating the administrator account</p>
         </div>
+        {initError && (
+          <div style={styles.errorBox}>
+            <AlertTriangle style={styles.errorIcon} />
+            <div style={styles.errorText}>{initError}</div>
+          </div>
+        )}
         <AdminForm onSubmit={handleAdminCreated} />
       </div>
     </div>
@@ -324,7 +365,7 @@ function InitializeAdmin({ onComplete }: { onComplete: () => void }) {
 }
 
 // Admin Form Component
-function AdminForm({ onSubmit }: { onSubmit: (data: AdminFormData) => void }) {
+function AdminForm({ onSubmit, error }: { onSubmit: (data: AdminFormData) => void; error?: string | null }) {
   const {
     register,
     handleSubmit,
@@ -341,6 +382,12 @@ function AdminForm({ onSubmit }: { onSubmit: (data: AdminFormData) => void }) {
 
   return (
     <form onSubmit={handleSubmit(onFormSubmit)} style={styles.form}>
+      {error && (
+        <div style={styles.formErrorBox}>
+          <AlertTriangle style={styles.formErrorIcon} />
+          <div style={styles.formErrorText}>{error}</div>
+        </div>
+      )}
       <div style={styles.formGroup}>
         <label style={styles.formLabel}>Email Address *</label>
         <input
@@ -919,6 +966,25 @@ const styles = {
     fontSize: '0.75rem',
     color: '#dc2626',
     marginTop: '0.25rem',
+  },
+  formErrorBox: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    padding: '1rem',
+    backgroundColor: '#fef2f2',
+    border: '1px solid #fecaca',
+    borderRadius: '0.5rem',
+    marginBottom: '1rem',
+  },
+  formErrorIcon: {
+    width: '1.25rem',
+    height: '1.25rem',
+    color: '#dc2626',
+  },
+  formErrorText: {
+    color: '#991b1b',
+    fontSize: '0.875rem',
   },
   formHelper: {
     fontSize: '0.75rem',

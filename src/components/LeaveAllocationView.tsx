@@ -416,34 +416,34 @@ const LeaveAllocationView = () => {
         </div>
       )}
 
-      {/* Stats Cards - Similar to Leave Management */}
+      {/* Stats Cards - Compact design to fit all 4 on one line */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {/* Total Allocations Card */}
         <div
-          className="card p-4 transition-all hover-lift"
+          className="card p-3 transition-all hover-lift"
         >
-          <div className="flex items-center gap-3">
-            <div className="icon-wrapper" style={{ backgroundColor: '#dbeafe', width: '2.5rem', height: '2.5rem' }}>
-              <Users className="w-4 h-4" style={{ color: '#2563eb' }} />
+          <div className="flex items-center gap-2">
+            <div className="icon-wrapper" style={{ backgroundColor: '#dbeafe', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
+              <Users className="w-3 h-3" style={{ color: '#2563eb' }} />
             </div>
             <div>
-              <p className="text-muted" style={{ fontSize: '0.7rem' }}>Total Allocations</p>
-              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{allocations.length}</p>
+              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Total Allocations</p>
+              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{allocations.length}</p>
             </div>
           </div>
         </div>
 
         {/* Total Days Allocated Card */}
         <div
-          className="card p-4 transition-all hover-lift"
+          className="card p-3 transition-all hover-lift"
         >
-          <div className="flex items-center gap-3">
-            <div className="icon-wrapper" style={{ backgroundColor: '#dcfce7', width: '2.5rem', height: '2.5rem' }}>
-              <CheckCircle className="w-4 h-4" style={{ color: '#16a34a' }} />
+          <div className="flex items-center gap-2">
+            <div className="icon-wrapper" style={{ backgroundColor: '#dcfce7', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
+              <CheckCircle className="w-3 h-3" style={{ color: '#16a34a' }} />
             </div>
             <div>
-              <p className="text-muted" style={{ fontSize: '0.7rem' }}>Days Allocated</p>
-              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>
+              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Days Allocated</p>
+              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>
                 {allocations.reduce((sum, a) => sum + (Number(a.allocated_days) || 0), 0)}
               </p>
             </div>
@@ -452,15 +452,15 @@ const LeaveAllocationView = () => {
 
         {/* Days Used Card */}
         <div
-          className="card p-4 transition-all hover-lift"
+          className="card p-3 transition-all hover-lift"
         >
-          <div className="flex items-center gap-3">
-            <div className="icon-wrapper" style={{ backgroundColor: '#fef3c7', width: '2.5rem', height: '2.5rem' }}>
-              <Calendar className="w-4 h-4" style={{ color: '#f59e0b' }} />
+          <div className="flex items-center gap-2">
+            <div className="icon-wrapper" style={{ backgroundColor: '#fef9c3', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
+              <Calendar className="w-3 h-3" style={{ color: '#ca8a04' }} />
             </div>
             <div>
-              <p className="text-muted" style={{ fontSize: '0.7rem' }}>Days Used</p>
-              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>
+              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Days Used</p>
+              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>
                 {allocations.reduce((sum, a) => sum + (Number(a.used_days) || 0), 0)}
               </p>
             </div>
@@ -469,15 +469,15 @@ const LeaveAllocationView = () => {
 
         {/* Days Remaining Card */}
         <div
-          className="card p-4 transition-all hover-lift"
+          className="card p-3 transition-all hover-lift"
         >
-          <div className="flex items-center gap-3">
-            <div className="icon-wrapper" style={{ backgroundColor: '#d1fae5', width: '2.5rem', height: '2.5rem' }}>
-              <TrendingUp className="w-4 h-4" style={{ color: '#10b981' }} />
+          <div className="flex items-center gap-2">
+            <div className="icon-wrapper" style={{ backgroundColor: '#d1fae5', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
+              <TrendingUp className="w-3 h-3" style={{ color: '#10b981' }} />
             </div>
             <div>
-              <p className="text-muted" style={{ fontSize: '0.7rem' }}>Days Remaining</p>
-              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>
+              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Days Remaining</p>
+              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>
                 {allocations.reduce((sum, a) => sum + ((Number(a.allocated_days) || 0) - (Number(a.used_days) || 0)), 0)}
               </p>
             </div>

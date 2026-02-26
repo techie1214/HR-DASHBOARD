@@ -1,23 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  getAllUsers, 
-  getUserById, 
-  createUser, 
-  updateUser, 
-  deleteUser, 
+import {
+  getAllUsers,
+  getUserById,
+  createUser,
+  updateUser,
+  deleteUser,
+  toggleUserStatus,
   User,
   CreateUserRequest,
   UpdateUserRequest
 } from '../services/userManagementService';
 import { getAllRoles } from '../services/roleManagementService';
 import { getAllBranches } from '../services/branchManagementService';
-import { getAllDepartments } from '../services/departmentManagementService';
-import { User as UserIcon, Plus, Edit3, Trash2, X, Check } from 'lucide-react';
+import { User as UserIcon, Plus, Edit3, Trash2, X, Check, AlertCircle, Mail, Shield, Building } from 'lucide-react';
 
 const UserManagementView = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20);
+  const [totalUsers_count, setTotalUsers_count] = useState(0);
 
   // Form states
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -31,12 +37,15 @@ const UserManagementView = () => {
   const [password, setPassword] = useState('');
   const [roleId, setRoleId] = useState<number>(0);
   const [branchId, setBranchId] = useState<number>(0);
-  const [departmentId, setDepartmentId] = useState<number>(0);
 
   // Lists for dropdowns
   const [roles, setRoles] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
-  const [departments, setDepartments] = useState<any[]>([]);
+
+  // Load users when page changes
+  useEffect(() => {
+    loadUsersAndOptions();
+  }, [currentPage]);
 
   // Load users on component mount
   useEffect(() => {
@@ -46,11 +55,13 @@ const UserManagementView = () => {
   const loadUsersAndOptions = async () => {
     try {
       setLoading(true);
+      setError(null);
 
-      // Load users
-      const usersResponse = await getAllUsers();
+      // Load users with pagination
+      const usersResponse = await getAllUsers(currentPage, itemsPerPage);
       if (usersResponse.success) {
         setUsers(usersResponse.users || []);
+        setTotalUsers_count(usersResponse.total || 0);
       } else {
         setError(usersResponse.message || 'Failed to load users');
       }
@@ -66,12 +77,6 @@ const UserManagementView = () => {
       if (branchesResponse.success) {
         setBranches(branchesResponse.branches || []);
       }
-
-      // Load departments
-      const departmentsResponse = await getAllDepartments();
-      if (departmentsResponse.success) {
-        setDepartments(departmentsResponse.departments || []);
-      }
     } catch (err: any) {
       setError(err.message || 'An error occurred while loading data');
     } finally {
@@ -86,12 +91,11 @@ const UserManagementView = () => {
     setPassword('');
     setRoleId(0);
     setBranchId(0);
-    setDepartmentId(0);
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       const userData: CreateUserRequest = {
         firstName,
@@ -99,16 +103,16 @@ const UserManagementView = () => {
         email,
         password,
         roleId,
-        branchId,
-        departmentId
+        branchId
       };
 
       const response = await createUser(userData);
-      
+
       if (response.success) {
+        setSuccessMessage('User created successfully');
+        setTimeout(() => setSuccessMessage(null), 3000);
         setShowCreateForm(false);
         resetForm();
-        // Reload users
         loadUsersAndOptions();
       } else {
         setError(response.message || 'Failed to create user');
@@ -120,26 +124,26 @@ const UserManagementView = () => {
 
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!editingUser) return;
-    
+
     try {
       const userData: UpdateUserRequest = {
         firstName,
         lastName,
         email,
         roleId,
-        branchId,
-        departmentId
+        branchId
       };
 
       const response = await updateUser(editingUser.id, userData);
-      
+
       if (response.success) {
+        setSuccessMessage('User updated successfully');
+        setTimeout(() => setSuccessMessage(null), 3000);
         setShowEditForm(false);
         setEditingUser(null);
         resetForm();
-        // Reload users
         loadUsersAndOptions();
       } else {
         setError(response.message || 'Failed to update user');
@@ -150,18 +154,51 @@ const UserManagementView = () => {
   };
 
   const handleDeleteUser = async (id: number) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
+    if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
       try {
         const response = await deleteUser(id);
-        
+
         if (response.success) {
-          // Reload users
+          setSuccessMessage('User deleted successfully');
+          setTimeout(() => setSuccessMessage(null), 3000);
           loadUsersAndOptions();
         } else {
           setError(response.message || 'Failed to delete user');
         }
       } catch (err: any) {
         setError(err.message || 'An error occurred while deleting user');
+      }
+    }
+  };
+
+  const handleActivateUser = async (id: number) => {
+    try {
+      const response = await toggleUserStatus(id, true);
+      if (response.success) {
+        setSuccessMessage('User activated successfully');
+        setTimeout(() => setSuccessMessage(null), 3000);
+        loadUsersAndOptions();
+      } else {
+        setError(response.message || 'Failed to activate user');
+      }
+    } catch (err: any) {
+      setError(err.message || 'An error occurred while activating user');
+    }
+  };
+
+  const handleDeactivateUser = async (id: number) => {
+    if (window.confirm('Are you sure you want to deactivate this user?')) {
+      try {
+        const response = await toggleUserStatus(id, false);
+        if (response.success) {
+          setSuccessMessage('User deactivated successfully');
+          setTimeout(() => setSuccessMessage(null), 3000);
+          loadUsersAndOptions();
+        } else {
+          setError(response.message || 'Failed to deactivate user');
+        }
+      } catch (err: any) {
+        setError(err.message || 'An error occurred while deactivating user');
       }
     }
   };
@@ -173,10 +210,15 @@ const UserManagementView = () => {
     setEmail(user.email);
     setRoleId(user.roleId);
     setBranchId(user.branchId);
-    setDepartmentId(user.departmentId);
-    setPassword(''); // Don't populate password for editing
+    setPassword('');
     setShowEditForm(true);
   };
+
+  // Calculate statistics
+  const totalUsers = users.length;
+  const activeUsers = users.filter(u => u.isActive).length;
+  const inactiveUsers = users.filter(u => !u.isActive).length;
+  const adminUsers = users.filter(u => roles.find(r => r.id === u.roleId)?.name.toLowerCase().includes('admin')).length;
 
   if (loading) {
     return (
@@ -188,338 +230,411 @@ const UserManagementView = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header Section with action buttons */}
-      <div className="flex items-center justify-between">
-        {/* <div>
-          <h2 className="text-xl font-semibold">User Management</h2>
-          <p className="text-muted">Manage system users and their access rights</p>
-        </div> */}
-        <div className="flex items-center gap-3">
-          <button 
-            className="btn btn-primary"
-            onClick={() => {
-              resetForm();
-              setShowCreateForm(true);
-            }}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Create User
-          </button>
+      {/* Success Message */}
+      {successMessage && (
+        <div className="bg-green-50 border-l-4 border-green-500 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <Check className="h-5 w-5 text-green-400" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-green-700">{successMessage}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <AlertCircle className="h-5 w-5 text-red-400" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stats Cards - Compact design to fit all 4 on one line */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="card p-3 cursor-pointer transition-all hover-lift">
+          <div className="flex items-center gap-2">
+            <div className="icon-wrapper" style={{ backgroundColor: '#dbeafe', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
+              <UserIcon className="w-3 h-3" style={{ color: '#2563eb' }} />
+            </div>
+            <div>
+              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Total Users</p>
+              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{totalUsers}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-3 cursor-pointer transition-all hover-lift">
+          <div className="flex items-center gap-2">
+            <div className="icon-wrapper" style={{ backgroundColor: '#dcfce7', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
+              <Check className="w-3 h-3" style={{ color: '#16a34a' }} />
+            </div>
+            <div>
+              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Active</p>
+              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{activeUsers}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-3 cursor-pointer transition-all hover-lift">
+          <div className="flex items-center gap-2">
+            <div className="icon-wrapper" style={{ backgroundColor: '#fef9c3', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
+              <X className="w-3 h-3" style={{ color: '#ca8a04' }} />
+            </div>
+            <div>
+              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Inactive</p>
+              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{inactiveUsers}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-3 cursor-pointer transition-all hover-lift">
+          <div className="flex items-center gap-2">
+            <div className="icon-wrapper" style={{ backgroundColor: '#f3e8ff', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
+              <Shield className="w-3 h-3" style={{ color: '#9333ea' }} />
+            </div>
+            <div>
+              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Admins</p>
+              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{adminUsers}</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Error message */}
-      {error && (
-        <div className="alert alert-error">
-          <div className="flex items-center">
-            <X className="w-5 h-5 mr-2" />
-            <span>{error}</span>
-          </div>
-        </div>
-      )}
+      {/* Action Bar */}
+      <div className="flex justify-end">
+        <button
+          className="btn btn-primary"
+          onClick={() => {
+            resetForm();
+            setShowCreateForm(true);
+          }}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Create User
+        </button>
+      </div>
 
-      {/* Create User Form */}
+      {/* Create User Form Modal */}
       {showCreateForm && (
-        <div className="card p-6 mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium">Create New User</h3>
-            <button 
-              className="btn btn-ghost btn-sm"
-              onClick={() => {
-                setShowCreateForm(false);
-                resetForm();
-              }}
-            >
-              <X className="w-4 h-4" />
-            </button>
+        <>
+          <div className="modal-overlay" onClick={() => { setShowCreateForm(false); resetForm(); }}></div>
+          <div className="modal">
+            <div className="modal-header">
+              <h3>Create New User</h3>
+              <button className="btn btn-ghost btn-icon" style={{ width: '2rem', height: '2rem' }} onClick={() => { setShowCreateForm(false); resetForm(); }}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="modal-content">
+              <form onSubmit={handleCreateUser} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">First Name *</label>
+                    <input
+                      type="text"
+                      className="input w-full"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="Enter first name"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Last Name *</label>
+                    <input
+                      type="text"
+                      className="input w-full"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Enter last name"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email *</label>
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-gray-400" />
+                    <input
+                      type="email"
+                      className="input w-full"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Enter email address"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Password *</label>
+                  <input
+                    type="password"
+                    className="input w-full"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter password (min. 8 characters)"
+                    minLength={8}
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Role *</label>
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-4 h-4 text-gray-400" />
+                      <select
+                        className="input w-full"
+                        value={roleId}
+                        onChange={(e) => setRoleId(Number(e.target.value))}
+                        style={{ color: roleId ? '#1f2937' : '#6b7280' }}
+                        required
+                      >
+                        <option value="">Select Role</option>
+                        {roles.map(role => (
+                          <option key={role.id} value={role.id}>{role.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Branch *</label>
+                    <div className="flex items-center gap-2">
+                      <Building className="w-4 h-4 text-gray-400" />
+                      <select
+                        className="input w-full"
+                        value={branchId}
+                        onChange={(e) => setBranchId(Number(e.target.value))}
+                        style={{ color: branchId ? '#1f2937' : '#6b7280' }}
+                        required
+                      >
+                        <option value="">Select Branch</option>
+                        {branches.map(branch => (
+                          <option key={branch.id} value={branch.id}>{branch.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => { setShowCreateForm(false); resetForm(); }}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary">
+                    <Check className="w-4 h-4 mr-2" />
+                    Create User
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-          
-          <form onSubmit={handleCreateUser} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">First Name</label>
-                <input
-                  type="text"
-                  className="input input-bordered w-full"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Last Name</label>
-                <input
-                  type="text"
-                  className="input input-bordered w-full"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
-              <input
-                type="email"
-                className="input input-bordered w-full"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium mb-1">Password</label>
-              <input
-                type="password"
-                className="input input-bordered w-full"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Role</label>
-                <select
-                  className="input input-bordered w-full"
-                  value={roleId}
-                  onChange={(e) => setRoleId(Number(e.target.value))}
-                  required
-                >
-                  <option value="">Select Role</option>
-                  {roles.map(role => (
-                    <option key={role.id} value={role.id}>{role.name}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">Branch</label>
-                <select
-                  className="input input-bordered w-full"
-                  value={branchId}
-                  onChange={(e) => setBranchId(Number(e.target.value))}
-                  required
-                >
-                  <option value="">Select Branch</option>
-                  {branches.map(branch => (
-                    <option key={branch.id} value={branch.id}>{branch.name}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">Department</label>
-                <select
-                  className="input input-bordered w-full"
-                  value={departmentId}
-                  onChange={(e) => setDepartmentId(Number(e.target.value))}
-                  required
-                >
-                  <option value="">Select Department</option>
-                  {departments.map(dept => (
-                    <option key={dept.id} value={dept.id}>{dept.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            
-            <div className="flex justify-end gap-2 pt-4">
-              <button 
-                type="button" 
-                className="btn btn-outline"
-                onClick={() => {
-                  setShowCreateForm(false);
-                  resetForm();
-                }}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="btn btn-primary">
-                Create User
-              </button>
-            </div>
-          </form>
-        </div>
+        </>
       )}
 
-      {/* Edit User Form */}
+      {/* Edit User Form Modal */}
       {showEditForm && editingUser && (
-        <div className="card p-6 mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium">Edit User: {editingUser.firstName} {editingUser.lastName}</h3>
-            <button 
-              className="btn btn-ghost btn-sm"
-              onClick={() => {
-                setShowEditForm(false);
-                setEditingUser(null);
-                resetForm();
-              }}
-            >
-              <X className="w-4 h-4" />
-            </button>
+        <>
+          <div className="modal-overlay" onClick={() => { setShowEditForm(false); setEditingUser(null); resetForm(); }}></div>
+          <div className="modal">
+            <div className="modal-header">
+              <h3>Edit User: {firstName} {lastName}</h3>
+              <button className="btn btn-ghost btn-icon" style={{ width: '2rem', height: '2rem' }} onClick={() => { setShowEditForm(false); setEditingUser(null); resetForm(); }}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="modal-content">
+              <form onSubmit={handleUpdateUser} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">First Name *</label>
+                    <input
+                      type="text"
+                      className="input w-full"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Last Name *</label>
+                    <input
+                      type="text"
+                      className="input w-full"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email *</label>
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-gray-400" />
+                    <input
+                      type="email"
+                      className="input w-full"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Role *</label>
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-4 h-4 text-gray-400" />
+                      <select
+                        className="input w-full"
+                        value={roleId}
+                        onChange={(e) => setRoleId(Number(e.target.value))}
+                        style={{ color: roleId ? '#1f2937' : '#6b7280' }}
+                        required
+                      >
+                        <option value="">Select Role</option>
+                        {roles.map(role => (
+                          <option key={role.id} value={role.id}>{role.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Branch *</label>
+                    <div className="flex items-center gap-2">
+                      <Building className="w-4 h-4 text-gray-400" />
+                      <select
+                        className="input w-full"
+                        value={branchId}
+                        onChange={(e) => setBranchId(Number(e.target.value))}
+                        style={{ color: branchId ? '#1f2937' : '#6b7280' }}
+                        required
+                      >
+                        <option value="">Select Branch</option>
+                        {branches.map(branch => (
+                          <option key={branch.id} value={branch.id}>{branch.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => { setShowEditForm(false); setEditingUser(null); resetForm(); }}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary">
+                    <Check className="w-4 h-4 mr-2" />
+                    Update User
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-          
-          <form onSubmit={handleUpdateUser} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">First Name</label>
-                <input
-                  type="text"
-                  className="input input-bordered w-full"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Last Name</label>
-                <input
-                  type="text"
-                  className="input input-bordered w-full"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
-              <input
-                type="email"
-                className="input input-bordered w-full"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Role</label>
-                <select
-                  className="input input-bordered w-full"
-                  value={roleId}
-                  onChange={(e) => setRoleId(Number(e.target.value))}
-                  required
-                >
-                  <option value="">Select Role</option>
-                  {roles.map(role => (
-                    <option key={role.id} value={role.id}>{role.name}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">Branch</label>
-                <select
-                  className="input input-bordered w-full"
-                  value={branchId}
-                  onChange={(e) => setBranchId(Number(e.target.value))}
-                  required
-                >
-                  <option value="">Select Branch</option>
-                  {branches.map(branch => (
-                    <option key={branch.id} value={branch.id}>{branch.name}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">Department</label>
-                <select
-                  className="input input-bordered w-full"
-                  value={departmentId}
-                  onChange={(e) => setDepartmentId(Number(e.target.value))}
-                  required
-                >
-                  <option value="">Select Department</option>
-                  {departments.map(dept => (
-                    <option key={dept.id} value={dept.id}>{dept.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            
-            <div className="flex justify-end gap-2 pt-4">
-              <button 
-                type="button" 
-                className="btn btn-outline"
-                onClick={() => {
-                  setShowEditForm(false);
-                  setEditingUser(null);
-                  resetForm();
-                }}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="btn btn-primary">
-                Update User
-              </button>
-            </div>
-          </form>
-        </div>
+        </>
       )}
 
-      {/* Existing Users */}
+      {/* Users Table */}
       <div className="card">
-        <div className="p-6 border-b">
+        <div className="p-4 border-b">
           <h3 className="text-lg font-medium">Existing Users</h3>
+          <p className="text-muted text-sm">Showing {users.length} user{users.length !== 1 ? 's' : ''}</p>
         </div>
         <div className="overflow-x-auto">
           <table className="table">
-            <thead>
+            <thead className="table-header">
               <tr>
-                <th>User</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Branch</th>
-                <th>Department</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th className="table-header-cell">Email</th>
+                <th className="table-header-cell">Role</th>
+                <th className="table-header-cell">Branch</th>
+                <th className="table-header-cell">Status</th>
+                <th className="table-header-cell right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {users.map(user => (
-                <tr key={user.id}>
-                  <td>
-                    <div className="flex items-center gap-3">
-                      <div className="avatar">
-                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                          <UserIcon className="w-5 h-5 text-blue-600" />
-                        </div>
-                      </div>
-                      <div>
-                        <div className="font-medium">{user.firstName} {user.lastName}</div>
-                      </div>
+                <tr key={user.id} className="table-row">
+                  <td className="table-cell">
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-3 h-3 text-gray-400" />
+                      <span>{user.email}</span>
                     </div>
                   </td>
-                  <td>{user.email}</td>
-                  <td>{roles.find(r => r.id === user.roleId)?.name || 'N/A'}</td>
-                  <td>{branches.find(b => b.id === user.branchId)?.name || 'N/A'}</td>
-                  <td>{departments.find(d => d.id === user.departmentId)?.name || 'N/A'}</td>
-                  <td>
-                    <span className={`badge ${user.isActive ? 'badge-success' : 'badge-error'}`}>
+                  <td className="table-cell">
+                    <div className="flex items-center gap-1">
+                      <Shield className="w-3 h-3 text-gray-400" />
+                      <span>{roles.find(r => r.id === user.roleId)?.name || (
+                        <span className="text-muted">N/A</span>
+                      )}</span>
+                    </div>
+                  </td>
+                  <td className="table-cell">
+                    {branches.find(b => b.id === user.branchId)?.name || (
+                      <span className="text-muted">N/A</span>
+                    )}
+                  </td>
+                  <td className="table-cell">
+                    <span className={`badge ${user.isActive ? 'badge-success' : 'badge-warning'}`}>
                       {user.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td>
-                    <div className="flex gap-2">
-                      <button 
+                  <td className="table-cell right">
+                    <div className="flex items-center justify-end gap-2">
+                      {user.isActive ? (
+                        <button
+                          className="btn btn-sm btn-outline yellow"
+                          onClick={() => handleDeactivateUser(user.id)}
+                          title="Deactivate user"
+                        >
+                          <X className="w-3 h-3 mr-1" />
+                          Deactivate
+                        </button>
+                      ) : (
+                        <button
+                          className="btn btn-sm btn-outline green"
+                          onClick={() => handleActivateUser(user.id)}
+                          title="Activate user"
+                        >
+                          <Check className="w-3 h-3 mr-1" />
+                          Activate
+                        </button>
+                      )}
+                      <button
                         className="btn btn-sm btn-outline"
                         onClick={() => startEditing(user)}
                       >
-                        <Edit3 className="w-4 h-4" />
+                        <Edit3 className="w-3 h-3 mr-1" />
+                        Edit
                       </button>
-                      <button 
-                        className="btn btn-sm btn-outline btn-error"
+                      <button
+                        className="btn btn-sm btn-outline red"
                         onClick={() => handleDeleteUser(user.id)}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3 h-3 mr-1" />
+                        Delete
                       </button>
                     </div>
                   </td>
@@ -528,6 +643,74 @@ const UserManagementView = () => {
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination Controls */}
+        {totalUsers_count > itemsPerPage && (
+          <div className="p-4 border-t flex items-center justify-between">
+            <div className="text-sm text-muted">
+              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalUsers_count)} of {totalUsers_count} users
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              {Array.from({ length: Math.min(5, Math.ceil(totalUsers_count / itemsPerPage)) }, (_, i) => {
+                const pageNum = currentPage <= 3 
+                  ? i + 1 
+                  : currentPage >= Math.ceil(totalUsers_count / itemsPerPage) - 2
+                    ? Math.ceil(totalUsers_count / itemsPerPage) - 4 + i
+                    : currentPage - 2 + i;
+                
+                if (pageNum < 1 || pageNum > Math.ceil(totalUsers_count / itemsPerPage)) return null;
+                
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`px-3 py-1 border rounded ${
+                      currentPage === pageNum
+                        ? 'bg-blue-500 text-white'
+                        : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(Math.ceil(totalUsers_count / itemsPerPage), prev + 1))}
+                disabled={currentPage >= Math.ceil(totalUsers_count / itemsPerPage)}
+                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {users.length === 0 && (
+          <div className="text-center py-12">
+            <div className="mx-auto w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mb-4">
+              <UserIcon className="w-8 h-8 text-blue-500" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-1">No Users Yet</h3>
+            <p className="text-gray-500 mb-4">Get started by creating your first user</p>
+            <button
+              onClick={() => {
+                resetForm();
+                setShowCreateForm(true);
+              }}
+              className="btn btn-primary"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create User
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

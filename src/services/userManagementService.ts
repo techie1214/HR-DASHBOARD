@@ -33,10 +33,12 @@ export interface UpdateUserRequest {
   roleId?: number;
   branchId?: number;
   departmentId?: number;
+  isActive?: boolean;
 }
 
 // Get all users
-export const getAllUsers = async (): Promise<{ success: boolean; users?: User[]; message?: string }> => {
+// GET {{baseUrl}}/users
+export const getAllUsers = async (page?: number, limit?: number): Promise<{ success: boolean; users?: User[]; total?: number; page?: number; limit?: number; message?: string }> => {
   try {
     const token = localStorage.getItem('authToken');
     if (!token) {
@@ -46,16 +48,62 @@ export const getAllUsers = async (): Promise<{ success: boolean; users?: User[];
       };
     }
 
-    const response = await axios.get(`${API_ENDPOINT}/api/users`, {
+    // Build query params for pagination
+    const params = new URLSearchParams();
+    if (page !== undefined) params.append('page', page.toString());
+    if (limit !== undefined) params.append('limit', limit.toString());
+    
+    const queryString = params.toString();
+    const url = `${API_ENDPOINT}/users${queryString ? '?' + queryString : ''}`;
+    
+    console.log('Fetching users from:', url);
+    const response = await axios.get(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
 
+    console.log('Users response:', response.data);
+    
+    // Handle different response formats
+    let usersData = [];
+    let total = 0;
+    
+    if (Array.isArray(response.data)) {
+      usersData = response.data;
+      total = response.data.length;
+    } else if (response.data?.data?.users) {
+      usersData = response.data.data.users;
+      total = response.data.data.total || response.data.data.count || usersData.length;
+    } else if (response.data?.users) {
+      usersData = response.data.users;
+      total = response.data.total || response.data.count || usersData.length;
+    } else if (response.data?.data) {
+      usersData = response.data.data;
+      total = response.data.total || response.data.count || usersData.length;
+    }
+
+    // Map API response to User interface (handle snake_case to camelCase)
+    const users = usersData.map((u: any) => ({
+      id: u.id,
+      firstName: u.first_name || u.firstName || 'N/A',
+      lastName: u.last_name || u.lastName || 'N/A',
+      email: u.email || 'N/A',
+      roleId: u.role_id || u.roleId || 0,
+      branchId: u.branch_id || u.branchId || 0,
+      departmentId: u.department_id || u.departmentId || 0,
+      isActive: u.is_active !== undefined ? u.is_active : (u.isActive !== undefined ? u.isActive : true),
+      createdAt: u.created_at || u.createdAt || '',
+      updatedAt: u.updated_at || u.updatedAt || ''
+    }));
+
     return {
       success: true,
-      users: response.data.data?.users || response.data.users || [],
+      users: users,
+      total: total,
+      page: response.data?.page || page || 1,
+      limit: response.data?.limit || limit || 20,
     };
   } catch (error: any) {
     console.error('Error fetching users:', error);
@@ -73,6 +121,7 @@ export const getAllUsers = async (): Promise<{ success: boolean; users?: User[];
 };
 
 // Get user by ID
+// GET {{baseUrl}}/users/:id
 export const getUserById = async (userId: number): Promise<{ success: boolean; user?: User; message?: string }> => {
   try {
     const token = localStorage.getItem('authToken');
@@ -83,16 +132,28 @@ export const getUserById = async (userId: number): Promise<{ success: boolean; u
       };
     }
 
-    const response = await axios.get(`${API_ENDPOINT}/api/users/${userId}`, {
+    const response = await axios.get(`${API_ENDPOINT}/users/${userId}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
 
+    // Handle different response formats
+    let user = null;
+    if (response.data?.data?.user) {
+      user = response.data.data.user;
+    } else if (response.data?.user) {
+      user = response.data.user;
+    } else if (response.data?.data) {
+      user = response.data.data;
+    } else {
+      user = response.data;
+    }
+
     return {
       success: true,
-      user: response.data.data?.user || response.data.user,
+      user: user,
     };
   } catch (error: any) {
     console.error('Error fetching user:', error);
@@ -110,6 +171,7 @@ export const getUserById = async (userId: number): Promise<{ success: boolean; u
 };
 
 // Create user
+// POST {{baseUrl}}/users
 export const createUser = async (userData: CreateUserRequest): Promise<{ success: boolean; user?: User; message?: string }> => {
   try {
     const token = localStorage.getItem('authToken');
@@ -120,16 +182,44 @@ export const createUser = async (userData: CreateUserRequest): Promise<{ success
       };
     }
 
-    const response = await axios.post(`${API_ENDPOINT}/api/users`, userData, {
+    console.log('Creating user with data:', userData);
+    
+    // Convert camelCase to snake_case for API
+    const apiPayload = {
+      first_name: userData.firstName,
+      last_name: userData.lastName,
+      email: userData.email,
+      password: userData.password,
+      role_id: userData.roleId,
+      branch_id: userData.branchId,
+      department_id: userData.departmentId
+    };
+    
+    const response = await axios.post(`${API_ENDPOINT}/users`, apiPayload, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
 
+    console.log('Create user response:', response.data);
+
+    // Handle different response formats
+    let user = null;
+    if (response.data?.data?.user) {
+      user = response.data.data.user;
+    } else if (response.data?.user) {
+      user = response.data.user;
+    } else if (response.data?.data) {
+      user = response.data.data;
+    } else {
+      user = response.data;
+    }
+
     return {
       success: true,
-      user: response.data.data?.user || response.data.user,
+      user: user,
+      message: 'User created successfully'
     };
   } catch (error: any) {
     console.error('Error creating user:', error);
@@ -147,6 +237,7 @@ export const createUser = async (userData: CreateUserRequest): Promise<{ success
 };
 
 // Update user
+// PUT {{baseUrl}}/users/:id
 export const updateUser = async (userId: number, userData: UpdateUserRequest): Promise<{ success: boolean; user?: User; message?: string }> => {
   try {
     const token = localStorage.getItem('authToken');
@@ -157,16 +248,43 @@ export const updateUser = async (userId: number, userData: UpdateUserRequest): P
       };
     }
 
-    const response = await axios.put(`${API_ENDPOINT}/api/users/${userId}`, userData, {
+    console.log(`Updating user ${userId} with data:`, userData);
+    
+    // Convert camelCase to snake_case for API
+    const apiPayload: any = {};
+    if (userData.firstName !== undefined) apiPayload.first_name = userData.firstName;
+    if (userData.lastName !== undefined) apiPayload.last_name = userData.lastName;
+    if (userData.email !== undefined) apiPayload.email = userData.email;
+    if (userData.roleId !== undefined) apiPayload.role_id = userData.roleId;
+    if (userData.branchId !== undefined) apiPayload.branch_id = userData.branchId;
+    if (userData.departmentId !== undefined) apiPayload.department_id = userData.departmentId;
+    if (userData.isActive !== undefined) apiPayload.is_active = userData.isActive;
+    
+    const response = await axios.put(`${API_ENDPOINT}/users/${userId}`, apiPayload, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
 
+    console.log('Update user response:', response.data);
+
+    // Handle different response formats
+    let user = null;
+    if (response.data?.data?.user) {
+      user = response.data.data.user;
+    } else if (response.data?.user) {
+      user = response.data.user;
+    } else if (response.data?.data) {
+      user = response.data.data;
+    } else {
+      user = response.data;
+    }
+
     return {
       success: true,
-      user: response.data.data?.user || response.data.user,
+      user: user,
+      message: 'User updated successfully'
     };
   } catch (error: any) {
     console.error('Error updating user:', error);
@@ -184,6 +302,7 @@ export const updateUser = async (userId: number, userData: UpdateUserRequest): P
 };
 
 // Delete user
+// DELETE {{baseUrl}}/users/:id
 export const deleteUser = async (userId: number): Promise<{ success: boolean; message?: string }> => {
   try {
     const token = localStorage.getItem('authToken');
@@ -194,15 +313,18 @@ export const deleteUser = async (userId: number): Promise<{ success: boolean; me
       };
     }
 
-    await axios.delete(`${API_ENDPOINT}/api/users/${userId}`, {
+    console.log(`Deleting user ${userId}`);
+    const response = await axios.delete(`${API_ENDPOINT}/users/${userId}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
     });
 
+    console.log('Delete user response:', response.data);
+
     return {
       success: true,
-      message: 'User deleted successfully',
+      message: response.data?.message || 'User deleted successfully',
     };
   } catch (error: any) {
     console.error('Error deleting user:', error);
@@ -220,6 +342,7 @@ export const deleteUser = async (userId: number): Promise<{ success: boolean; me
 };
 
 // Get user profile
+// GET {{baseUrl}}/users/profile
 export const getUserProfile = async (): Promise<{ success: boolean; user?: User; message?: string }> => {
   try {
     const token = localStorage.getItem('authToken');
@@ -230,7 +353,7 @@ export const getUserProfile = async (): Promise<{ success: boolean; user?: User;
       };
     }
 
-    const response = await axios.get(`${API_ENDPOINT}/api/users/profile`, {
+    const response = await axios.get(`${API_ENDPOINT}/users/profile`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -257,6 +380,7 @@ export const getUserProfile = async (): Promise<{ success: boolean; user?: User;
 };
 
 // Update user profile
+// PUT {{baseUrl}}/users/profile
 export const updateUserProfile = async (profileData: Partial<User>): Promise<{ success: boolean; user?: User; message?: string }> => {
   try {
     const token = localStorage.getItem('authToken');
@@ -267,7 +391,7 @@ export const updateUserProfile = async (profileData: Partial<User>): Promise<{ s
       };
     }
 
-    const response = await axios.put(`${API_ENDPOINT}/api/users/profile`, profileData, {
+    const response = await axios.put(`${API_ENDPOINT}/users/profile`, profileData, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -294,6 +418,7 @@ export const updateUserProfile = async (profileData: Partial<User>): Promise<{ s
 };
 
 // Change password
+// PUT {{baseUrl}}/users/change-password
 export const changePassword = async (currentPassword: string, newPassword: string): Promise<{ success: boolean; message?: string }> => {
   try {
     const token = localStorage.getItem('authToken');
@@ -304,7 +429,7 @@ export const changePassword = async (currentPassword: string, newPassword: strin
       };
     }
 
-    const response = await axios.put(`${API_ENDPOINT}/api/users/change-password`, {
+    const response = await axios.put(`${API_ENDPOINT}/users/change-password`, {
       currentPassword,
       newPassword
     }, {
@@ -334,9 +459,10 @@ export const changePassword = async (currentPassword: string, newPassword: strin
 };
 
 // Forgot password
+// POST {{baseUrl}}/users/forgot-password
 export const forgotPassword = async (email: string): Promise<{ success: boolean; message?: string }> => {
   try {
-    const response = await axios.post(`${API_ENDPOINT}/api/users/forgot-password`, {
+    const response = await axios.post(`${API_ENDPOINT}/users/forgot-password`, {
       email
     }, {
       headers: {
@@ -358,10 +484,11 @@ export const forgotPassword = async (email: string): Promise<{ success: boolean;
 };
 
 // Reset password
-export const resetPassword = async (token: string, newPassword: string): Promise<{ success: boolean; message?: string }> => {
+// POST {{baseUrl}}/users/reset-password
+export const resetPassword = async (resetToken: string, newPassword: string): Promise<{ success: boolean; message?: string }> => {
   try {
-    const response = await axios.post(`${API_ENDPOINT}/api/users/reset-password`, {
-      token,
+    const response = await axios.post(`${API_ENDPOINT}/users/reset-password`, {
+      token: resetToken,
       newPassword
     }, {
       headers: {
@@ -378,6 +505,59 @@ export const resetPassword = async (token: string, newPassword: string): Promise
     return {
       success: false,
       message: error.response?.data?.message || error.message || 'Failed to reset password',
+    };
+  }
+};
+
+// Toggle user status (activate/deactivate)
+// PUT {{baseUrl}}/users/:id/status
+export const toggleUserStatus = async (userId: number, isActive: boolean): Promise<{ success: boolean; user?: User; message?: string }> => {
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      return {
+        success: false,
+        message: 'Authentication token not found. Please log in again.'
+      };
+    }
+
+    const response = await axios.put(`${API_ENDPOINT}/users/${userId}/status`, {
+      is_active: isActive
+    }, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    // Handle different response formats
+    let user = null;
+    if (response.data?.data?.user) {
+      user = response.data.data.user;
+    } else if (response.data?.user) {
+      user = response.data.user;
+    } else if (response.data?.data) {
+      user = response.data.data;
+    } else {
+      user = response.data;
+    }
+
+    return {
+      success: true,
+      user: user,
+      message: isActive ? 'User activated successfully' : 'User deactivated successfully'
+    };
+  } catch (error: any) {
+    console.error('Error toggling user status:', error);
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      return {
+        success: false,
+        message: 'Access denied. Please check your permissions or log in again.'
+      };
+    }
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Failed to update user status',
     };
   }
 };

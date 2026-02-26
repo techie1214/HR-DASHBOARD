@@ -9,6 +9,7 @@ import { Search, Calendar, Download, Filter, Check, X, Clock, User, Building, Fi
 import {
   getAllLeaveRequests,
   updateLeaveRequestStatus,
+  cancelLeaveRequest,
   getUserLeaveBalance,
   createLeaveType,
   getAllLeaveTypes,
@@ -59,6 +60,8 @@ const LeaveManagementView = () => {
   const [approvalAction, setApprovalAction] = useState<'approve' | 'decline' | null>(null);
   // State for decline reason input
   const [declineReason, setDeclineReason] = useState('');
+  // State for showing cancellation confirmation modal
+  const [showCancelModal, setShowCancelModal] = useState(false);
   // State for showing details modal
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   // State for showing create leave type modal
@@ -384,6 +387,51 @@ const LeaveManagementView = () => {
     }
   };
 
+  // Handler for cancelling an approved leave request
+  const handleCancelLeave = async () => {
+    if (!selectedRequest) return;
+
+    try {
+      setLoading(true);
+      const requestId = parseInt(selectedRequest.id);
+
+      console.log(`Cancelling leave request ${requestId}`);
+
+      // Use the cancelLeaveRequest function
+      const response = await cancelLeaveRequest(requestId);
+
+      console.log('Cancel response:', response);
+
+      if (response.success) {
+        // Update the local state to reflect the change
+        setLeaveRequests(prev => prev.map(req =>
+          req.id === selectedRequest.id
+            ? {
+                ...req,
+                status: 'Declined', // Show as Declined in the UI
+                declineReason: 'Cancelled by HR'
+              }
+            : req
+        ));
+
+        setSuccessMessage(response.message || 'Leave request cancelled successfully');
+        setTimeout(() => setSuccessMessage(null), 3000);
+      } else {
+        throw new Error(response.message || 'Failed to cancel leave request');
+      }
+
+      // Close modal and reset state
+      setShowCancelModal(false);
+      setSelectedRequest(null);
+    } catch (err: any) {
+      console.error('Error cancelling leave request:', err);
+      setError(err.message || 'An error occurred while cancelling the request');
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Handler for creating a new leave type
   const handleCreateLeaveType = async () => {
     try {
@@ -491,99 +539,99 @@ const LeaveManagementView = () => {
   const renderRequestsTab = () => (
     <>
       {/* Interactive Stats Cards - clickable cards that filter by status */}
-      <div className="grid grid-cols-1 md-grid-cols-2 lg-grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* All Requests Card - shows total count and filters to show all */}
         <div
-          className="card p-4 cursor-pointer transition-all hover-lift"
+          className="card p-3 cursor-pointer transition-all hover-lift"
           onClick={() => setFilterStatus('all')}
           style={{
             border: filterStatus === 'all' ? '2px solid #2563eb' : '1px solid #e5e7eb',
             backgroundColor: filterStatus === 'all' ? '#eff6ff' : 'white'
           }}
         >
-          <div className="flex items-center gap-3">
-            <div className="icon-wrapper" style={{ backgroundColor: '#dbeafe', width: '2.5rem', height: '2.5rem' }}>
-              <Calendar className="w-4 h-4" style={{ color: '#2563eb' }} />
+          <div className="flex items-center gap-2">
+            <div className="icon-wrapper" style={{ backgroundColor: '#dbeafe', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
+              <Calendar className="w-3 h-3" style={{ color: '#2563eb' }} />
             </div>
             <div>
-              <p className="text-muted" style={{ fontSize: '0.7rem' }}>All Requests</p>
-              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{totalRequests}</p>
+              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>All Requests</p>
+              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{totalRequests}</p>
             </div>
           </div>
         </div>
         {/* Approved Requests Card */}
         <div
-          className="card p-4 cursor-pointer transition-all hover-lift"
+          className="card p-3 cursor-pointer transition-all hover-lift"
           onClick={() => setFilterStatus('approved')}
           style={{
             border: filterStatus === 'approved' ? '2px solid #16a34a' : '1px solid #e5e7eb',
             backgroundColor: filterStatus === 'approved' ? '#f0fdf4' : 'white'
           }}
         >
-          <div className="flex items-center gap-3">
-            <div className="icon-wrapper" style={{ backgroundColor: '#dcfce7', width: '2.5rem', height: '2.5rem' }}>
-              <Check className="w-4 h-4" style={{ color: '#16a34a' }} />
+          <div className="flex items-center gap-2">
+            <div className="icon-wrapper" style={{ backgroundColor: '#dcfce7', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
+              <Check className="w-3 h-3" style={{ color: '#16a34a' }} />
             </div>
             <div>
-              <p className="text-muted" style={{ fontSize: '0.7rem' }}>Approved</p>
-              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{approvedCount}</p>
+              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Approved</p>
+              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{approvedCount}</p>
             </div>
           </div>
         </div>
         {/* Declined Requests Card */}
         <div
-          className="card p-4 cursor-pointer transition-all hover-lift"
+          className="card p-3 cursor-pointer transition-all hover-lift"
           onClick={() => setFilterStatus('declined')}
           style={{
             border: filterStatus === 'declined' ? '2px solid #dc2626' : '1px solid #e5e7eb',
             backgroundColor: filterStatus === 'declined' ? '#fef2f2' : 'white'
           }}
         >
-          <div className="flex items-center gap-3">
-            <div className="icon-wrapper" style={{ backgroundColor: '#fee2e2', width: '2.5rem', height: '2.5rem' }}>
-              <X className="w-4 h-4" style={{ color: '#dc2626' }} />
+          <div className="flex items-center gap-2">
+            <div className="icon-wrapper" style={{ backgroundColor: '#fee2e2', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
+              <X className="w-3 h-3" style={{ color: '#dc2626' }} />
             </div>
             <div>
-              <p className="text-muted" style={{ fontSize: '0.7rem' }}>Declined</p>
-              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{declinedCount}</p>
+              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Declined</p>
+              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{declinedCount}</p>
             </div>
           </div>
         </div>
         {/* Active Leave Card */}
         <div
-          className="card p-4 cursor-pointer transition-all hover-lift"
+          className="card p-3 cursor-pointer transition-all hover-lift"
           onClick={() => setFilterStatus('active')}
           style={{
             border: filterStatus === 'active' ? '2px solid #10b981' : '1px solid #e5e7eb',
             backgroundColor: filterStatus === 'active' ? '#ecfdf5' : 'white'
           }}
         >
-          <div className="flex items-center gap-3">
-            <div className="icon-wrapper" style={{ backgroundColor: '#d1fae5', width: '2.5rem', height: '2.5rem' }}>
-              <CalendarDays className="w-4 h-4" style={{ color: '#10b981' }} />
+          <div className="flex items-center gap-2">
+            <div className="icon-wrapper" style={{ backgroundColor: '#d1fae5', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
+              <CalendarDays className="w-3 h-3" style={{ color: '#10b981' }} />
             </div>
             <div>
-              <p className="text-muted" style={{ fontSize: '0.7rem' }}>Active Now</p>
-              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{activeCount}</p>
+              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Active Now</p>
+              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{activeCount}</p>
             </div>
           </div>
         </div>
         {/* Pending Requests Card */}
         <div
-          className="card p-4 cursor-pointer transition-all hover-lift"
+          className="card p-3 cursor-pointer transition-all hover-lift"
           onClick={() => setFilterStatus('pending')}
           style={{
             border: filterStatus === 'pending' ? '2px solid #f59e0b' : '1px solid #e5e7eb',
             backgroundColor: filterStatus === 'pending' ? '#fffbeb' : 'white'
           }}
         >
-          <div className="flex items-center gap-3">
-            <div className="icon-wrapper" style={{ backgroundColor: '#fef3c7', width: '2.5rem', height: '2.5rem' }}>
-              <Clock className="w-4 h-4" style={{ color: '#f59e0b' }} />
+          <div className="flex items-center gap-2">
+            <div className="icon-wrapper" style={{ backgroundColor: '#fef9c3', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
+              <Clock className="w-3 h-3" style={{ color: '#ca8a04' }} />
             </div>
             <div>
-              <p className="text-muted" style={{ fontSize: '0.7rem' }}>Pending</p>
-              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{pendingCount}</p>
+              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Pending</p>
+              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{pendingCount}</p>
             </div>
           </div>
         </div>
@@ -856,14 +904,14 @@ const LeaveManagementView = () => {
                     <td className="table-cell right">
                       {request.status === 'Pending' ? (
                         <div className="flex items-center justify-end gap-2">
-                          <button 
+                          <button
                             className="btn btn-sm btn-outline green"
                             onClick={() => handleApprovalAction(request, 'approve')}
                           >
                             <Check className="w-3 h-3 mr-1" />
                             Approve
                           </button>
-                          <button 
+                          <button
                             className="btn btn-sm btn-outline red"
                             onClick={() => handleApprovalAction(request, 'decline')}
                           >
@@ -871,8 +919,28 @@ const LeaveManagementView = () => {
                             Decline
                           </button>
                         </div>
+                      ) : request.status === 'Approved' ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            className="btn btn-sm btn-outline"
+                            onClick={() => handleViewDetails(request)}
+                          >
+                            <FileText className="w-3 h-3 mr-1" />
+                            Details
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline red"
+                            onClick={() => {
+                              setSelectedRequest(request);
+                              setShowCancelModal(true);
+                            }}
+                          >
+                            <X className="w-3 h-3 mr-1" />
+                            Cancel
+                          </button>
+                        </div>
                       ) : (
-                        <button 
+                        <button
                           className="btn btn-sm btn-outline"
                           onClick={() => handleViewDetails(request)}
                         >
@@ -1254,6 +1322,102 @@ const LeaveManagementView = () => {
                       <>
                         <X className="w-4 h-4 mr-2" />
                         Decline Request
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Cancel Leave Modal */}
+          {showCancelModal && selectedRequest && (
+            <>
+              <div className="modal-overlay" onClick={() => setShowCancelModal(false)}></div>
+              <div className="modal">
+                <div className="modal-header">
+                  <h3>Cancel Leave Request</h3>
+                  <button className="btn btn-ghost btn-icon" style={{ width: '2rem', height: '2rem' }} onClick={() => setShowCancelModal(false)}>
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="modal-content">
+                  <div className="space-y-4">
+                    <div className="p-4 rounded" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca' }}>
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5" style={{ color: '#dc2626', flexShrink: 0, marginTop: '0.125rem' }} />
+                        <div>
+                          <p style={{ fontSize: '0.875rem', color: '#991b1b', fontWeight: 600 }}>Warning: This action will cancel the approved leave</p>
+                          <p style={{ fontSize: '0.875rem', color: '#dc2626', marginTop: '0.25rem' }}>
+                            The employee's leave balance will be restored and the leave request will be marked as declined.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 p-4 rounded" style={{ backgroundColor: '#f9fafb' }}>
+                      <div className="avatar" style={{ width: '3rem', height: '3rem' }}>
+                        {selectedRequest.staffName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                      </div>
+                      <div>
+                        <p style={{ fontWeight: 600, fontSize: '1rem' }}>{selectedRequest.staffName}</p>
+                        <p className="text-xs text-muted">{selectedRequest.staffId} · {selectedRequest.department}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Leave Type</p>
+                        <div className="flex items-center gap-2">
+                          <span style={{ fontSize: '1.25rem' }}>{leaveTypes.find(t => t.type === selectedRequest.leaveType)?.icon}</span>
+                          <span style={{ fontWeight: 600 }}>{selectedRequest.leaveType}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Duration</p>
+                        <p style={{ fontWeight: 600 }}>{selectedRequest.duration} day{selectedRequest.duration > 1 ? 's' : ''}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Start Date</p>
+                        <p style={{ fontWeight: 600 }}>
+                          {new Date(selectedRequest.startDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        </p>
+                      </div>
+                      <div>
+                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>End Date</p>
+                        <p style={{ fontWeight: 600 }}>
+                          {new Date(selectedRequest.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Reason</p>
+                      <p style={{ fontSize: '0.875rem', padding: '0.75rem', backgroundColor: '#f9fafb', borderRadius: '0.375rem' }}>
+                        {selectedRequest.reason}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-outline" onClick={() => setShowCancelModal(false)}>Go Back</button>
+                  <button
+                    className="btn btn-outline red"
+                    onClick={handleCancelLeave}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <Clock className="w-4 h-4 mr-2 animate-spin" />
+                        Cancelling...
+                      </>
+                    ) : (
+                      <>
+                        <X className="w-4 h-4 mr-2" />
+                        Cancel Leave Request
                       </>
                     )}
                   </button>
