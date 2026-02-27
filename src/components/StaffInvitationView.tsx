@@ -81,6 +81,10 @@ const StaffInvitationView: React.FC<StaffInvitationViewProps> = ({ onSuccess, on
           acceptedAt: inv.accepted_at || inv.acceptedAt
         }));
         setInvitations(mappedInvitations);
+        console.log('Loaded invitations:', mappedInvitations.length);
+      } else {
+        console.warn('Failed to load invitations:', invitationsResponse.message);
+        setInvitations([]);
       }
 
       // Load roles
@@ -101,8 +105,8 @@ const StaffInvitationView: React.FC<StaffInvitationViewProps> = ({ onSuccess, on
         setDepartments(departmentsResponse.departments);
       }
     } catch (err: any) {
-      setError('An error occurred while loading data');
-      console.error(err);
+      console.error('Error loading data:', err);
+      setError('An error occurred while loading data. Please refresh the page.');
     } finally {
       setLoading(false);
     }
@@ -131,15 +135,30 @@ const StaffInvitationView: React.FC<StaffInvitationViewProps> = ({ onSuccess, on
       const response = await inviteStaff(invitationData);
       if (response.success) {
         setSuccessMessage('Invitation sent successfully!');
-        setTimeout(() => setSuccessMessage(null), 3000);
+        setTimeout(() => setSuccessMessage(null), 4000);
         resetForm();
         loadData();
         if (onSuccess) onSuccess();
       } else {
-        setError(response.message || 'Failed to send invitation');
+        // Handle specific error messages
+        const errorMsg = response.message || 'Failed to send invitation';
+        if (errorMsg.toLowerCase().includes('duplicate')) {
+          setError('This email has already been invited. Please use a different email or resend the existing invitation.');
+        } else if (errorMsg.toLowerCase().includes('email')) {
+          setError('Invalid email address. Please check and try again.');
+        } else {
+          setError(errorMsg);
+        }
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to send invitation');
+      const errorMsg = err.response?.data?.message || err.message || 'Failed to send invitation';
+      if (errorMsg.toLowerCase().includes('duplicate')) {
+        setError('This email has already been invited. Please use a different email or resend the existing invitation.');
+      } else if (errorMsg.toLowerCase().includes('network')) {
+        setError('Network error. Please check your connection and try again.');
+      } else {
+        setError(errorMsg);
+      }
     } finally {
       setActionLoading(null);
     }
@@ -267,14 +286,25 @@ const StaffInvitationView: React.FC<StaffInvitationViewProps> = ({ onSuccess, on
             Manage pending and accepted staff invitations
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowInviteForm(true)}
-          className="btn btn-primary"
-        >
-          <Send className="w-4 h-4 mr-2" />
-          Send Invitation
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={loadData}
+            disabled={loading}
+            className="btn btn-outline"
+            title="Refresh list"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowInviteForm(true)}
+            className="btn btn-primary"
+          >
+            <Send className="w-4 h-4 mr-2" />
+            Send Invitation
+          </button>
+        </div>
       </div>
 
       {/* Invite Form Modal */}

@@ -219,13 +219,15 @@ export const getAllStaffInvitations = async (): Promise<{ success: boolean; invi
       };
     }
 
-    const response = await axios.get(`${API_ENDPOINT}/staff-invitation`, {
+    console.log('Fetching invitations from:', `${API_ENDPOINT}/staff-invitation/invitations`);
+    const response = await axios.get(`${API_ENDPOINT}/staff-invitation/invitations`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
 
+    console.log('Invitations response:', response.data);
     return {
       success: true,
       invitations: response.data.data?.invitations || response.data.invitations || [],
@@ -632,16 +634,18 @@ export const resendStaffInvitation = async (invitationId: string): Promise<{ suc
       };
     }
 
-    const response = await axios.post(`${API_ENDPOINT}/staff-invitation/${invitationId}/resend`, {}, {
+    console.log(`Resending invitation ${invitationId}...`);
+    const response = await axios.post(`${API_ENDPOINT}/staff-invitation/invitations/${invitationId}/resend`, {}, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
 
+    console.log('Resend response:', response.data);
     return {
       success: true,
-      invitation: response.data.invitation || response.data,
+      invitation: response.data.data?.invitation || response.data.invitation || response.data,
     };
   } catch (error: any) {
     console.error('Error resending staff invitation:', error);
@@ -669,7 +673,8 @@ export const revokeStaffInvitation = async (invitationId: string): Promise<{ suc
       };
     }
 
-    await axios.delete(`${API_ENDPOINT}/staff-invitation/${invitationId}`, {
+    console.log(`Revoking invitation ${invitationId}...`);
+    await axios.delete(`${API_ENDPOINT}/staff-invitation/invitations/${invitationId}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },

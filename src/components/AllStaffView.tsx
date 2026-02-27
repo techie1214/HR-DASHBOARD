@@ -416,43 +416,9 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
                       </div>
 
                       <div className="flex flex-col items-end gap-1">
-                        <span className={`badge ${staff.status === 'Active' ? 'badge-success' : 'badge-secondary'}`}>
+                        <span className={`badge ${staff.status === 'Active' ? 'badge-success' : 'badge-warning'}`}>
                           {staff.status}
                         </span>
-
-                        {staff.status === 'Active' ? (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeactivateStaff(staff.id);
-                            }}
-                            disabled={actionLoading === `deactivate-${staff.id}`}
-                            className="btn btn-xs"
-                            style={{ backgroundColor: '#f59e0b', color: 'white' }}
-                          >
-                            {actionLoading === `deactivate-${staff.id}` ? (
-                              <span className="loading loading-spinner loading-xs"></span>
-                            ) : (
-                              'Deactivate'
-                            )}
-                          </button>
-                        ) : (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleActivateStaff(staff.id);
-                            }}
-                            disabled={actionLoading === `activate-${staff.id}`}
-                            className="btn btn-xs"
-                            style={{ backgroundColor: '#16a34a', color: 'white' }}
-                          >
-                            {actionLoading === `activate-${staff.id}` ? (
-                              <span className="loading loading-spinner loading-xs"></span>
-                            ) : (
-                              'Activate'
-                            )}
-                          </button>
-                        )}
 
                         {isStaffOnActiveOffDay(staff) && (
                           <span

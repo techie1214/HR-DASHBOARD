@@ -532,14 +532,17 @@ export const toggleUserStatus = async (userId: number, isActive: boolean): Promi
       };
     }
 
+    console.log(`Toggling user ${userId} to ${isActive ? 'active' : 'inactive'}...`);
     const response = await axios.put(`${API_ENDPOINT}/users/${userId}/status`, {
-      is_active: isActive
+      isActive: isActive  // Send as camelCase
     }, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
+
+    console.log('Toggle status response:', response.data);
 
     // Handle different response formats
     let user = null;
@@ -560,6 +563,9 @@ export const toggleUserStatus = async (userId: number, isActive: boolean): Promi
     };
   } catch (error: any) {
     console.error('Error toggling user status:', error);
+    console.error('Response data:', error.response?.data);
+    console.error('Response status:', error.response?.status);
+    
     if (error.response?.status === 401 || error.response?.status === 403) {
       return {
         success: false,
