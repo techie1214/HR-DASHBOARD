@@ -92,6 +92,9 @@ const LeaveAllocationView = () => {
     carried_over_days: 0,
     user_ids: [],
   });
+
+  // Staff search for bulk modal
+  const [bulkStaffSearch, setBulkStaffSearch] = useState('');
   
   const [bulkAllForm, setBulkAllForm] = useState<Omit<BulkAllocationRequest, 'user_ids'>>({
     leave_type_id: 0,
@@ -112,12 +115,17 @@ const LeaveAllocationView = () => {
     fetchData();
     loadLeaveTypes();
     loadStaffMembers();
-  }, [currentPage]);
+  }, [currentPage, selectedUserId, selectedLeaveTypeId]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedUserId, selectedLeaveTypeId]);
 
   const fetchData = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const params: PaginationParams = {
         page: currentPage,
@@ -167,9 +175,33 @@ const LeaveAllocationView = () => {
 
   const loadStaffMembers = async () => {
     try {
-      const result = await getAllStaff();
+      // Fetch all staff without pagination limits (use large limit)
+      const result = await getAllStaff(1, 1000);
       if (result.success && result.staff) {
-        setStaffMembers(result.staff);
+        console.log('Loaded staff members:', result.staff.length);
+        console.log('Sample staff data:', result.staff[0]);
+        // Map the API response to our StaffMember interface
+        const mappedStaff = result.staff.map((s: any) => {
+          // Try multiple field name variations for name
+          const firstName = s.first_name || s.firstName || s.firstname || '';
+          const lastName = s.last_name || s.lastName || s.lastname || '';
+          const middleName = s.middle_name || s.middleName || s.middlename || '';
+          
+          // Build full name
+          const fullName = [firstName, middleName, lastName].filter(n => n).join(' ').trim();
+          
+          return {
+            id: s.id,
+            name: fullName || s.name || s.full_name || s.staff_name || s.email || 'Unknown',
+            email: s.work_email || s.email || s.personal_email || '',
+            staff_id: s.staff_id || s.staffId || s.id?.toString(),
+            department: s.department || s.department_name || ''
+          };
+        });
+        console.log('Mapped staff members:', mappedStaff);
+        setStaffMembers(mappedStaff);
+      } else {
+        console.warn('Failed to load staff:', result.message);
       }
     } catch (err) {
       console.error('Error loading staff members:', err);
@@ -565,7 +597,7 @@ const LeaveAllocationView = () => {
               >
                 <option value="">All Staff</option>
                 {staffMembers.map(staff => (
-                  <option key={staff.id} value={staff.id}>
+                  <option key={staff.id} value={staff.id} style={{ color: '#1f2937' }}>
                     {staff.name} {staff.staff_id ? `(${staff.staff_id})` : ''}
                   </option>
                 ))}
@@ -583,12 +615,26 @@ const LeaveAllocationView = () => {
               >
                 <option value="">All Leave Types</option>
                 {leaveTypes.map(type => (
-                  <option key={type.id} value={type.id}>
+                  <option key={type.id} value={type.id} style={{ color: '#1f2937' }}>
                     {type.name}
                   </option>
                 ))}
               </select>
             </div>
+            {(selectedUserId || selectedLeaveTypeId) && (
+              <div className="md:col-span-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedUserId('');
+                    setSelectedLeaveTypeId('');
+                  }}
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Clear All Filters
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -733,53 +779,81 @@ const LeaveAllocationView = () => {
 
         {/* Pagination */}
         {pagination && pagination.totalPages > 1 && (
-          <div className="p-4 border-t flex items-center justify-between">
-            <div className="text-sm text-muted">
-              Showing <span style={{ fontWeight: 600, color: '#1f2937' }}>{((currentPage - 1) * limit) + 1}</span> to <span style={{ fontWeight: 600, color: '#1f2937' }}>{Math.min(currentPage * limit, pagination.totalRecords)}</span> of <span style={{ fontWeight: 600, color: '#1f2937' }}>{pagination.totalRecords}</span> allocations
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-medium text-gray-700 hover:border-gray-400"
-              >
-                Previous
-              </button>
+          <div className="p-4 border-t" style={{ backgroundColor: '#f9fafb' }}>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="text-sm" style={{ color: '#6b7280' }}>
+                Showing <span style={{ fontWeight: 600, color: '#111827' }}>{((currentPage - 1) * limit) + 1}</span> to{' '}
+                <span style={{ fontWeight: 600, color: '#111827' }}>{Math.min(currentPage * limit, pagination.totalRecords)}</span> of{' '}
+                <span style={{ fontWeight: 600, color: '#111827' }}>{pagination.totalRecords}</span> allocations
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="flex items-center gap-1 px-3 py-1.5 border rounded-lg hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  style={{ 
+                    backgroundColor: currentPage === 1 ? '#f3f4f6' : 'white',
+                    borderColor: '#e5e7eb',
+                    color: currentPage === 1 ? '#9ca3af' : '#374151',
+                    fontSize: '0.875rem',
+                    fontWeight: 500
+                  }}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Previous
+                </button>
 
-              {Array.from({ length: Math.min(7, pagination.totalPages) }, (_, i) => {
-                let pageNum;
-                if (pagination.totalPages <= 7) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 4) {
-                  pageNum = i + 1;
-                } else if (currentPage >= pagination.totalPages - 3) {
-                  pageNum = pagination.totalPages - 6 + i;
-                } else {
-                  pageNum = currentPage - 3 + i;
-                }
+                {Array.from({ length: Math.min(7, pagination.totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (pagination.totalPages <= 7) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 4) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= pagination.totalPages - 3) {
+                    pageNum = pagination.totalPages - 6 + i;
+                  } else {
+                    pageNum = currentPage - 3 + i;
+                  }
 
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`px-4 py-1.5 border rounded-lg transition-all text-sm font-medium ${
-                      currentPage === pageNum
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                        : 'border-gray-300 text-gray-700 hover:bg-blue-50 hover:border-blue-300'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className="min-w-[2.5rem] px-2 py-1.5 border rounded-lg transition-all"
+                      style={{
+                        backgroundColor: currentPage === pageNum ? '#2563eb' : 'white',
+                        borderColor: currentPage === pageNum ? '#2563eb' : '#e5e7eb',
+                        color: currentPage === pageNum ? 'white' : '#374151',
+                        fontSize: '0.875rem',
+                        fontWeight: currentPage === pageNum ? 600 : 500,
+                        boxShadow: currentPage === pageNum ? '0 1px 2px 0 rgba(37, 99, 235, 0.2)' : 'none'
+                      }}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
 
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(pagination.totalPages, prev + 1))}
-                disabled={currentPage === pagination.totalPages}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-medium text-gray-700 hover:border-gray-400"
-              >
-                Next
-              </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(pagination.totalPages, prev + 1))}
+                  disabled={currentPage === pagination.totalPages}
+                  className="flex items-center gap-1 px-3 py-1.5 border rounded-lg hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  style={{ 
+                    backgroundColor: currentPage === pagination.totalPages ? '#f3f4f6' : 'white',
+                    borderColor: '#e5e7eb',
+                    color: currentPage === pagination.totalPages ? '#9ca3af' : '#374151',
+                    fontSize: '0.875rem',
+                    fontWeight: 500
+                  }}
+                >
+                  Next
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -787,12 +861,47 @@ const LeaveAllocationView = () => {
 
       {/* Create Allocation Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">Create Leave Allocation</h2>
+        <>
+          <div className="modal-overlay" onClick={() => { setShowCreateModal(false); resetCreateForm(); }} style={{ animation: 'fadeIn 0.2s ease-out' }}></div>
+          <div 
+            className="modal" 
+            style={{ 
+              maxWidth: '1200px', 
+              animation: 'slideUp 0.3s ease-out',
+              width: 'calc(100% - 2rem)',
+              maxHeight: '90vh'
+            }}
+          >
+            <div className="modal-header" style={{ padding: '1.25rem 1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ 
+                  width: '2.5rem', 
+                  height: '2.5rem', 
+                  borderRadius: '0.5rem', 
+                  backgroundColor: '#eff6ff', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center'
+                }}>
+                  <Plus className="w-5 h-5" style={{ color: '#2563eb' }} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>Create Leave Allocation</h3>
+                  <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>Allocate leave days to a staff member</p>
+                </div>
+              </div>
+              <button 
+                className="btn btn-ghost btn-icon" 
+                style={{ width: '2.25rem', height: '2.25rem', borderRadius: '0.5rem' }} 
+                onClick={() => { setShowCreateModal(false); resetCreateForm(); }}
+                title="Close modal"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            <form onSubmit={handleCreateAllocation} className="p-6">
+            <div className="modal-content" style={{ padding: '1.5rem' }}>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -803,11 +912,14 @@ const LeaveAllocationView = () => {
                     onChange={(e) => setCreateForm({ ...createForm, user_id: Number(e.target.value) })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
+                    style={{ backgroundColor: 'white', color: '#1f2937' }}
                   >
-                    <option value="">Select Staff</option>
+                    <option value="" disabled>Select Staff</option>
                     {staffMembers.map(staff => (
-                      <option key={staff.id} value={staff.id}>
-                        {staff.name} {staff.staff_id ? `(${staff.staff_id})` : ''}
+                      <option key={staff.id} value={staff.id} style={{ color: '#1f2937', fontWeight: 500 }}>
+                        {staff.name}
+                        {staff.staff_id ? ` (${staff.staff_id})` : ''}
+                        {staff.email ? ` - ${staff.email}` : ''}
                       </option>
                     ))}
                   </select>
@@ -821,96 +933,134 @@ const LeaveAllocationView = () => {
                     onChange={(e) => setCreateForm({ ...createForm, leave_type_id: Number(e.target.value) })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
+                    style={{ backgroundColor: 'white', color: '#1f2937' }}
                   >
-                    <option value="">Select Leave Type</option>
+                    <option value="" disabled>Select Leave Type</option>
                     {leaveTypes.map(type => (
-                      <option key={type.id} value={type.id}>
-                        {type.name} ({type.daysPerYear} days/year)
+                      <option key={type.id} value={type.id} style={{ color: '#1f2937' }}>
+                        {type.name} ({type.days_per_year || type.daysPerYear} days/year)
                       </option>
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Allocated Days *
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={createForm.allocated_days || ''}
-                    onChange={(e) => setCreateForm({ ...createForm, allocated_days: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Allocated Days *
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={createForm.allocated_days || ''}
+                      onChange={(e) => setCreateForm({ ...createForm, allocated_days: Number(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Carried Over Days
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={createForm.carried_over_days || ''}
+                      onChange={(e) => setCreateForm({ ...createForm, carried_over_days: Number(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Cycle Start Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={createForm.cycle_start_date}
-                    onChange={(e) => setCreateForm({ ...createForm, cycle_start_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Cycle End Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={createForm.cycle_end_date}
-                    onChange={(e) => setCreateForm({ ...createForm, cycle_end_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Carried Over Days
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={createForm.carried_over_days || ''}
-                    onChange={(e) => setCreateForm({ ...createForm, carried_over_days: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Cycle Start Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={createForm.cycle_start_date}
+                      onChange={(e) => setCreateForm({ ...createForm, cycle_start_date: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Cycle End Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={createForm.cycle_end_date}
+                      onChange={(e) => setCreateForm({ ...createForm, cycle_end_date: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
                 </div>
               </div>
-              <div className="flex gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    resetCreateForm();
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Create Allocation
-                </button>
-              </div>
-            </form>
+            </div>
+            <div className="modal-footer" style={{ padding: '1rem 1.5rem', backgroundColor: '#f9fafb' }}>
+              <button
+                type="button"
+                onClick={() => { setShowCreateModal(false); resetCreateForm(); }}
+                className="btn btn-outline"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateAllocation}
+                className="btn btn-primary"
+              >
+                Create Allocation
+              </button>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Bulk Allocation Modal */}
       {showBulkModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">Bulk Allocate to Selected Users</h2>
+        <>
+          <div className="modal-overlay" onClick={() => setShowBulkModal(false)} style={{ animation: 'fadeIn 0.2s ease-out' }}></div>
+          <div 
+            className="modal" 
+            style={{ 
+              maxWidth: '1200px', 
+              animation: 'slideUp 0.3s ease-out',
+              width: 'calc(100% - 2rem)',
+              maxHeight: '90vh'
+            }}
+          >
+            <div className="modal-header" style={{ padding: '1.25rem 1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ 
+                  width: '2.5rem', 
+                  height: '2.5rem', 
+                  borderRadius: '0.5rem', 
+                  backgroundColor: '#eff6ff', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center'
+                }}>
+                  <Users className="w-5 h-5" style={{ color: '#2563eb' }} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>Bulk Allocate to Selected Users</h3>
+                  <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>Allocate leave days to multiple staff members</p>
+                </div>
+              </div>
+              <button 
+                className="btn btn-ghost btn-icon" 
+                style={{ width: '2.25rem', height: '2.25rem', borderRadius: '0.5rem' }} 
+                onClick={() => setShowBulkModal(false)}
+                title="Close modal"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            <form onSubmit={handleBulkAllocate} className="p-6">
+            <div className="modal-content" style={{ padding: '1.5rem' }}>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -921,11 +1071,12 @@ const LeaveAllocationView = () => {
                     onChange={(e) => setBulkForm({ ...bulkForm, leave_type_id: Number(e.target.value) })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
+                    style={{ backgroundColor: 'white', color: '#1f2937' }}
                   >
-                    <option value="">Select Leave Type</option>
+                    <option value="" disabled>Select Leave Type</option>
                     {leaveTypes.map(type => (
-                      <option key={type.id} value={type.id}>
-                        {type.name} ({type.daysPerYear} days/year)
+                      <option key={type.id} value={type.id} style={{ color: '#1f2937' }}>
+                        {type.name} ({type.days_per_year || type.daysPerYear} days/year)
                       </option>
                     ))}
                   </select>
@@ -947,55 +1098,152 @@ const LeaveAllocationView = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Select Users *
                   </label>
-                  <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto bg-white">
-                    {staffMembers.map(staff => (
-                      <label key={staff.id} className="flex items-center gap-3 p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={bulkForm.user_ids?.includes(staff.id)}
-                          onChange={(e) => {
-                            const current = bulkForm.user_ids || [];
-                            if (e.target.checked) {
-                              setBulkForm({ ...bulkForm, user_ids: [...current, staff.id] });
-                            } else {
-                              setBulkForm({ ...bulkForm, user_ids: current.filter(id => id !== staff.id) });
-                            }
-                          }}
-                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <div className="flex-1">
-                          <span className="text-sm font-medium text-gray-900">{staff.name}</span>
-                          {staff.staff_id && (
-                            <span className="text-xs text-gray-500 ml-2">({staff.staff_id})</span>
+                  <div className="space-y-3">
+                    {/* Search box */}
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Search staff by name or email..."
+                        value={bulkStaffSearch}
+                        onChange={(e) => setBulkStaffSearch(e.target.value)}
+                        className="w-full px-4 py-2.5 pl-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        style={{ backgroundColor: 'white', color: '#1f2937' }}
+                      />
+                      <svg className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    
+                    {/* Selected staff pills */}
+                    {bulkForm.user_ids && bulkForm.user_ids.length > 0 && (
+                      <div className="flex flex-wrap gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <span className="text-xs font-medium text-blue-800 py-1">Selected:</span>
+                        {bulkForm.user_ids.map(userId => {
+                          const staff = staffMembers.find(s => s.id === userId);
+                          if (!staff) return null;
+                          return (
+                            <span 
+                              key={userId}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-white text-blue-700 rounded-full text-sm border border-blue-300"
+                            >
+                              {staff.name}
+                              <button
+                                type="button"
+                                onClick={() => setBulkForm({ 
+                                  ...bulkForm, 
+                                  user_ids: bulkForm.user_ids.filter(id => id !== userId) 
+                                })}
+                                className="hover:text-blue-900"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                    
+                    {/* Search results */}
+                    <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto bg-white" style={{ backgroundColor: 'white' }}>
+                      {bulkStaffSearch ? (
+                        <div className="p-2">
+                          {staffMembers.filter(staff => {
+                            const search = bulkStaffSearch.toLowerCase();
+                            const isAlreadySelected = bulkForm.user_ids?.includes(staff.id);
+                            return (staff.name.toLowerCase().includes(search) || 
+                                   staff.email.toLowerCase().includes(search)) &&
+                                   !isAlreadySelected;
+                          }).map(staff => (
+                            <button
+                              key={staff.id}
+                              type="button"
+                              onClick={() => setBulkForm({ 
+                                ...bulkForm, 
+                                user_ids: [...(bulkForm.user_ids || []), staff.id] 
+                              })}
+                              className="w-full flex items-center gap-3 p-2 hover:bg-blue-50 rounded-lg transition-colors text-left"
+                            >
+                              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                <span className="text-xs font-medium text-blue-600">
+                                  {staff.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                </span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium text-gray-900">{staff.name}</div>
+                                <div className="text-xs text-gray-500 truncate">{staff.email}</div>
+                              </div>
+                              <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                              </svg>
+                            </button>
+                          ))}
+                          {staffMembers.filter(staff => {
+                            const search = bulkStaffSearch.toLowerCase();
+                            const isAlreadySelected = bulkForm.user_ids?.includes(staff.id);
+                            return (staff.name.toLowerCase().includes(search) || 
+                                   staff.email.toLowerCase().includes(search)) &&
+                                   !isAlreadySelected;
+                          }).length === 0 && (
+                            <div className="p-4 text-center text-gray-500">
+                              <p>No staff found matching "{bulkStaffSearch}"</p>
+                            </div>
                           )}
                         </div>
-                      </label>
-                    ))}
+                      ) : (
+                        <div className="p-4 text-center text-gray-500">
+                          <p className="text-sm">Type to search for staff...</p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Quick actions */}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setBulkForm({ ...bulkForm, user_ids: staffMembers.map(s => s.id) })}
+                        className="text-xs px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors font-medium"
+                      >
+                        Select All ({staffMembers.length})
+                      </button>
+                      {bulkForm.user_ids && bulkForm.user_ids.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setBulkForm({ ...bulkForm, user_ids: [] })}
+                          className="text-xs px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                        >
+                          Clear All
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Cycle Start Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={bulkForm.cycle_start_date}
-                    onChange={(e) => setBulkForm({ ...bulkForm, cycle_start_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Cycle End Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={bulkForm.cycle_end_date}
-                    onChange={(e) => setBulkForm({ ...bulkForm, cycle_end_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Cycle Start Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={bulkForm.cycle_start_date}
+                      onChange={(e) => setBulkForm({ ...bulkForm, cycle_start_date: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Cycle End Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={bulkForm.cycle_end_date}
+                      onChange={(e) => setBulkForm({ ...bulkForm, cycle_end_date: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1010,38 +1258,74 @@ const LeaveAllocationView = () => {
                   />
                 </div>
               </div>
-              <div className="flex gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowBulkModal(false);
-                    resetBulkForm();
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                >
-                  Allocate to Selected
-                </button>
-              </div>
-            </form>
+            </div>
+            <div className="modal-footer" style={{ padding: '1rem 1.5rem', backgroundColor: '#f9fafb' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBulkModal(false);
+                  resetBulkForm();
+                }}
+                className="btn btn-outline"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkAllocate}
+                className="btn btn-primary"
+                style={{ backgroundColor: '#7c3aed', borderColor: '#7c3aed' }}
+              >
+                Allocate to Selected
+              </button>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Bulk Allocate All Modal */}
       {showBulkAllModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">Allocate to All Active Users</h2>
-              <p className="text-sm text-gray-600 mt-1">This will create allocations for all active staff members</p>
+        <>
+          <div className="modal-overlay" onClick={() => setShowBulkAllModal(false)} style={{ animation: 'fadeIn 0.2s ease-out' }}></div>
+          <div 
+            className="modal" 
+            style={{ 
+              maxWidth: '1200px', 
+              animation: 'slideUp 0.3s ease-out',
+              width: 'calc(100% - 2rem)',
+              maxHeight: '90vh'
+            }}
+          >
+            <div className="modal-header" style={{ padding: '1.25rem 1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ 
+                  width: '2.5rem', 
+                  height: '2.5rem', 
+                  borderRadius: '0.5rem', 
+                  backgroundColor: '#eef2ff', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center'
+                }}>
+                  <Users className="w-5 h-5" style={{ color: '#4f46e5' }} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>Allocate to All Active Users</h3>
+                  <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>Create allocations for all active staff members</p>
+                </div>
+              </div>
+              <button 
+                className="btn btn-ghost btn-icon" 
+                style={{ width: '2.25rem', height: '2.25rem', borderRadius: '0.5rem' }} 
+                onClick={() => setShowBulkAllModal(false)}
+                title="Close modal"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            <form onSubmit={handleBulkAllocateAll} className="p-6">
+            <div className="modal-content" style={{ padding: '1.5rem' }}>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1052,11 +1336,12 @@ const LeaveAllocationView = () => {
                     onChange={(e) => setBulkAllForm({ ...bulkAllForm, leave_type_id: Number(e.target.value) })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
+                    style={{ backgroundColor: 'white', color: '#1f2937' }}
                   >
-                    <option value="">Select Leave Type</option>
+                    <option value="" disabled>Select Leave Type</option>
                     {leaveTypes.map(type => (
-                      <option key={type.id} value={type.id}>
-                        {type.name} ({type.daysPerYear} days/year)
+                      <option key={type.id} value={type.id} style={{ color: '#1f2937' }}>
+                        {type.name} ({type.days_per_year || type.daysPerYear} days/year)
                       </option>
                     ))}
                   </select>
@@ -1074,29 +1359,31 @@ const LeaveAllocationView = () => {
                     required
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Cycle Start Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={bulkAllForm.cycle_start_date}
-                    onChange={(e) => setBulkAllForm({ ...bulkAllForm, cycle_start_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Cycle End Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={bulkAllForm.cycle_end_date}
-                    onChange={(e) => setBulkAllForm({ ...bulkAllForm, cycle_end_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Cycle Start Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={bulkAllForm.cycle_start_date}
+                      onChange={(e) => setBulkAllForm({ ...bulkAllForm, cycle_start_date: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Cycle End Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={bulkAllForm.cycle_end_date}
+                      onChange={(e) => setBulkAllForm({ ...bulkAllForm, cycle_end_date: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1111,27 +1398,29 @@ const LeaveAllocationView = () => {
                   />
                 </div>
               </div>
-              <div className="flex gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowBulkAllModal(false);
-                    resetBulkAllForm();
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                >
-                  Allocate to All
-                </button>
-              </div>
-            </form>
+            </div>
+            <div className="modal-footer" style={{ padding: '1rem 1.5rem', backgroundColor: '#f9fafb' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBulkAllModal(false);
+                  resetBulkAllForm();
+                }}
+                className="btn btn-outline"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkAllocateAll}
+                className="btn btn-primary"
+                style={{ backgroundColor: '#4f46e5', borderColor: '#4f46e5' }}
+              >
+                Allocate to All
+              </button>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Edit Allocation Modal */}

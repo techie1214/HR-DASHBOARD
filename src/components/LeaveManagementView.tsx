@@ -125,10 +125,10 @@ const LeaveManagementView = () => {
             type: type.name,
             limit: type.days_per_year, // Use the correct field name from API
             color: type.is_paid ? '#3b82f6' : '#6b7280', // Different colors for paid/unpaid
-            icon: getLeaveTypeIcon(type.name), // Use a helper function to get appropriate icon
             description: type.description || `${type.days_per_year} days per year`
           }));
 
+          console.log('Transformed leave types:', transformedTypes);
           setLeaveTypes(transformedTypes);
         } else {
           console.warn('Failed to fetch leave types from API:', typesResponse.message);
@@ -264,17 +264,9 @@ const LeaveManagementView = () => {
     fetchData();
   }, [currentPage, filterStatus, filterLeaveType, searchTerm]);
 
-  // Helper function to get appropriate icon for leave type
-  const getLeaveTypeIcon = (typeName: string) => {
-    const type = typeName.toLowerCase();
-    if (type.includes('sick') || type.includes('medical')) return '🤒';
-    if (type.includes('annual') || type.includes('vacation') || type.includes('leave')) return '🏖️';
-    if (type.includes('emergency') || type.includes('urgent')) return '🚨';
-    if (type.includes('maternity')) return '🤱';
-    if (type.includes('paternity')) return '👶';
-    if (type.includes('unpaid')) return '💼';
-    if (type.includes('bereav') || type.includes('mourning')) return '🕊️';
-    return '🗓️'; // Default icon
+  // Helper function to get appropriate icon for leave type - now using a single consistent icon
+  const getLeaveTypeIcon = () => {
+    return Calendar; // Use Lucide Calendar icon for all leave types
   };
   
   // Handler to open edit leave type modal
@@ -329,9 +321,25 @@ const LeaveManagementView = () => {
   };
 
   // Handler for viewing request details - opens details modal
-  const handleViewDetails = (request: LeaveRequest) => {
+  const handleViewDetails = async (request: LeaveRequest) => {
     setSelectedRequest(request);
     setShowDetailsModal(true);
+    
+    // Fetch full details from API
+    setDetailsLoading(true);
+    try {
+      const response = await getLeaveRequestById(parseInt(request.id));
+      if (response.success && response.leaveRequest) {
+        setSelectedRequestDetails(response.leaveRequest);
+        console.log('Leave request details:', response.leaveRequest);
+      } else {
+        console.warn('Failed to load leave request details:', response.message);
+      }
+    } catch (err) {
+      console.error('Error fetching leave request details:', err);
+    } finally {
+      setDetailsLoading(false);
+    }
   };
 
   // Handler for confirming approval/decline action
@@ -516,7 +524,6 @@ const LeaveManagementView = () => {
             type: type.name,
             limit: type.days_per_year, // Use the correct field name from API
             color: type.is_paid ? '#3b82f6' : '#6b7280', // Different colors for paid/unpaid
-            icon: getLeaveTypeIcon(type.name), // Use a helper function to get appropriate icon
             description: type.description || `${type.days_per_year} days per year`
           }));
           
@@ -685,7 +692,7 @@ const LeaveManagementView = () => {
                 <option value="all">All Types</option>
                 {/* Map through leave types to create options */}
                 {leaveTypes.map(type => (
-                  <option key={type.type} value={type.type}>{type.icon} {type.type}</option>
+                  <option key={type.type} value={type.type}>{type.type}</option>
                 ))}
               </select>
             </div>
@@ -757,24 +764,33 @@ const LeaveManagementView = () => {
                 onClick={() => setFilterLeaveType(filterLeaveType === type.type ? 'all' : type.type)} // Toggle filter
               >
                 {/* Leave type icon */}
-                <div className="icon-wrapper" style={{ backgroundColor: type.color + '30', width: '2.75rem', height: '2.75rem' }}>
-                  <span style={{ fontSize: '1.25rem' }}>{type.icon}</span>
+                <div className="icon-wrapper" style={{ backgroundColor: type.color + '30', width: '2.75rem', height: '2.75rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Calendar className="w-5 h-5" style={{ color: type.color }} />
                 </div>
                 {/* Leave type details */}
                 <div style={{ flex: 1 }}>
                   <p style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.125rem' }}>{type.type}</p>
                   <p className="text-xs text-muted">{type.description}</p>
                 </div>
-                {/* Edit button */}
-                <button 
-                  className="absolute top-1 right-1 btn btn-xs btn-ghost"
+                {/* Edit button - more pronounced */}
+                <button
+                  className="absolute top-2 right-2 btn btn-sm btn-outline"
                   onClick={(e) => {
                     e.stopPropagation(); // Prevent triggering the parent click
                     openEditLeaveTypeModal(type);
                   }}
                   title="Edit leave type"
+                  style={{ 
+                    padding: '0.375rem 0.5rem',
+                    minWidth: 'auto',
+                    width: 'auto',
+                    height: 'auto'
+                  }}
                 >
-                  ✏️
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  <span style={{ fontSize: '0.625rem', marginLeft: '0.25rem' }}>Edit</span>
                 </button>
               </div>
             ))
@@ -852,7 +868,17 @@ const LeaveManagementView = () => {
                     </td>
                     <td className="table-cell">
                       <div className="flex items-center gap-2">
-                        <span style={{ fontSize: '1.25rem' }}>{leaveTypeInfo?.icon}</span>
+                        <div style={{ 
+                          width: '2rem', 
+                          height: '2rem', 
+                          borderRadius: '0.375rem', 
+                          backgroundColor: leaveTypeInfo?.color + '20',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <Calendar className="w-4 h-4" style={{ color: leaveTypeInfo?.color }} />
+                        </div>
                         <div>
                           <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>{request.leaveType} Leave</p>
                           <p className="text-xs text-muted" style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -958,66 +984,94 @@ const LeaveManagementView = () => {
         
         {/* Pagination Controls */}
         {totalPages > 1 && (
-          <div className="p-4 border-t flex items-center justify-between">
-            <div className="text-sm text-muted">
-              Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} leave requests
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setCurrentPage(prev => Math.max(1, prev - 1));
-                }}
-                disabled={currentPage === 1}
-                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
+          <div className="p-4 border-t" style={{ backgroundColor: '#f9fafb' }}>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="text-sm" style={{ color: '#6b7280' }}>
+                Showing <span style={{ fontWeight: 600, color: '#111827' }}>{startIndex + 1}</span> to{' '}
+                <span style={{ fontWeight: 600, color: '#111827' }}>{Math.min(endIndex, totalItems)}</span> of{' '}
+                <span style={{ fontWeight: 600, color: '#111827' }}>{totalItems}</span> leave requests
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage(prev => Math.max(1, prev - 1));
+                  }}
+                  disabled={currentPage === 1}
+                  className="flex items-center gap-1 px-3 py-1.5 border rounded-lg hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  style={{ 
+                    backgroundColor: currentPage === 1 ? '#f3f4f6' : 'white',
+                    borderColor: '#e5e7eb',
+                    color: currentPage === 1 ? '#9ca3af' : '#374151',
+                    fontSize: '0.875rem',
+                    fontWeight: 500
+                  }}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Previous
+                </button>
 
-              {/* Page number buttons */}
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPage - 2 + i;
-                }
+                {/* Page number buttons */}
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
 
-                return (
-                  <button
-                    key={pageNum}
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setCurrentPage(pageNum);
-                    }}
-                    className={`px-3 py-1 border rounded ${
-                      currentPage === pageNum
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCurrentPage(pageNum);
+                      }}
+                      className="min-w-[2.5rem] px-2 py-1.5 border rounded-lg transition-all"
+                      style={{
+                        backgroundColor: currentPage === pageNum ? '#2563eb' : 'white',
+                        borderColor: currentPage === pageNum ? '#2563eb' : '#e5e7eb',
+                        color: currentPage === pageNum ? 'white' : '#374151',
+                        fontSize: '0.875rem',
+                        fontWeight: currentPage === pageNum ? 600 : 500,
+                        boxShadow: currentPage === pageNum ? '0 1px 2px 0 rgba(37, 99, 235, 0.2)' : 'none'
+                      }}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
 
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setCurrentPage(prev => Math.min(totalPages, prev + 1));
-                }}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage(prev => Math.min(totalPages, prev + 1));
+                  }}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center gap-1 px-3 py-1.5 border rounded-lg hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  style={{ 
+                    backgroundColor: currentPage === totalPages ? '#f3f4f6' : 'white',
+                    borderColor: '#e5e7eb',
+                    color: currentPage === totalPages ? '#9ca3af' : '#374151',
+                    fontSize: '0.875rem',
+                    fontWeight: 500
+                  }}
+                >
+                  Next
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1441,108 +1495,282 @@ const LeaveManagementView = () => {
           {/* Details Modal */}
           {showDetailsModal && selectedRequest && (
             <>
-              <div className="modal-overlay" onClick={() => setShowDetailsModal(false)}></div>
-              <div className="modal">
-                <div className="modal-header">
-                  <h3>Leave Request Details</h3>
-                  <button className="btn btn-ghost btn-icon" style={{ width: '2rem', height: '2rem' }} onClick={() => setShowDetailsModal(false)}>
-                    <X className="w-4 h-4" />
+              <div className="modal-overlay" onClick={() => setShowDetailsModal(false)} style={{ animation: 'fadeIn 0.2s ease-out' }}></div>
+              <div 
+                className="modal" 
+                style={{ 
+                  maxWidth: '800px', 
+                  animation: 'slideUp 0.3s ease-out',
+                  width: 'calc(100% - 2rem)'
+                }}
+              >
+                <div className="modal-header" style={{ padding: '1.25rem 1.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ 
+                      width: '2.5rem', 
+                      height: '2.5rem', 
+                      borderRadius: '0.5rem', 
+                      backgroundColor: '#eff6ff', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center'
+                    }}>
+                      <FileText className="w-5 h-5" style={{ color: '#2563eb' }} />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>Leave Request Details</h3>
+                      <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>Request #{selectedRequest.id}</p>
+                    </div>
+                  </div>
+                  <button 
+                    className="btn btn-ghost btn-icon" 
+                    style={{ width: '2.25rem', height: '2.25rem', borderRadius: '0.5rem' }} 
+                    onClick={() => setShowDetailsModal(false)}
+                    title="Close modal"
+                  >
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
-                <div className="modal-content">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-4 p-4 rounded" style={{ backgroundColor: '#f9fafb' }}>
-                      <div className="avatar" style={{ width: '3rem', height: '3rem' }}>
-                        {selectedRequest.staffName.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                      </div>
-                      <div>
-                        <p style={{ fontWeight: 600, fontSize: '1rem' }}>{selectedRequest.staffName}</p>
-                        <p className="text-xs text-muted">{selectedRequest.staffId} · {selectedRequest.department}</p>
-                        <p className="text-xs text-muted">{selectedRequest.branch}</p>
-                      </div>
+                <div className="modal-content" style={{ padding: '1.5rem' }}>
+                  {detailsLoading ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}>
+                      <svg className="animate-spin w-8 h-8" style={{ color: '#2563eb' }} fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Leave Type</p>
-                        <div className="flex items-center gap-2">
-                          <span style={{ fontSize: '1.25rem' }}>{leaveTypes.find(t => t.type === selectedRequest.leaveType)?.icon}</span>
-                          <span style={{ fontWeight: 600 }}>{selectedRequest.leaveType}</span>
+                  ) : selectedRequestDetails ? (
+                    <div className="space-y-4">
+                      {/* Employee Info Card */}
+                      <div className="flex items-center gap-4 p-4 rounded" style={{ backgroundColor: '#f9fafb', border: '1px solid #e5e7eb' }}>
+                        <div className="avatar" style={{ width: '3.5rem', height: '3.5rem', fontSize: '1rem' }}>
+                          {selectedRequestDetails.user_name?.split(' ').map(n => n[0]).join('').slice(0, 2) || selectedRequest.staffName.split(' ').map(n => n[0]).join('').slice(0, 2)}
                         </div>
-                      </div>
-                      <div>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Status</p>
-                        <span className={`badge ${
-                          selectedRequest.status === 'Approved' ? 'badge-success' :
-                          selectedRequest.status === 'Declined' ? 'badge-danger' :
-                          selectedRequest.status === 'Active' ? 'badge-info' :
-                          'badge-warning'
-                        }`}>
-                          {selectedRequest.status}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Start Date</p>
-                        <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>
-                          {new Date(selectedRequest.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </p>
-                      </div>
-                      <div>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>End Date</p>
-                        <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>
-                          {new Date(selectedRequest.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </p>
-                      </div>
-                      <div>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Duration</p>
-                        <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>{selectedRequest.duration} day{selectedRequest.duration > 1 ? 's' : ''}</p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Reason</p>
-                      <p style={{ fontSize: '0.875rem', padding: '0.75rem', backgroundColor: '#f9fafb', borderRadius: '0.375rem' }}>
-                        {selectedRequest.reason}
-                      </p>
-                    </div>
-
-                    {selectedRequest.coveringStaff && (
-                      <div>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Covering Staff</p>
-                        <p style={{ fontWeight: 600 }}>{selectedRequest.coveringStaff}</p>
-                      </div>
-                    )}
-
-                    {selectedRequest.approvedBy && (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>
-                            {selectedRequest.status === 'Approved' ? 'Approved By' : 'Declined By'}
-                          </p>
-                          <p style={{ fontWeight: 600 }}>{selectedRequest.approvedBy}</p>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontWeight: 600, fontSize: '1rem' }}>{selectedRequestDetails.user_name || selectedRequest.staffName}</p>
+                          <p className="text-xs text-muted">ID: {selectedRequestDetails.user_id} · {selectedRequest.department || 'General'}</p>
+                          <p className="text-xs text-muted">{selectedRequest.branch || 'Main Office'}</p>
                         </div>
                         <div>
-                          <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Date</p>
+                          <span className={`badge ${
+                            selectedRequestDetails.status === 'approved' ? 'badge-success' :
+                            selectedRequestDetails.status === 'rejected' ? 'badge-danger' :
+                            selectedRequestDetails.status === 'active' ? 'badge-info' :
+                            'badge-warning'
+                          }`} style={{ textTransform: 'capitalize' }}>
+                            {selectedRequestDetails.status}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Leave Details Grid */}
+                      <div style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                        gap: '1rem',
+                        padding: '1.25rem',
+                        backgroundColor: '#f0f9ff',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #bae6fd'
+                      }}>
+                        <div>
+                          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem', textTransform: 'uppercase', fontWeight: 600 }}>Leave Type</p>
+                          <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>{selectedRequestDetails.leave_type_name || selectedRequest.leaveType}</p>
+                        </div>
+                        <div>
+                          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem', textTransform: 'uppercase', fontWeight: 600 }}>Days Requested</p>
+                          <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>{selectedRequestDetails.days_requested || selectedRequest.duration} days</p>
+                        </div>
+                        <div>
+                          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem', textTransform: 'uppercase', fontWeight: 600 }}>Submitted</p>
                           <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>
-                            {selectedRequest.approvalDate && new Date(selectedRequest.approvalDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            {new Date(selectedRequestDetails.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </p>
                         </div>
                       </div>
-                    )}
 
-                    {selectedRequest.declineReason && (
-                      <div className="p-3 rounded" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca' }}>
-                        <p style={{ fontSize: '0.875rem', color: '#991b1b', fontWeight: 500, marginBottom: '0.25rem' }}>Decline Reason</p>
-                        <p style={{ fontSize: '0.875rem', color: '#dc2626' }}>{selectedRequest.declineReason}</p>
+                      {/* Dates */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div style={{ padding: '1rem', backgroundColor: '#f9fafb', borderRadius: '0.5rem' }}>
+                          <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Start Date
+                          </p>
+                          <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>
+                            {new Date(selectedRequestDetails.start_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                          </p>
+                        </div>
+                        <div style={{ padding: '1rem', backgroundColor: '#f9fafb', borderRadius: '0.5rem' }}>
+                          <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            End Date
+                          </p>
+                          <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>
+                            {new Date(selectedRequestDetails.end_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                          </p>
+                        </div>
                       </div>
-                    )}
-                  </div>
+
+                      {/* Reason */}
+                      <div>
+                        <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          Reason for Leave
+                        </p>
+                        <p style={{ fontSize: '0.875rem', padding: '1rem', backgroundColor: '#f9fafb', borderRadius: '0.5rem', border: '1px solid #e5e7eb', lineHeight: '1.6' }}>
+                          {selectedRequestDetails.reason}
+                        </p>
+                      </div>
+
+                      {/* Attachments */}
+                      {selectedRequestDetails.attachments && selectedRequestDetails.attachments.length > 0 && (
+                        <div>
+                          <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                            </svg>
+                            Attachments ({selectedRequestDetails.attachments.length})
+                          </p>
+                          <div style={{ display: 'grid', gap: '0.75rem' }}>
+                            {selectedRequestDetails.attachments.map((attachment: any, index: number) => (
+                              <div 
+                                key={index} 
+                                style={{ 
+                                  padding: '1rem', 
+                                  backgroundColor: '#f8fafc', 
+                                  borderRadius: '0.5rem', 
+                                  border: '1px solid #e2e8f0',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '1rem'
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+                                  <div style={{ 
+                                    width: '2.5rem', 
+                                    height: '2.5rem', 
+                                    borderRadius: '0.375rem', 
+                                    backgroundColor: attachment.mime_type?.includes('pdf') ? '#fee2e2' : '#dbeafe',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}>
+                                    {attachment.mime_type?.includes('pdf') ? (
+                                      <svg className="w-5 h-5" style={{ color: '#dc2626' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                      </svg>
+                                    ) : attachment.mime_type?.includes('image') ? (
+                                      <svg className="w-5 h-5" style={{ color: '#2563eb' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                      </svg>
+                                    ) : (
+                                      <svg className="w-5 h-5" style={{ color: '#64748b' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                      </svg>
+                                    )}
+                                  </div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <p style={{ fontWeight: 600, fontSize: '0.875rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {attachment.file_name || `Attachment ${index + 1}`}
+                                    </p>
+                                    <p className="text-xs text-muted">
+                                      {attachment.mime_type || 'Unknown'} · {attachment.file_size ? Math.round(attachment.file_size / 1024) + ' KB' : 'Unknown size'}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                  {attachment.file_path && (
+                                    <a 
+                                      href={`${import.meta.env.VITE_API_Endpoint || 'http://localhost:3000/api'}${attachment.file_path}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="btn btn-sm btn-outline"
+                                      style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+                                    >
+                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                      </svg>
+                                      View
+                                    </a>
+                                  )}
+                                  <a 
+                                    href={`${import.meta.env.VITE_API_Endpoint || 'http://localhost:3000/api'}${attachment.file_path}`}
+                                    download={attachment.file_name}
+                                    className="btn btn-sm btn-primary"
+                                    style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+                                  >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    Download
+                                  </a>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Approval Info */}
+                      {(selectedRequestDetails.reviewed_by || selectedRequestDetails.reviewed_at) && (
+                        <div style={{ 
+                          padding: '1rem', 
+                          backgroundColor: selectedRequestDetails.status === 'approved' ? '#f0fdf4' : '#fef2f2', 
+                          borderRadius: '0.5rem',
+                          border: `1px solid ${selectedRequestDetails.status === 'approved' ? '#bbf7d0' : '#fecaca'}`
+                        }}>
+                          <p style={{ 
+                            fontSize: '0.75rem', 
+                            color: selectedRequestDetails.status === 'approved' ? '#166534' : '#991b1b',
+                            marginBottom: '0.75rem',
+                            fontWeight: 600,
+                            textTransform: 'uppercase'
+                          }}>
+                            {selectedRequestDetails.status === 'approved' ? 'Approval Information' : 'Rejection Information'}
+                          </p>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                                {selectedRequestDetails.status === 'approved' ? 'Approved By' : 'Rejected By'}
+                              </p>
+                              <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>
+                                {selectedRequestDetails.reviewed_by_name || 'HR Manager'}
+                              </p>
+                            </div>
+                            <div>
+                              <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>Date</p>
+                              <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>
+                                {selectedRequestDetails.reviewed_at && new Date(selectedRequestDetails.reviewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                          </div>
+                          {selectedRequestDetails.notes && (
+                            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(0,0,0,0.1)' }}>
+                              <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem' }}>Comments</p>
+                              <p style={{ fontSize: '0.875rem', lineHeight: '1.6' }}>{selectedRequestDetails.notes}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ padding: '3rem', textAlign: 'center' }}>
+                      <AlertCircle className="w-12 h-12" style={{ color: '#f59e0b', margin: '0 auto 1rem' }} />
+                      <p style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Unable to load details</p>
+                      <p className="text-muted">Please try again later</p>
+                    </div>
+                  )}
                 </div>
                 {/* Modal footer with close button */}
-                <div className="modal-footer">
+                <div className="modal-footer" style={{ padding: '1rem 1.5rem', backgroundColor: '#f9fafb' }}>
                   <button className="btn btn-outline" onClick={() => setShowDetailsModal(false)}>Close</button>
                 </div>
               </div>
