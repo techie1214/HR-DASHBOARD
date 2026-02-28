@@ -117,7 +117,7 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 <span>All Staff</span>
               </button>
             </li>
-            <li className="sidebar-menu-item">
+            {/* <li className="sidebar-menu-item">
               <button
                 onClick={() => onNavigate("offdays")}
                 className={`sidebar-menu-button ${activeView === "offdays" ? "active" : ""}`}
@@ -125,7 +125,7 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 <Sun className="w-4 h-4" />
                 <span>Off Days</span>
               </button>
-            </li>
+            </li> */}
             <li className="sidebar-menu-item">
               <button
                 onClick={() => onNavigate("leave")}
