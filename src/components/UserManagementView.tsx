@@ -13,6 +13,15 @@ import {
 import { getAllRoles } from '../services/roleManagementService';
 import { getAllBranches } from '../services/branchManagementService';
 import { User as UserIcon, Plus, Edit3, Trash2, X, Check, AlertCircle, Mail, Shield, Building } from 'lucide-react';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 
 const UserManagementView = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -655,64 +664,69 @@ const UserManagementView = () => {
             </tbody>
           </table>
         </div>
-        
+
         {/* Pagination Controls */}
         {(totalUsers_count > itemsPerPage || users.length === itemsPerPage) && (
-          <div className="p-4 border-t flex items-center justify-between">
-            <div className="text-sm text-muted">
-              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalUsers_count)} of {totalUsers_count} users
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setCurrentPage(prev => Math.max(1, prev - 1));
-                }}
-                disabled={currentPage === 1}
-                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
-              {Array.from({ length: Math.min(5, Math.ceil(totalUsers_count / itemsPerPage)) }, (_, i) => {
-                const totalPages = Math.ceil(totalUsers_count / itemsPerPage);
-                const pageNum = currentPage <= 3
-                  ? i + 1
-                  : currentPage >= totalPages - 2
-                    ? totalPages - 4 + i
-                    : currentPage - 2 + i;
-
-                if (pageNum < 1 || pageNum > totalPages) return null;
-
-                return (
-                  <button
-                    key={pageNum}
-                    type="button"
+          <div className="p-4 border-t">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      setCurrentPage(pageNum);
+                      setCurrentPage(prev => Math.max(1, prev - 1));
                     }}
-                    className={`px-3 py-1 border rounded ${
-                      currentPage === pageNum
-                        ? 'bg-blue-500 text-white'
-                        : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setCurrentPage(prev => prev + 1);
-                }}
-                disabled={currentPage >= Math.ceil(totalUsers_count / itemsPerPage)}
-                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
+                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+
+                {Array.from({ length: Math.min(5, Math.ceil(totalUsers_count / itemsPerPage)) }, (_, i) => {
+                  const totalPages = Math.ceil(totalUsers_count / itemsPerPage);
+                  const pageNum = currentPage <= 3
+                    ? i + 1
+                    : currentPage >= totalPages - 2
+                      ? totalPages - 4 + i
+                      : currentPage - 2 + i;
+
+                  if (pageNum < 1 || pageNum > totalPages) return null;
+
+                  return (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setCurrentPage(pageNum);
+                        }}
+                        isActive={currentPage === pageNum}
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+
+                {Math.ceil(totalUsers_count / itemsPerPage) > 5 && currentPage < Math.ceil(totalUsers_count / itemsPerPage) - 2 && (
+                  <PaginationItem>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                )}
+
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentPage(prev => prev + 1);
+                    }}
+                    className={currentPage >= Math.ceil(totalUsers_count / itemsPerPage) ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+            <div className="mt-2 text-sm text-muted text-center">
+              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalUsers_count)} of {totalUsers_count} users
             </div>
           </div>
         )}

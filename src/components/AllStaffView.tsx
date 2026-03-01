@@ -8,6 +8,15 @@ import { StaffMember as ApiStaffMember } from '../services/staffManagementServic
 import { StaffProfileView } from './StaffProfileViewSimple';
 import StaffInvitationView from './StaffInvitationView';
 import { getAllStaff, activateStaff, deactivateStaff } from '../services/staffManagementService';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 
 // Color palettes for staff cards based on department (dynamically assigned)
 const departmentColorPalette = [
@@ -455,63 +464,68 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
 
         {/* Pagination Controls */}
         {totalPages > 1 && (
-          <div className="p-4 border-t flex items-center justify-between">
-            <div className="text-sm text-muted">
-              Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} staff members
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setCurrentPage(prev => Math.max(1, prev - 1));
-                }}
-                disabled={currentPage === 1}
-                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPage - 2 + i;
-                }
-
-                return (
-                  <button
-                    key={pageNum}
-                    type="button"
+          <div className="p-4 border-t">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      setCurrentPage(pageNum);
+                      setCurrentPage(prev => Math.max(1, prev - 1));
                     }}
-                    className={`px-3 py-1 border rounded ${
-                      currentPage === pageNum
-                        ? 'bg-blue-500 text-white'
-                        : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setCurrentPage(prev => Math.min(totalPages, prev + 1));
-                }}
-                disabled={currentPage >= totalPages}
-                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
+                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+
+                  return (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setCurrentPage(pageNum);
+                        }}
+                        isActive={currentPage === pageNum}
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+
+                {totalPages > 5 && currentPage < totalPages - 2 && (
+                  <PaginationItem>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                )}
+
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentPage(prev => Math.min(totalPages, prev + 1));
+                    }}
+                    className={currentPage >= totalPages ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+            <div className="mt-2 text-sm text-muted text-center">
+              Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} staff members
             </div>
           </div>
         )}

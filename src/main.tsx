@@ -13,6 +13,9 @@ import { AuthProvider } from "./AuthContext";
 // This includes base styles and Tailwind CSS for the entire application
 import "./index.css";
 
+// Import the modern design system for beautiful UI components
+import "./styles/design-system.css";
+
 // Create a React root attached to the DOM element with id 'root'
 // The exclamation mark asserts that getElementById will not return null
 // Wrap the App component with AuthProvider to provide authentication context

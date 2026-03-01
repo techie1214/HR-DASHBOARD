@@ -862,14 +862,16 @@ const LeaveAllocationView = () => {
       {/* Create Allocation Modal */}
       {showCreateModal && (
         <>
-          <div className="modal-overlay" onClick={() => { setShowCreateModal(false); resetCreateForm(); }} style={{ animation: 'fadeIn 0.2s ease-out' }}></div>
-          <div 
-            className="modal" 
-            style={{ 
-              maxWidth: '1200px', 
+          <div className="modal-overlay" onClick={() => { setShowCreateModal(false); resetCreateForm(); }} style={{ animation: 'fadeIn 0.2s ease-out', position: 'fixed', inset: 0, zIndex: 99999 }}></div>
+          <div
+            className="modal"
+            style={{
+              maxWidth: '1200px',
               animation: 'slideUp 0.3s ease-out',
               width: 'calc(100% - 2rem)',
-              maxHeight: '90vh'
+              maxHeight: '90vh',
+              position: 'fixed',
+              zIndex: 100000
             }}
           >
             <div className="modal-header" style={{ padding: '1.25rem 1.5rem' }}>
@@ -1021,14 +1023,16 @@ const LeaveAllocationView = () => {
       {/* Bulk Allocation Modal */}
       {showBulkModal && (
         <>
-          <div className="modal-overlay" onClick={() => setShowBulkModal(false)} style={{ animation: 'fadeIn 0.2s ease-out' }}></div>
-          <div 
-            className="modal" 
-            style={{ 
-              maxWidth: '1200px', 
+          <div className="modal-overlay" onClick={() => setShowBulkModal(false)} style={{ animation: 'fadeIn 0.2s ease-out', position: 'fixed', inset: 0, zIndex: 99999 }}></div>
+          <div
+            className="modal"
+            style={{
+              maxWidth: '1200px',
               animation: 'slideUp 0.3s ease-out',
               width: 'calc(100% - 2rem)',
-              maxHeight: '90vh'
+              maxHeight: '90vh',
+              position: 'fixed',
+              zIndex: 100000
             }}
           >
             <div className="modal-header" style={{ padding: '1.25rem 1.5rem' }}>
@@ -1286,14 +1290,16 @@ const LeaveAllocationView = () => {
       {/* Bulk Allocate All Modal */}
       {showBulkAllModal && (
         <>
-          <div className="modal-overlay" onClick={() => setShowBulkAllModal(false)} style={{ animation: 'fadeIn 0.2s ease-out' }}></div>
-          <div 
-            className="modal" 
-            style={{ 
-              maxWidth: '1200px', 
+          <div className="modal-overlay" onClick={() => setShowBulkAllModal(false)} style={{ animation: 'fadeIn 0.2s ease-out', position: 'fixed', inset: 0, zIndex: 99999 }}></div>
+          <div
+            className="modal"
+            style={{
+              maxWidth: '1200px',
               animation: 'slideUp 0.3s ease-out',
               width: 'calc(100% - 2rem)',
-              maxHeight: '90vh'
+              maxHeight: '90vh',
+              position: 'fixed',
+              zIndex: 100000
             }}
           >
             <div className="modal-header" style={{ padding: '1.25rem 1.5rem' }}>
@@ -1425,8 +1431,8 @@ const LeaveAllocationView = () => {
 
       {/* Edit Allocation Modal */}
       {showEditModal && selectedAllocation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 99999, animation: 'fadeIn 0.2s ease-out' }} onClick={() => { setShowEditModal(false); setSelectedAllocation(null); resetEditForm(); }}>
+          <div className="modal" style={{ position: 'fixed', zIndex: 100000, maxWidth: '28rem', animation: 'slideUp 0.3s ease-out' }}>
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-900">Edit Leave Allocation</h2>
             </div>
@@ -1520,8 +1526,8 @@ const LeaveAllocationView = () => {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && selectedAllocation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full mx-4">
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 99999, animation: 'fadeIn 0.2s ease-out' }} onClick={() => { setShowDeleteModal(false); setSelectedAllocation(null); }}>
+          <div className="modal" style={{ position: 'fixed', zIndex: 100000, maxWidth: '24rem', animation: 'slideUp 0.3s ease-out' }}>
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">

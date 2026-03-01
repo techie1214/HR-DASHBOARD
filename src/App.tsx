@@ -207,7 +207,7 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 <span>KPI</span>
               </button>
             </li> */}
-            {/* <li className="sidebar-menu-item">
+            <li className="sidebar-menu-item">
               <button
                 onClick={() => onNavigate("holidays")}
                 className={`sidebar-menu-button ${activeView === "holidays" ? "active" : ""}`}
@@ -215,8 +215,8 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 <CalendarDays className="w-4 h-4" />
                 <span>Holidays</span>
               </button>
-            </li> */}
-            {/* <li className="sidebar-menu-item">
+            </li>
+            <li className="sidebar-menu-item">
               <button
                 onClick={() => onNavigate("shiftscheduling")}
                 className={`sidebar-menu-button ${activeView === "shiftscheduling" ? "active" : ""}`}
@@ -224,7 +224,7 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 <Calendar className="w-4 h-4" />
                 <span>Shift Scheduling</span>
               </button>
-            </li> */}
+            </li>
           </ul>
         </div>
         <div className="sidebar-group">

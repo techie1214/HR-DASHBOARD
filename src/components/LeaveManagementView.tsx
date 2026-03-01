@@ -5,6 +5,8 @@
 import { useState, useEffect } from 'react';
 // Import Lucide React icons for UI elements
 import { Search, Calendar, Download, Filter, Check, X, Clock, User, Building, FileText, TrendingUp, AlertCircle, CalendarDays, Info } from 'lucide-react';
+// Import utility functions
+import { cn } from '@/components/ui/utils';
 // Import leave management service
 import {
   getAllLeaveRequests,
@@ -13,10 +15,20 @@ import {
   getUserLeaveBalance,
   createLeaveType,
   getAllLeaveTypes,
+  getLeaveRequestById,
   LeaveRequest as LeaveRequestType,
   LeaveBalance,
   LeaveType
 } from '../services/leaveManagementService';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 
 // Interface defining the structure of a leave request
 interface LeaveRequest {
@@ -72,6 +84,8 @@ const LeaveManagementView = () => {
   const [leaveTypes, setLeaveTypes] = useState<any[]>([]);
   // State for loading indicator
   const [loading, setLoading] = useState(true);
+  // State for details modal loading indicator
+  const [detailsLoading, setDetailsLoading] = useState(false);
   // State for error messages
   const [error, setError] = useState<string | null>(null);
   // State for success messages
@@ -981,40 +995,23 @@ const LeaveManagementView = () => {
             </tbody>
           </table>
         </div>
-        
+
         {/* Pagination Controls */}
         {totalPages > 1 && (
           <div className="p-4 border-t" style={{ backgroundColor: '#f9fafb' }}>
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div className="text-sm" style={{ color: '#6b7280' }}>
-                Showing <span style={{ fontWeight: 600, color: '#111827' }}>{startIndex + 1}</span> to{' '}
-                <span style={{ fontWeight: 600, color: '#111827' }}>{Math.min(endIndex, totalItems)}</span> of{' '}
-                <span style={{ fontWeight: 600, color: '#111827' }}>{totalItems}</span> leave requests
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setCurrentPage(prev => Math.max(1, prev - 1));
-                  }}
-                  disabled={currentPage === 1}
-                  className="flex items-center gap-1 px-3 py-1.5 border rounded-lg hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                  style={{ 
-                    backgroundColor: currentPage === 1 ? '#f3f4f6' : 'white',
-                    borderColor: '#e5e7eb',
-                    color: currentPage === 1 ? '#9ca3af' : '#374151',
-                    fontSize: '0.875rem',
-                    fontWeight: 500
-                  }}
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  Previous
-                </button>
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentPage(prev => Math.max(1, prev - 1));
+                    }}
+                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
 
-                {/* Page number buttons */}
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum;
                   if (totalPages <= 5) {
@@ -1028,50 +1025,43 @@ const LeaveManagementView = () => {
                   }
 
                   return (
-                    <button
-                      key={pageNum}
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setCurrentPage(pageNum);
-                      }}
-                      className="min-w-[2.5rem] px-2 py-1.5 border rounded-lg transition-all"
-                      style={{
-                        backgroundColor: currentPage === pageNum ? '#2563eb' : 'white',
-                        borderColor: currentPage === pageNum ? '#2563eb' : '#e5e7eb',
-                        color: currentPage === pageNum ? 'white' : '#374151',
-                        fontSize: '0.875rem',
-                        fontWeight: currentPage === pageNum ? 600 : 500,
-                        boxShadow: currentPage === pageNum ? '0 1px 2px 0 rgba(37, 99, 235, 0.2)' : 'none'
-                      }}
-                    >
-                      {pageNum}
-                    </button>
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setCurrentPage(pageNum);
+                        }}
+                        isActive={currentPage === pageNum}
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
                   );
                 })}
 
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setCurrentPage(prev => Math.min(totalPages, prev + 1));
-                  }}
-                  disabled={currentPage === totalPages}
-                  className="flex items-center gap-1 px-3 py-1.5 border rounded-lg hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                  style={{ 
-                    backgroundColor: currentPage === totalPages ? '#f3f4f6' : 'white',
-                    borderColor: '#e5e7eb',
-                    color: currentPage === totalPages ? '#9ca3af' : '#374151',
-                    fontSize: '0.875rem',
-                    fontWeight: 500
-                  }}
-                >
-                  Next
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
+                {totalPages > 5 && currentPage < totalPages - 2 && (
+                  <PaginationItem>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                )}
+
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentPage(prev => Math.min(totalPages, prev + 1));
+                    }}
+                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+            <div className="mt-2 text-sm" style={{ color: '#6b7280' }}>
+              Showing <span style={{ fontWeight: 600, color: '#111827' }}>{startIndex + 1}</span> to{' '}
+              <span style={{ fontWeight: 600, color: '#111827' }}>{Math.min(endIndex, totalItems)}</span> of{' '}
+              <span style={{ fontWeight: 600, color: '#111827' }}>{totalItems}</span> leave requests
             </div>
           </div>
         )}
@@ -1112,53 +1102,53 @@ const LeaveManagementView = () => {
 
     return (
       <div className="space-y-6">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md-grid-cols-2 lg-grid-cols-4 gap-6">
-          <div className="card p-4">
-            <div className="flex items-center gap-3">
-              <div className="icon-wrapper" style={{ backgroundColor: '#dbeafe' }}>
-                <Calendar className="w-5 h-5" style={{ color: '#2563eb' }} />
+        {/* Summary Cards - 4 cards in single row */}
+        <div className="grid grid-cols-2 lg-grid-cols-4 gap-3">
+          <div className="card p-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="icon-wrapper" style={{ backgroundColor: '#dbeafe', minWidth: '2.25rem', width: '2.25rem', height: '2.25rem', borderRadius: '0.375rem', flexShrink: 0 }}>
+                <Calendar className="w-4 h-4" style={{ color: '#2563eb' }} />
               </div>
-              <div>
-                <p className="text-muted" style={{ fontSize: '0.75rem' }}>Total Leave Days</p>
-                <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>
+              <div className="min-w-0">
+                <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: 1.1 }}>Total Leave Days</p>
+                <p style={{ fontSize: '1.125rem', fontWeight: 600, lineHeight: 1.2 }}>
                   {leaveRequests.filter(r => r.status === 'Approved').reduce((sum, r) => sum + r.duration, 0)}
                 </p>
               </div>
             </div>
           </div>
-          <div className="card p-4">
-            <div className="flex items-center gap-3">
-              <div className="icon-wrapper" style={{ backgroundColor: '#f0fdf4' }}>
-                <User className="w-5 h-5" style={{ color: '#16a34a' }} />
+          <div className="card p-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="icon-wrapper" style={{ backgroundColor: '#f0fdf4', minWidth: '2.25rem', width: '2.25rem', height: '2.25rem', borderRadius: '0.375rem', flexShrink: 0 }}>
+                <User className="w-4 h-4" style={{ color: '#16a34a' }} />
               </div>
-              <div>
-                <p className="text-muted" style={{ fontSize: '0.75rem' }}>Employees on Leave</p>
-                <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{activeCount}</p>
+              <div className="min-w-0">
+                <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: 1.1 }}>Employees on Leave</p>
+                <p style={{ fontSize: '1.125rem', fontWeight: 600, lineHeight: 1.2 }}>{activeCount}</p>
               </div>
             </div>
           </div>
-          <div className="card p-4">
-            <div className="flex items-center gap-3">
-              <div className="icon-wrapper" style={{ backgroundColor: '#fef3c7' }}>
-                <TrendingUp className="w-5 h-5" style={{ color: '#f59e0b' }} />
+          <div className="card p-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="icon-wrapper" style={{ backgroundColor: '#fef3c7', minWidth: '2.25rem', width: '2.25rem', height: '2.25rem', borderRadius: '0.375rem', flexShrink: 0 }}>
+                <TrendingUp className="w-4 h-4" style={{ color: '#f59e0b' }} />
               </div>
-              <div>
-                <p className="text-muted" style={{ fontSize: '0.75rem' }}>Approval Rate</p>
-                <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>
+              <div className="min-w-0">
+                <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: 1.1 }}>Approval Rate</p>
+                <p style={{ fontSize: '1.125rem', fontWeight: 600, lineHeight: 1.2 }}>
                   {approvedCount + declinedCount > 0 ? ((approvedCount / (approvedCount + declinedCount)) * 100).toFixed(0) : 0}%
                 </p>
               </div>
             </div>
           </div>
-          <div className="card p-4">
-            <div className="flex items-center gap-3">
-              <div className="icon-wrapper" style={{ backgroundColor: '#fef2f2' }}>
-                <AlertCircle className="w-5 h-5" style={{ color: '#dc2626' }} />
+          <div className="card p-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="icon-wrapper" style={{ backgroundColor: '#fef2f2', minWidth: '2.25rem', width: '2.25rem', height: '2.25rem', borderRadius: '0.375rem', flexShrink: 0 }}>
+                <AlertCircle className="w-4 h-4" style={{ color: '#dc2626' }} />
               </div>
-              <div>
-                <p className="text-muted" style={{ fontSize: '0.75rem' }}>Pending Review</p>
-                <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{pendingCount}</p>
+              <div className="min-w-0">
+                <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: 1.1 }}>Pending Review</p>
+                <p style={{ fontSize: '1.125rem', fontWeight: 600, lineHeight: 1.2 }}>{pendingCount}</p>
               </div>
             </div>
           </div>
@@ -1272,121 +1262,159 @@ const LeaveManagementView = () => {
           {activeTab === 'requests' && renderRequestsTab()}
           {activeTab === 'report' && renderReportTab()}
 
-          {/* Approval Modal - shown when showApprovalModal is true */}
+          {/* Approval Modal - Modern Design */}
           {showApprovalModal && selectedRequest && (
             <>
-              {/* Modal overlay for backdrop */}
               <div className="modal-overlay" onClick={() => setShowApprovalModal(false)}></div>
-              {/* Modal dialog */}
-              <div className="modal">
-                {/* Modal header with title and close button */}
+              <div className="modal modal-lg animate-scale-in">
                 <div className="modal-header">
-                  <h3>{approvalAction === 'approve' ? 'Approve' : 'Decline'} Leave Request</h3>
-                  <button className="btn btn-ghost btn-icon" style={{ width: '2rem', height: '2rem' }} onClick={() => setShowApprovalModal(false)}>
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                {/* Modal content */}
-                <div className="modal-content">
-                  <div className="space-y-4">
-                    {/* Employee information section */}
-                    <div className="flex items-center gap-4 p-4 rounded" style={{ backgroundColor: '#f9fafb' }}>
-                      {/* Employee avatar with initials */}
-                      <div className="avatar" style={{ width: '3rem', height: '3rem' }}>
-                        {selectedRequest.staffName.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                      </div>
-                      {/* Employee details */}
-                      <div>
-                        <p style={{ fontWeight: 600, fontSize: '1rem' }}>{selectedRequest.staffName}</p>
-                        <p className="text-xs text-muted">{selectedRequest.staffId} · {selectedRequest.department}</p>
-                      </div>
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "w-12 h-12 rounded-xl flex items-center justify-center",
+                      approvalAction === 'approve' 
+                        ? "bg-gradient-to-br from-green-500 to-green-600" 
+                        : "bg-gradient-to-br from-red-500 to-red-600"
+                    )}>
+                      {approvalAction === 'approve' ? (
+                        <Check className="w-6 h-6 text-white" />
+                      ) : (
+                        <AlertCircle className="w-6 h-6 text-white" />
+                      )}
                     </div>
-
-                    {/* Leave details grid */}
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* Leave type information */}
-                      <div>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Leave Type</p>
-                        <div className="flex items-center gap-2">
-                          <span style={{ fontSize: '1.25rem' }}>{leaveTypes.find(t => t.type === selectedRequest.leaveType)?.icon}</span>
-                          <span style={{ fontWeight: 600 }}>{selectedRequest.leaveType}</span>
-                        </div>
-                      </div>
-                      {/* Duration information */}
-                      <div>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Duration</p>
-                        <p style={{ fontWeight: 600 }}>{selectedRequest.duration} day{selectedRequest.duration > 1 ? 's' : ''}</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Start Date</p>
-                        <p style={{ fontWeight: 600 }}>
-                          {new Date(selectedRequest.startDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                        </p>
-                      </div>
-                      <div>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>End Date</p>
-                        <p style={{ fontWeight: 600 }}>
-                          {new Date(selectedRequest.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                        </p>
-                      </div>
-                    </div>
-
                     <div>
-                      <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Reason</p>
-                      <p style={{ fontSize: '0.875rem', padding: '0.75rem', backgroundColor: '#f9fafb', borderRadius: '0.375rem' }}>
-                        {selectedRequest.reason}
+                      <h2 className="modal-title text-xl font-semibold text-slate-900">
+                        {approvalAction === 'approve' ? 'Approve' : 'Decline'} Leave Request
+                      </h2>
+                      <p className="text-sm text-slate-500 mt-0.5">
+                        Request #{selectedRequest.id}
                       </p>
                     </div>
+                  </div>
+                  <button 
+                    className="btn btn-ghost btn-icon rounded-lg hover:bg-slate-100 transition-colors" 
+                    onClick={() => setShowApprovalModal(false)}
+                  >
+                    <X className="w-5 h-5 text-slate-500" />
+                  </button>
+                </div>
+                <div className="modal-content space-y-5">
+                  {/* Employee Info Card */}
+                  <div className="card p-4 bg-gradient-to-r from-slate-50 to-white">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md">
+                        <span className="text-white font-semibold text-sm">
+                          {selectedRequest.staffName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        </span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-slate-900 text-base">{selectedRequest.staffName}</p>
+                        <p className="text-sm text-slate-500 mt-0.5">{selectedRequest.staffId} · {selectedRequest.department}</p>
+                      </div>
+                      <div className={cn(
+                        "badge px-3 py-1.5 text-xs font-semibold",
+                        selectedRequest.status === 'Pending' ? "badge-warning" :
+                        selectedRequest.status === 'Approved' ? "badge-success" :
+                        selectedRequest.status === 'Declined' ? "badge-error" : "badge-secondary"
+                      )}>
+                        {selectedRequest.status}
+                      </div>
+                    </div>
+                  </div>
 
-                    {selectedRequest.leaveType === 'Annual' && selectedRequest.duration > 7 && approvalAction === 'approve' && (
-                      <div className="p-3 rounded" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca' }}>
-                        <div className="flex items-start gap-2">
-                          <AlertCircle className="w-4 h-4" style={{ color: '#dc2626', marginTop: '0.125rem', flexShrink: 0 }} />
-                          <div>
-                            <p style={{ fontSize: '0.875rem', color: '#991b1b', fontWeight: 500 }}>Policy Violation</p>
-                            <p style={{ fontSize: '0.875rem', color: '#dc2626', marginTop: '0.25rem' }}>
-                              This annual leave request exceeds the 7-day limit. Please request the employee to split this into separate requests.
-                            </p>
-                          </div>
+                  {/* Leave Details Grid */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="card p-4 bg-gradient-to-br from-blue-50 to-white border-blue-100">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Calendar className="w-4 h-4 text-blue-600" />
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Leave Type</span>
+                      </div>
+                      <p className="font-semibold text-slate-900">{selectedRequest.leaveType}</p>
+                    </div>
+                    <div className="card p-4 bg-gradient-to-br from-purple-50 to-white border-purple-100">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Clock className="w-4 h-4 text-purple-600" />
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Duration</span>
+                      </div>
+                      <p className="font-semibold text-slate-900">{selectedRequest.duration} {selectedRequest.duration > 1 ? 'days' : 'day'}</p>
+                    </div>
+                  </div>
+
+                  {/* Dates */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Start Date</span>
+                      <p className="font-medium text-slate-900 mt-1.5 text-sm">
+                        {new Date(selectedRequest.startDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">End Date</span>
+                      <p className="font-medium text-slate-900 mt-1.5 text-sm">
+                        {new Date(selectedRequest.endDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Reason */}
+                  <div>
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Reason for Leave</span>
+                    <div className="card p-4 mt-2 bg-slate-50 border-slate-200">
+                      <p className="text-sm text-slate-700 leading-relaxed">{selectedRequest.reason}</p>
+                    </div>
+                  </div>
+
+                  {/* Policy Warning */}
+                  {selectedRequest.leaveType === 'Annual' && selectedRequest.duration > 7 && approvalAction === 'approve' && (
+                    <div className="card p-4 bg-gradient-to-r from-red-50 to-orange-50 border-red-200">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-red-900">Policy Violation</p>
+                          <p className="text-sm text-red-700 mt-1 leading-relaxed">
+                            This annual leave request exceeds the 7-day limit. Please request the employee to split this into separate requests.
+                          </p>
                         </div>
                       </div>
-                    )}
+                    </div>
+                  )}
 
-                    {approvalAction === 'decline' && (
-                      <div>
-                        <label style={{ fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', display: 'block' }}>
-                          Decline Reason *
-                        </label>
-                        <textarea
-                          className="input"
-                          rows={3}
-                          placeholder="Please provide a reason for declining this request..."
-                          value={declineReason}
-                          onChange={(e) => setDeclineReason(e.target.value)}
-                          style={{ resize: 'vertical' }}
-                        ></textarea>
-                      </div>
-                    )}
-                  </div>
+                  {/* Decline Reason Input */}
+                  {approvalAction === 'decline' && (
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Decline Reason <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        className="input min-h-[120px] resize-none"
+                        placeholder="Please provide a detailed reason for declining this request..."
+                        value={declineReason}
+                        onChange={(e) => setDeclineReason(e.target.value)}
+                      />
+                    </div>
+                  )}
                 </div>
-                <div className="modal-footer">
-                  <button className="btn btn-outline" onClick={() => setShowApprovalModal(false)}>Cancel</button>
+                <div className="modal-footer bg-slate-50">
+                  <button className="btn btn-ghost" onClick={() => setShowApprovalModal(false)}>
+                    Cancel
+                  </button>
                   <button
-                    className={`btn ${approvalAction === 'approve' ? 'btn-primary' : 'btn-outline red'}`}
+                    className={cn(
+                      "btn font-semibold px-6",
+                      approvalAction === 'approve' 
+                        ? "btn-primary bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800" 
+                        : "btn-danger bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800"
+                    )}
                     onClick={confirmApproval}
                     disabled={(approvalAction === 'decline' && !declineReason.trim()) || (approvalAction === 'approve' && selectedRequest.leaveType === 'Annual' && selectedRequest.duration > 7)}
                   >
                     {approvalAction === 'approve' ? (
                       <>
-                        <Check className="w-4 h-4 mr-2" />
+                        <Check className="w-4 h-4" />
                         Approve Request
                       </>
                     ) : (
                       <>
-                        <X className="w-4 h-4 mr-2" />
+                        <X className="w-4 h-4" />
                         Decline Request
                       </>
                     )}
@@ -1396,93 +1424,119 @@ const LeaveManagementView = () => {
             </>
           )}
 
-          {/* Cancel Leave Modal */}
+          {/* Cancel Leave Modal - Modern Design */}
           {showCancelModal && selectedRequest && (
             <>
               <div className="modal-overlay" onClick={() => setShowCancelModal(false)}></div>
-              <div className="modal">
+              <div className="modal modal-lg animate-scale-in">
                 <div className="modal-header">
-                  <h3>Cancel Leave Request</h3>
-                  <button className="btn btn-ghost btn-icon" style={{ width: '2rem', height: '2rem' }} onClick={() => setShowCancelModal(false)}>
-                    <X className="w-4 h-4" />
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-lg">
+                      <AlertCircle className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="modal-title text-xl font-semibold text-slate-900">Cancel Leave Request</h2>
+                      <p className="text-sm text-slate-500 mt-0.5">Request #{selectedRequest.id}</p>
+                    </div>
+                  </div>
+                  <button 
+                    className="btn btn-ghost btn-icon rounded-lg hover:bg-slate-100 transition-colors" 
+                    onClick={() => setShowCancelModal(false)}
+                  >
+                    <X className="w-5 h-5 text-slate-500" />
                   </button>
                 </div>
-                <div className="modal-content">
-                  <div className="space-y-4">
-                    <div className="p-4 rounded" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca' }}>
-                      <div className="flex items-start gap-3">
-                        <AlertCircle className="w-5 h-5" style={{ color: '#dc2626', flexShrink: 0, marginTop: '0.125rem' }} />
-                        <div>
-                          <p style={{ fontSize: '0.875rem', color: '#991b1b', fontWeight: 600 }}>Warning: This action will cancel the approved leave</p>
-                          <p style={{ fontSize: '0.875rem', color: '#dc2626', marginTop: '0.25rem' }}>
-                            The employee's leave balance will be restored and the leave request will be marked as declined.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 p-4 rounded" style={{ backgroundColor: '#f9fafb' }}>
-                      <div className="avatar" style={{ width: '3rem', height: '3rem' }}>
-                        {selectedRequest.staffName.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                      </div>
-                      <div>
-                        <p style={{ fontWeight: 600, fontSize: '1rem' }}>{selectedRequest.staffName}</p>
-                        <p className="text-xs text-muted">{selectedRequest.staffId} · {selectedRequest.department}</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Leave Type</p>
-                        <div className="flex items-center gap-2">
-                          <span style={{ fontSize: '1.25rem' }}>{leaveTypes.find(t => t.type === selectedRequest.leaveType)?.icon}</span>
-                          <span style={{ fontWeight: 600 }}>{selectedRequest.leaveType}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Duration</p>
-                        <p style={{ fontWeight: 600 }}>{selectedRequest.duration} day{selectedRequest.duration > 1 ? 's' : ''}</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Start Date</p>
-                        <p style={{ fontWeight: 600 }}>
-                          {new Date(selectedRequest.startDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                        </p>
-                      </div>
-                      <div>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>End Date</p>
-                        <p style={{ fontWeight: 600 }}>
-                          {new Date(selectedRequest.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                <div className="modal-content space-y-5">
+                  {/* Warning Card */}
+                  <div className="card p-5 bg-gradient-to-r from-red-50 to-orange-50 border-red-200">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="w-6 h-6 text-red-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-base font-semibold text-red-900">Warning: This action will cancel the approved leave</p>
+                        <p className="text-sm text-red-700 mt-1.5 leading-relaxed">
+                          The employee's leave balance will be restored and the leave request will be marked as declined. This action cannot be undone.
                         </p>
                       </div>
                     </div>
+                  </div>
 
+                  {/* Employee Info Card */}
+                  <div className="card p-4 bg-gradient-to-r from-slate-50 to-white">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md">
+                        <span className="text-white font-semibold text-sm">
+                          {selectedRequest.staffName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        </span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-slate-900 text-base">{selectedRequest.staffName}</p>
+                        <p className="text-sm text-slate-500 mt-0.5">{selectedRequest.staffId} · {selectedRequest.department}</p>
+                      </div>
+                      <div className="badge badge-success px-3 py-1.5 text-xs font-semibold">
+                        {selectedRequest.status}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Leave Details Grid */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="card p-4 bg-gradient-to-br from-blue-50 to-white border-blue-100">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Calendar className="w-4 h-4 text-blue-600" />
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Leave Type</span>
+                      </div>
+                      <p className="font-semibold text-slate-900">{selectedRequest.leaveType}</p>
+                    </div>
+                    <div className="card p-4 bg-gradient-to-br from-purple-50 to-white border-purple-100">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Clock className="w-4 h-4 text-purple-600" />
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Duration</span>
+                      </div>
+                      <p className="font-semibold text-slate-900">{selectedRequest.duration} {selectedRequest.duration > 1 ? 'days' : 'day'}</p>
+                    </div>
+                  </div>
+
+                  {/* Dates */}
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Reason</p>
-                      <p style={{ fontSize: '0.875rem', padding: '0.75rem', backgroundColor: '#f9fafb', borderRadius: '0.375rem' }}>
-                        {selectedRequest.reason}
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Start Date</span>
+                      <p className="font-medium text-slate-900 mt-1.5 text-sm">
+                        {new Date(selectedRequest.startDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">End Date</span>
+                      <p className="font-medium text-slate-900 mt-1.5 text-sm">
+                        {new Date(selectedRequest.endDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                       </p>
                     </div>
                   </div>
+
+                  {/* Reason */}
+                  <div>
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Reason for Leave</span>
+                    <div className="card p-4 mt-2 bg-slate-50 border-slate-200">
+                      <p className="text-sm text-slate-700 leading-relaxed">{selectedRequest.reason}</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="modal-footer">
-                  <button className="btn btn-outline" onClick={() => setShowCancelModal(false)}>Go Back</button>
+                <div className="modal-footer bg-slate-50">
+                  <button className="btn btn-ghost" onClick={() => setShowCancelModal(false)}>
+                    Go Back
+                  </button>
                   <button
-                    className="btn btn-outline red"
+                    className="btn btn-danger font-semibold px-6"
                     onClick={handleCancelLeave}
                     disabled={loading}
                   >
                     {loading ? (
                       <>
-                        <Clock className="w-4 h-4 mr-2 animate-spin" />
+                        <Clock className="w-4 h-4 animate-spin" />
                         Cancelling...
                       </>
                     ) : (
                       <>
-                        <X className="w-4 h-4 mr-2" />
+                        <X className="w-4 h-4" />
                         Cancel Leave Request
                       </>
                     )}
@@ -1492,46 +1546,43 @@ const LeaveManagementView = () => {
             </>
           )}
 
-          {/* Details Modal */}
+          {/* Details Modal - BAM Design */}
           {showDetailsModal && selectedRequest && (
             <>
-              <div className="modal-overlay" onClick={() => setShowDetailsModal(false)} style={{ animation: 'fadeIn 0.2s ease-out' }}></div>
-              <div 
-                className="modal" 
-                style={{ 
-                  maxWidth: '800px', 
-                  animation: 'slideUp 0.3s ease-out',
-                  width: 'calc(100% - 2rem)'
-                }}
-              >
-                <div className="modal-header" style={{ padding: '1.25rem 1.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{ 
-                      width: '2.5rem', 
-                      height: '2.5rem', 
-                      borderRadius: '0.5rem', 
-                      backgroundColor: '#eff6ff', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center'
+              <div className="bam-overlay" onClick={() => setShowDetailsModal(false)}></div>
+              <div className="bam-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px' }}>
+                {/* Header */}
+                <div className="bam-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      background: '#eff6ff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#2563eb',
+                      flexShrink: 0
                     }}>
-                      <FileText className="w-5 h-5" style={{ color: '#2563eb' }} />
+                      <FileText className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>Leave Request Details</h3>
-                      <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>Request #{selectedRequest.id}</p>
+                      <h3 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 600, color: '#111827' }}>
+                        Leave Request Details
+                      </h3>
+                      <p style={{ margin: 0, fontSize: '0.72rem', color: '#6b7280' }}>
+                        Request #{selectedRequest.id}
+                      </p>
                     </div>
                   </div>
-                  <button 
-                    className="btn btn-ghost btn-icon" 
-                    style={{ width: '2.25rem', height: '2.25rem', borderRadius: '0.5rem' }} 
-                    onClick={() => setShowDetailsModal(false)}
-                    title="Close modal"
-                  >
-                    <X className="w-5 h-5" />
+                  <button className="bam-btn-close" onClick={() => setShowDetailsModal(false)} title="Close">
+                    <X className="w-[18px] h-[18px]" />
                   </button>
                 </div>
-                <div className="modal-content" style={{ padding: '1.5rem' }}>
+
+                {/* Body */}
+                <div className="bam-body">
                   {detailsLoading ? (
                     <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}>
                       <svg className="animate-spin w-8 h-8" style={{ color: '#2563eb' }} fill="none" viewBox="0 0 24 24">
@@ -1540,32 +1591,44 @@ const LeaveManagementView = () => {
                       </svg>
                     </div>
                   ) : selectedRequestDetails ? (
-                    <div className="space-y-4">
+                    <>
                       {/* Employee Info Card */}
-                      <div className="flex items-center gap-4 p-4 rounded" style={{ backgroundColor: '#f9fafb', border: '1px solid #e5e7eb' }}>
-                        <div className="avatar" style={{ width: '3.5rem', height: '3.5rem', fontSize: '1rem' }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '1rem',
+                        padding: '1rem',
+                        borderRadius: '0.5rem',
+                        backgroundColor: '#f9fafb',
+                        border: '1px solid #e5e7eb'
+                      }}>
+                        <div className="bam-avatar" style={{
+                          width: '3.5rem',
+                          height: '3.5rem',
+                          fontSize: '0.9375rem',
+                          background: '#e0e7ff',
+                          color: '#4338ca'
+                        }}>
                           {selectedRequestDetails.user_name?.split(' ').map(n => n[0]).join('').slice(0, 2) || selectedRequest.staffName.split(' ').map(n => n[0]).join('').slice(0, 2)}
                         </div>
                         <div style={{ flex: 1 }}>
-                          <p style={{ fontWeight: 600, fontSize: '1rem' }}>{selectedRequestDetails.user_name || selectedRequest.staffName}</p>
-                          <p className="text-xs text-muted">ID: {selectedRequestDetails.user_id} · {selectedRequest.department || 'General'}</p>
-                          <p className="text-xs text-muted">{selectedRequest.branch || 'Main Office'}</p>
+                          <p style={{ fontWeight: 600, fontSize: '0.9375rem', margin: 0 }}>{selectedRequestDetails.user_name || selectedRequest.staffName}</p>
+                          <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>ID: {selectedRequestDetails.user_id} · {selectedRequest.department || 'General'}</p>
+                          <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>{selectedRequest.branch || 'Main Office'}</p>
                         </div>
-                        <div>
-                          <span className={`badge ${
-                            selectedRequestDetails.status === 'approved' ? 'badge-success' :
-                            selectedRequestDetails.status === 'rejected' ? 'badge-danger' :
-                            selectedRequestDetails.status === 'active' ? 'badge-info' :
-                            'badge-warning'
-                          }`} style={{ textTransform: 'capitalize' }}>
-                            {selectedRequestDetails.status}
-                          </span>
-                        </div>
+                        <span className={`badge ${
+                          selectedRequestDetails.status === 'approved' ? 'badge-success' :
+                          selectedRequestDetails.status === 'rejected' ? 'badge-danger' :
+                          selectedRequestDetails.status === 'active' ? 'badge-info' :
+                          'badge-warning'
+                        }`} style={{ textTransform: 'capitalize' }}>
+                          {selectedRequestDetails.status}
+                        </span>
                       </div>
 
                       {/* Leave Details Grid */}
-                      <div style={{ 
-                        display: 'grid', 
+                      <div style={{
+                        display: 'grid',
                         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
                         gap: '1rem',
                         padding: '1.25rem',
@@ -1582,8 +1645,8 @@ const LeaveManagementView = () => {
                           <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>{selectedRequestDetails.days_requested || selectedRequest.duration} days</p>
                         </div>
                         <div>
-                          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem', textTransform: 'uppercase', fontWeight: 600 }}>Submitted</p>
-                          <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>
+                          <p style={{ fontSize: '0.65rem', color: '#64748b', marginBottom: '0.375rem', textTransform: 'uppercase', fontWeight: 600 }}>Submitted</p>
+                          <p style={{ fontWeight: 600, fontSize: '0.8125rem' }}>
                             {new Date(selectedRequestDetails.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </p>
                         </div>
@@ -1639,12 +1702,12 @@ const LeaveManagementView = () => {
                           </p>
                           <div style={{ display: 'grid', gap: '0.75rem' }}>
                             {selectedRequestDetails.attachments.map((attachment: any, index: number) => (
-                              <div 
-                                key={index} 
-                                style={{ 
+                              <div
+                                key={index}
+                                style={{
                                   padding: '1rem', 
-                                  backgroundColor: '#f8fafc', 
-                                  borderRadius: '0.5rem', 
+                                  backgroundColor: '#f8fafc',
+                                  borderRadius: '0.5rem',
                                   border: '1px solid #e2e8f0',
                                   display: 'flex',
                                   alignItems: 'center',
@@ -1652,64 +1715,49 @@ const LeaveManagementView = () => {
                                   gap: '1rem'
                                 }}
                               >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
-                                  <div style={{ 
-                                    width: '2.5rem', 
-                                    height: '2.5rem', 
-                                    borderRadius: '0.375rem', 
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flex: 1 }}>
+                                  <div style={{
+                                    width: '2rem',
+                                    height: '2rem',
+                                    borderRadius: '0.375rem',
                                     backgroundColor: attachment.mime_type?.includes('pdf') ? '#fee2e2' : '#dbeafe',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center'
                                   }}>
                                     {attachment.mime_type?.includes('pdf') ? (
-                                      <svg className="w-5 h-5" style={{ color: '#dc2626' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                      </svg>
-                                    ) : attachment.mime_type?.includes('image') ? (
-                                      <svg className="w-5 h-5" style={{ color: '#2563eb' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                      </svg>
+                                      <FileText className="w-4 h-4" style={{ color: '#dc2626' }} />
                                     ) : (
-                                      <svg className="w-5 h-5" style={{ color: '#64748b' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                      </svg>
+                                      <FileText className="w-4 h-4" style={{ color: '#2563eb' }} />
                                     )}
                                   </div>
                                   <div style={{ flex: 1, minWidth: 0 }}>
-                                    <p style={{ fontWeight: 600, fontSize: '0.875rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    <p style={{ fontWeight: 600, fontSize: '0.8125rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }}>
                                       {attachment.file_name || `Attachment ${index + 1}`}
                                     </p>
-                                    <p className="text-xs text-muted">
-                                      {attachment.mime_type || 'Unknown'} · {attachment.file_size ? Math.round(attachment.file_size / 1024) + ' KB' : 'Unknown size'}
+                                    <p style={{ fontSize: '0.65rem', color: '#6b7280', margin: 0 }}>
+                                      {attachment.mime_type || 'Unknown'} · {attachment.file_size ? Math.round(attachment.file_size / 1024) + ' KB' : ''}
                                     </p>
                                   </div>
                                 </div>
-                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <div style={{ display: 'flex', gap: '0.375rem' }}>
                                   {attachment.file_path && (
-                                    <a 
+                                    <a
                                       href={`${import.meta.env.VITE_API_Endpoint || 'http://localhost:3000/api'}${attachment.file_path}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="btn btn-sm btn-outline"
-                                      style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+                                      className="bam-btn bam-btn-ghost"
+                                      style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem' }}
                                     >
-                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                      </svg>
                                       View
                                     </a>
                                   )}
-                                  <a 
+                                  <a
                                     href={`${import.meta.env.VITE_API_Endpoint || 'http://localhost:3000/api'}${attachment.file_path}`}
                                     download={attachment.file_name}
-                                    className="btn btn-sm btn-primary"
-                                    style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+                                    className="bam-btn bam-btn-primary"
+                                    style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem' }}
                                   >
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                    </svg>
                                     Download
                                   </a>
                                 </div>
@@ -1721,57 +1769,59 @@ const LeaveManagementView = () => {
 
                       {/* Approval Info */}
                       {(selectedRequestDetails.reviewed_by || selectedRequestDetails.reviewed_at) && (
-                        <div style={{ 
-                          padding: '1rem', 
-                          backgroundColor: selectedRequestDetails.status === 'approved' ? '#f0fdf4' : '#fef2f2', 
+                        <div style={{
+                          padding: '0.75rem',
+                          backgroundColor: selectedRequestDetails.status === 'approved' ? '#f0fdf4' : '#fef2f2',
                           borderRadius: '0.5rem',
                           border: `1px solid ${selectedRequestDetails.status === 'approved' ? '#bbf7d0' : '#fecaca'}`
                         }}>
-                          <p style={{ 
-                            fontSize: '0.75rem', 
+                          <p style={{
+                            fontSize: '0.65rem',
                             color: selectedRequestDetails.status === 'approved' ? '#166534' : '#991b1b',
-                            marginBottom: '0.75rem',
+                            marginBottom: '0.5rem',
                             fontWeight: 600,
-                            textTransform: 'uppercase'
+                            textTransform: 'uppercase',
+                            margin: 0
                           }}>
                             {selectedRequestDetails.status === 'approved' ? 'Approval Information' : 'Rejection Information'}
                           </p>
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="bam-row2">
                             <div>
-                              <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                              <p style={{ fontSize: '0.65rem', color: '#6b7280', marginBottom: '0.125rem', margin: 0 }}>
                                 {selectedRequestDetails.status === 'approved' ? 'Approved By' : 'Rejected By'}
                               </p>
-                              <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>
+                              <p style={{ fontWeight: 600, fontSize: '0.8125rem', margin: 0 }}>
                                 {selectedRequestDetails.reviewed_by_name || 'HR Manager'}
                               </p>
                             </div>
                             <div>
-                              <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>Date</p>
-                              <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>
+                              <p style={{ fontSize: '0.65rem', color: '#6b7280', marginBottom: '0.125rem', margin: 0 }}>Date</p>
+                              <p style={{ fontWeight: 600, fontSize: '0.8125rem', margin: 0 }}>
                                 {selectedRequestDetails.reviewed_at && new Date(selectedRequestDetails.reviewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                               </p>
                             </div>
                           </div>
                           {selectedRequestDetails.notes && (
-                            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(0,0,0,0.1)' }}>
-                              <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem' }}>Comments</p>
-                              <p style={{ fontSize: '0.875rem', lineHeight: '1.6' }}>{selectedRequestDetails.notes}</p>
+                            <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(0,0,0,0.1)' }}>
+                              <p style={{ fontSize: '0.65rem', color: '#6b7280', marginBottom: '0.25rem', margin: 0 }}>Comments</p>
+                              <p style={{ fontSize: '0.8125rem', lineHeight: '1.5', margin: 0 }}>{selectedRequestDetails.notes}</p>
                             </div>
                           )}
                         </div>
                       )}
-                    </div>
+                    </>
                   ) : (
                     <div style={{ padding: '3rem', textAlign: 'center' }}>
                       <AlertCircle className="w-12 h-12" style={{ color: '#f59e0b', margin: '0 auto 1rem' }} />
-                      <p style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Unable to load details</p>
-                      <p className="text-muted">Please try again later</p>
+                      <p style={{ fontWeight: 600, marginBottom: '0.5rem', margin: 0 }}>Unable to load details</p>
+                      <p style={{ fontSize: '0.8125rem', color: '#6b7280', margin: 0 }}>Please try again later</p>
                     </div>
                   )}
                 </div>
-                {/* Modal footer with close button */}
-                <div className="modal-footer" style={{ padding: '1rem 1.5rem', backgroundColor: '#f9fafb' }}>
-                  <button className="btn btn-outline" onClick={() => setShowDetailsModal(false)}>Close</button>
+
+                {/* Footer */}
+                <div className="bam-footer">
+                  <button className="bam-btn bam-btn-ghost" onClick={() => setShowDetailsModal(false)}>Close</button>
                 </div>
               </div>
             </>
@@ -1800,7 +1850,7 @@ const LeaveManagementView = () => {
                         placeholder="Enter leave type name"
                       />
                     </div>
-                    
+
                     <div>
                       <label className="form-label">Description</label>
                       <textarea
@@ -1811,7 +1861,7 @@ const LeaveManagementView = () => {
                         rows={3}
                       />
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="form-label">Days Per Year *</label>
@@ -1823,7 +1873,7 @@ const LeaveManagementView = () => {
                           min="0"
                         />
                       </div>
-                      
+
                       <div>
                         <label className="form-label">Paid Leave?</label>
                         <div className="flex items-center mt-2">
@@ -1839,7 +1889,7 @@ const LeaveManagementView = () => {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="form-label">Allow Carryover?</label>
@@ -1855,7 +1905,7 @@ const LeaveManagementView = () => {
                           </label>
                         </div>
                       </div>
-                      
+
                       {createLeaveTypeForm.allowCarryover && (
                         <div>
                           <label className="form-label">Carryover Limit</label>
@@ -1869,7 +1919,7 @@ const LeaveManagementView = () => {
                         </div>
                       )}
                     </div>
-                    
+
                     <div>
                       <label className="form-label">Expiry Rule ID</label>
                       <input
@@ -1884,8 +1934,8 @@ const LeaveManagementView = () => {
                 </div>
                 <div className="modal-footer">
                   <button className="btn btn-outline" onClick={() => setShowCreateLeaveTypeModal(false)}>Cancel</button>
-                  <button 
-                    className="btn btn-primary" 
+                  <button
+                    className="btn btn-primary"
                     onClick={handleCreateLeaveType}
                     disabled={!createLeaveTypeForm.name || createLeaveTypeForm.daysPerYear === null || createLeaveTypeForm.daysPerYear < 0}
                   >
@@ -1919,7 +1969,7 @@ const LeaveManagementView = () => {
                         placeholder="Enter leave type name"
                       />
                     </div>
-                    
+
                     <div>
                       <label className="form-label">Description</label>
                       <textarea
@@ -1930,7 +1980,7 @@ const LeaveManagementView = () => {
                         rows={3}
                       />
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="form-label">Days Per Year *</label>
@@ -1942,7 +1992,7 @@ const LeaveManagementView = () => {
                           min="0"
                         />
                       </div>
-                      
+
                       <div>
                         <label className="form-label">Paid Leave?</label>
                         <div className="flex items-center mt-2">
@@ -1958,7 +2008,7 @@ const LeaveManagementView = () => {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="form-label">Allow Carryover?</label>
@@ -1974,7 +2024,7 @@ const LeaveManagementView = () => {
                           </label>
                         </div>
                       </div>
-                      
+
                       {editLeaveTypeForm.allowCarryover && (
                         <div>
                           <label className="form-label">Carryover Limit</label>
@@ -1988,7 +2038,7 @@ const LeaveManagementView = () => {
                         </div>
                       )}
                     </div>
-                    
+
                     <div>
                       <label className="form-label">Expiry Rule ID</label>
                       <input
@@ -2003,8 +2053,8 @@ const LeaveManagementView = () => {
                 </div>
                 <div className="modal-footer">
                   <button className="btn btn-outline" onClick={() => setShowEditLeaveTypeModal(false)}>Cancel</button>
-                  <button 
-                    className="btn btn-primary" 
+                  <button
+                    className="btn btn-primary"
                     onClick={handleEditLeaveType}
                     disabled={!editLeaveTypeForm.name || editLeaveTypeForm.daysPerYear === null || editLeaveTypeForm.daysPerYear < 0}
                   >
