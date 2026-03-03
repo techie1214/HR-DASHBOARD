@@ -9,7 +9,7 @@ import { AttendanceChart } from "./components/AttendanceChart";
 import { DepartmentChart } from "./components/DepartmentChart";
 import LeaveRequestCard from "./components/LeaveRequestCard";
 import { RecentHires } from "./components/RecentHires";
-import { AttendanceView } from "./components/AttendanceView";
+import AttendanceView from "./components/AttendanceView";
 import { EmployeesView } from "./components/EmployeesView";
 import { DepartmentManagementView } from "./components/DepartmentManagementView";
 import PerformanceView from "./components/PerformanceView";
@@ -24,6 +24,7 @@ import { EmployeeTable } from "./components/EmployeeTable";
 import KPIView from "./components/KPIView";
 import HolidayManagementView from "./components/HolidayManagementView";
 import ShiftSchedulingView from "./components/ShiftSchedulingView";
+import SettingsView from "./components/SettingsView";
 // import  StaffManagementView  from "./components/StaffManagementView";
 import { mockNotifications, mockStaffData } from "./data/staffData";
 import {
@@ -714,18 +715,7 @@ export default function App() {
       case "rolemanagement":
         return <RoleManagementView />;
       case "settings":
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2>Settings</h2>
-              <p className="text-muted">Configure your HR dashboard preferences</p>
-            </div>
-            <div className="card p-6">
-              <h3 className="mb-4">General Settings</h3>
-              <p className="text-muted">Settings page coming soon...</p>
-            </div>
-          </div>
-        );
+        return <SettingsView />;
 
       default:
         return null;

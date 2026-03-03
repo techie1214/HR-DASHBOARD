@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Plus,
   Edit,
+  Edit3,
   Trash2,
   Search,
   Filter,
@@ -862,39 +863,29 @@ const LeaveAllocationView = () => {
       {/* Create Allocation Modal */}
       {showCreateModal && (
         <>
-          <div className="modal-overlay" onClick={() => { setShowCreateModal(false); resetCreateForm(); }} style={{ animation: 'fadeIn 0.2s ease-out', position: 'fixed', inset: 0, zIndex: 99999 }}></div>
-          <div
-            className="modal"
-            style={{
-              maxWidth: '1200px',
-              animation: 'slideUp 0.3s ease-out',
-              width: 'calc(100% - 2rem)',
-              maxHeight: '90vh',
-              position: 'fixed',
-              zIndex: 100000
-            }}
-          >
-            <div className="modal-header" style={{ padding: '1.25rem 1.5rem' }}>
+          <div className="modal-overlay" onClick={() => { setShowCreateModal(false); resetCreateForm(); }} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(15, 23, 42, 0.5)' }}></div>
+          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100000, maxWidth: '42rem', width: 'calc(100% - 2rem)', margin: 0, backgroundColor: 'white', borderRadius: '1rem', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+            <div className="modal-header" style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e5e7eb' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ 
-                  width: '2.5rem', 
-                  height: '2.5rem', 
-                  borderRadius: '0.5rem', 
-                  backgroundColor: '#eff6ff', 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                <div style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: '#2563eb',
+                  display: 'flex',
+                  alignItems: 'center',
                   justifyContent: 'center'
                 }}>
-                  <Plus className="w-5 h-5" style={{ color: '#2563eb' }} />
+                  <Plus className="w-5 h-5" style={{ color: 'white' }} />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>Create Leave Allocation</h3>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0, color: '#111827' }}>Create Leave Allocation</h3>
                   <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>Allocate leave days to a staff member</p>
                 </div>
               </div>
-              <button 
-                className="btn btn-ghost btn-icon" 
-                style={{ width: '2.25rem', height: '2.25rem', borderRadius: '0.5rem' }} 
+              <button
+                className="btn btn-ghost btn-icon"
+                style={{ width: '2.25rem', height: '2.25rem', borderRadius: '0.5rem' }}
                 onClick={() => { setShowCreateModal(false); resetCreateForm(); }}
                 title="Close modal"
               >
@@ -904,50 +895,46 @@ const LeaveAllocationView = () => {
               </button>
             </div>
             <div className="modal-content" style={{ padding: '1.5rem' }}>
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Staff Member *
                   </label>
                   <select
                     value={createForm.user_id || ''}
                     onChange={(e) => setCreateForm({ ...createForm, user_id: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="input w-full"
                     required
-                    style={{ backgroundColor: 'white', color: '#1f2937' }}
                   >
                     <option value="" disabled>Select Staff</option>
                     {staffMembers.map(staff => (
-                      <option key={staff.id} value={staff.id} style={{ color: '#1f2937', fontWeight: 500 }}>
-                        {staff.name}
-                        {staff.staff_id ? ` (${staff.staff_id})` : ''}
-                        {staff.email ? ` - ${staff.email}` : ''}
+                      <option key={staff.id} value={staff.id}>
+                        {staff.name} {staff.staff_id ? `(${staff.staff_id})` : ''} {staff.email ? `- ${staff.email}` : ''}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Leave Type *
                   </label>
                   <select
                     value={createForm.leave_type_id || ''}
                     onChange={(e) => setCreateForm({ ...createForm, leave_type_id: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="input w-full"
                     required
-                    style={{ backgroundColor: 'white', color: '#1f2937' }}
                   >
                     <option value="" disabled>Select Leave Type</option>
                     {leaveTypes.map(type => (
-                      <option key={type.id} value={type.id} style={{ color: '#1f2937' }}>
-                        {type.name} ({type.days_per_year || type.daysPerYear} days/year)
+                      <option key={type.id} value={type.id}>
+                        {type.name} — {type.days_per_year || type.daysPerYear} days/year
                       </option>
                     ))}
                   </select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Allocated Days *
                     </label>
                     <input
@@ -955,12 +942,12 @@ const LeaveAllocationView = () => {
                       min="0"
                       value={createForm.allocated_days || ''}
                       onChange={(e) => setCreateForm({ ...createForm, allocated_days: Number(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="input w-full"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Carried Over Days
                     </label>
                     <input
@@ -968,39 +955,39 @@ const LeaveAllocationView = () => {
                       min="0"
                       value={createForm.carried_over_days || ''}
                       onChange={(e) => setCreateForm({ ...createForm, carried_over_days: Number(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="input w-full"
                     />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Cycle Start Date *
                     </label>
                     <input
                       type="date"
                       value={createForm.cycle_start_date}
                       onChange={(e) => setCreateForm({ ...createForm, cycle_start_date: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="input w-full"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Cycle End Date *
                     </label>
                     <input
                       type="date"
                       value={createForm.cycle_end_date}
                       onChange={(e) => setCreateForm({ ...createForm, cycle_end_date: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="input w-full"
                       required
                     />
                   </div>
                 </div>
               </div>
             </div>
-            <div className="modal-footer" style={{ padding: '1rem 1.5rem', backgroundColor: '#f9fafb' }}>
+            <div className="modal-footer" style={{ padding: '1rem 1.5rem', backgroundColor: '#f9fafb', borderTop: '1px solid #e5e7eb' }}>
               <button
                 type="button"
                 onClick={() => { setShowCreateModal(false); resetCreateForm(); }}
@@ -1023,30 +1010,20 @@ const LeaveAllocationView = () => {
       {/* Bulk Allocation Modal */}
       {showBulkModal && (
         <>
-          <div className="modal-overlay" onClick={() => setShowBulkModal(false)} style={{ animation: 'fadeIn 0.2s ease-out', position: 'fixed', inset: 0, zIndex: 99999 }}></div>
-          <div
-            className="modal"
-            style={{
-              maxWidth: '1200px',
-              animation: 'slideUp 0.3s ease-out',
-              width: 'calc(100% - 2rem)',
-              maxHeight: '90vh',
-              position: 'fixed',
-              zIndex: 100000
-            }}
-          >
-            <div className="modal-header" style={{ padding: '1.25rem 1.5rem' }}>
+          <div className="modal-overlay" onClick={() => setShowBulkModal(false)} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(15, 23, 42, 0.5)' }}></div>
+          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100000, maxWidth: '48rem', width: 'calc(100% - 2rem)', margin: 0, backgroundColor: 'white', borderRadius: '1rem', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+            <div className="modal-header" style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e5e7eb' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <div style={{ 
                   width: '2.5rem', 
                   height: '2.5rem', 
                   borderRadius: '0.5rem', 
-                  backgroundColor: '#eff6ff', 
+                  backgroundColor: '#2563eb', 
                   display: 'flex', 
                   alignItems: 'center', 
-                  justifyContent: 'center'
+                  justifyContent: 'center' 
                 }}>
-                  <Users className="w-5 h-5" style={{ color: '#2563eb' }} />
+                  <Users className="w-5 h-5" style={{ color: 'white' }} />
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>Bulk Allocate to Selected Users</h3>
@@ -1290,30 +1267,20 @@ const LeaveAllocationView = () => {
       {/* Bulk Allocate All Modal */}
       {showBulkAllModal && (
         <>
-          <div className="modal-overlay" onClick={() => setShowBulkAllModal(false)} style={{ animation: 'fadeIn 0.2s ease-out', position: 'fixed', inset: 0, zIndex: 99999 }}></div>
-          <div
-            className="modal"
-            style={{
-              maxWidth: '1200px',
-              animation: 'slideUp 0.3s ease-out',
-              width: 'calc(100% - 2rem)',
-              maxHeight: '90vh',
-              position: 'fixed',
-              zIndex: 100000
-            }}
-          >
-            <div className="modal-header" style={{ padding: '1.25rem 1.5rem' }}>
+          <div className="modal-overlay" onClick={() => setShowBulkAllModal(false)} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(15, 23, 42, 0.5)' }}></div>
+          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100000, maxWidth: '42rem', width: 'calc(100% - 2rem)', margin: 0, backgroundColor: 'white', borderRadius: '1rem', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+            <div className="modal-header" style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e5e7eb' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ 
-                  width: '2.5rem', 
-                  height: '2.5rem', 
-                  borderRadius: '0.5rem', 
-                  backgroundColor: '#eef2ff', 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                <div style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: '#2563eb',
+                  display: 'flex',
+                  alignItems: 'center',
                   justifyContent: 'center'
                 }}>
-                  <Users className="w-5 h-5" style={{ color: '#4f46e5' }} />
+                  <Users className="w-5 h-5" style={{ color: 'white' }} />
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>Allocate to All Active Users</h3>
@@ -1431,10 +1398,26 @@ const LeaveAllocationView = () => {
 
       {/* Edit Allocation Modal */}
       {showEditModal && selectedAllocation && (
-        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 99999, animation: 'fadeIn 0.2s ease-out' }} onClick={() => { setShowEditModal(false); setSelectedAllocation(null); resetEditForm(); }}>
-          <div className="modal" style={{ position: 'fixed', zIndex: 100000, maxWidth: '28rem', animation: 'slideUp 0.3s ease-out' }}>
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">Edit Leave Allocation</h2>
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(15, 23, 42, 0.5)' }} onClick={() => { setShowEditModal(false); setSelectedAllocation(null); resetEditForm(); }}>
+          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100000, maxWidth: '28rem', width: 'calc(100% - 2rem)', margin: 0, backgroundColor: 'white', borderRadius: '1rem', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+            <div className="modal-header" style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e5e7eb' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: '#059669',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Edit3 className="w-5 h-5" style={{ color: 'white' }} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0, color: '#111827' }}>Edit Leave Allocation</h3>
+                  <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>Update allocation details</p>
+                </div>
+              </div>
             </div>
             <form onSubmit={handleEditAllocation} className="p-6">
               <div className="space-y-4">
@@ -1526,19 +1509,21 @@ const LeaveAllocationView = () => {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && selectedAllocation && (
-        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 99999, animation: 'fadeIn 0.2s ease-out' }} onClick={() => { setShowDeleteModal(false); setSelectedAllocation(null); }}>
-          <div className="modal" style={{ position: 'fixed', zIndex: 100000, maxWidth: '24rem', animation: 'slideUp 0.3s ease-out' }}>
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(15, 23, 42, 0.5)' }} onClick={() => { setShowDeleteModal(false); setSelectedAllocation(null); }}>
+          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100000, maxWidth: '24rem', width: 'calc(100% - 2rem)', margin: 0, backgroundColor: 'white', borderRadius: '1rem', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
                   <AlertCircle className="w-6 h-6 text-red-600" />
                 </div>
-                <h2 className="text-xl font-semibold text-gray-900">Delete Allocation</h2>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Delete Allocation</h3>
+                  <p className="text-sm text-gray-500">This action cannot be undone</p>
+                </div>
               </div>
               <p className="text-gray-600 mb-6">
                 Are you sure you want to delete this allocation for{' '}
                 <strong>{selectedAllocation.user?.name || `User ${selectedAllocation.userId}`}</strong>?
-                This action cannot be undone.
               </p>
               <div className="flex gap-3">
                 <button

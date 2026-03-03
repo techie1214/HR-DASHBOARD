@@ -1,751 +1,878 @@
-// This component provides a comprehensive attendance tracking and reporting interface
-// It displays attendance statistics, charts, and detailed records with filtering capabilities
+// src/components/AttendanceView.tsx
+// Admin-focused Attendance Management with Calendar, List View, and Check-in Tracking
 
-// Import Lucide React icons for UI elements
-import { Calendar, Clock, TrendingUp, TrendingDown, UserCheck, Download, Building, Filter, Search } from "lucide-react";
-// Import AttendanceChart component for visualization
-import { AttendanceChart } from "./AttendanceChart";
-// Import React useState hook for state management
-import { useState } from 'react';
-// Import branch data constants
-import { BRANCHES } from '../data/branchData';
-// Import attendance service hook
-import { useAttendanceService } from '../services/useAttendanceService';
+import React, { useState, useEffect } from 'react';
+import {
+  getAllAttendanceRecords,
+  markAttendanceCheckIn,
+  markAttendanceCheckOut,
+  createManualAttendance,
+  updateAttendanceRecord,
+  AttendanceRecord
+} from '../services/attendanceService';
+import { getAllStaff } from '../services/staffManagementService';
+import { getAllBranches, Branch } from '../services/branchManagementService';
+import {
+  Calendar, Clock, CheckCircle, XCircle, AlertCircle, Search, Filter, Download,
+  Plus, Edit3, Trash2, Users, Building, TrendingUp, TrendingDown, RefreshCw
+} from 'lucide-react';
 
-// Interface defining the structure of staff attendance records
-interface StaffAttendanceRecord {
-  id: string; // Unique staff identifier
-  fullName: string; // Full name of the staff member
-  department: string; // Department the staff belongs to
-  branch?: string; // Branch location (optional)
-  present: number; // Number of days present
-  early: number; // Number of early arrivals
-  late: number; // Number of late arrivals
-  permitted: number; // Number of permitted absences
-  absent: number; // Number of unexcused absences
-  offDays: number; // Number of off days
-  leaveDays: number; // Number of leave days
-  averageTime: string; // Average working time
+interface StaffMember {
+  id: number;
+  name: string;
+  email: string;
+  department?: string;
+  branch_id?: number;
 }
 
-// Main component function for attendance view
-export function AttendanceView() {
-  // State for search term input
+interface AttendanceWithStaff extends AttendanceRecord {
+  staff_name?: string;
+  staff_email?: string;
+  department?: string;
+  branch_name?: string;
+}
+
+const AttendanceView = () => {
+  const [activeView, setActiveView] = useState<'list' | 'calendar'>('list');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Data state
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceWithStaff[]>([]);
+  const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+
+  // Filter state
   const [searchTerm, setSearchTerm] = useState('');
-  // State for selected branch filter
-  const [selectedBranch, setSelectedBranch] = useState('all');
-  // State for date range filter
-  const [dateRange, setDateRange] = useState('month');
-  // State for status filter (all, early, late, absent)
-  const [filterStatus, setFilterStatus] = useState<'all' | 'early' | 'late' | 'absent'>('all');
-  // State for showing/hiding filter panel
+  const [selectedBranch, setSelectedBranch] = useState<number | ''>('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [dateRange, setDateRange] = useState({
+    start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+    end: new Date().toISOString().split('T')[0]
+  });
   const [showFilters, setShowFilters] = useState(false);
 
-  // Use attendance service hook to get data from backend
-  const {
-    attendanceRecords: todayAttendanceRecords,
-    staffAttendanceData,
-    monthlyStats,
-    attendanceMetrics: metrics,
-    attendanceMode,
-    loading,
-    recordsLoading,
-    staffDataLoading,
-    monthlyStatsLoading,
-    metricsLoading,
-    modeLoading,
-    error,
-    recordsError,
-    staffDataError,
-    monthlyStatsError,
-    metricsError,
-    modeError,
-    refreshData,
-    updateAttendanceMode
-  } = useAttendanceService();
+  // Modal state
+  const [showManualAttendanceModal, setShowManualAttendanceModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<AttendanceWithStaff | null>(null);
 
-  // If loading, show a loading indicator
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-        <span className="ml-3">Loading attendance data...</span>
-      </div>
-    );
-  }
-
-  // If there's an error, show an error message
-  if (error) {
-    return (
-      <div className="alert alert-error">
-        <p>Error loading attendance data: {error}</p>
-        <button className="btn btn-sm" onClick={refreshData}>Retry</button>
-      </div>
-    );
-  }
-
-  // Calculate active branches from attendance records or fall back to branch list
-  const attendanceBranchSet = new Set<string>(staffAttendanceData.map(r => (r.branch ? r.branch : '')).filter(Boolean));
-  const computedActiveBranches = attendanceBranchSet.size > 0 ? attendanceBranchSet.size : BRANCHES.length;
-
-  // Filter attendance data based on search, status, and branch filters
-  const filteredData = staffAttendanceData.filter(record => {
-    // Check if record matches search term (name, department, or ID)
-    const matchesSearch = searchTerm === '' ||
-      record.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.id.toLowerCase().includes(searchTerm.toLowerCase());
-
-    // Check if record matches status filter
-    const matchesFilter =
-      filterStatus === 'all' ? true :
-      filterStatus === 'early' ? record.early > record.late :
-      filterStatus === 'late' ? record.late > 0 :
-      record.absent > 0;
-    const matchesBranch = selectedBranch === 'all' ? true : (record.branch === selectedBranch);
-
-    return matchesSearch && matchesFilter && matchesBranch;
+  // Manual attendance form
+  const [manualForm, setManualForm] = useState({
+    user_id: 0,
+    date: new Date().toISOString().split('T')[0],
+    check_in_time: '09:00:00',
+    check_out_time: '17:00:00',
+    status: 'present' as 'present' | 'late' | 'half_day',
+    notes: '',
   });
 
-  // Calculate totals from filtered data
-  const totalPresent = filteredData.reduce((sum, r) => sum + r.present, 0);
-  const totalEarly = filteredData.reduce((sum, r) => sum + r.early, 0);
-  const totalLate = filteredData.reduce((sum, r) => sum + r.late, 0);
-  const totalAbsent = filteredData.reduce((sum, r) => sum + r.absent, 0);
+  // Edit form
+  const [editForm, setEditForm] = useState({
+    status: 'present',
+    check_in_time: '',
+    check_out_time: '',
+    notes: '',
+  });
 
-  // Main render return
-  return (
+  // Calendar state
+  const [calendarDate, setCalendarDate] = useState(new Date());
+
+  // Load data
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const [attendanceRes, staffRes, branchesRes] = await Promise.all([
+        getAllAttendanceRecords(),
+        getAllStaff(1, 1000),
+        getAllBranches()
+      ]);
+
+      if (staffRes.success && staffRes.staff) {
+        const mappedStaff = staffRes.staff.map((s: any) => ({
+          id: s.id,
+          name: [s.first_name, s.middle_name, s.last_name].filter(Boolean).join(' ') || s.email,
+          email: s.work_email || s.email,
+          department: s.department,
+          branch_id: s.branch_id
+        }));
+        setStaffMembers(mappedStaff);
+      }
+
+      if (branchesRes.success && branchesRes.branches) {
+        setBranches(branchesRes.branches);
+      }
+
+      if (attendanceRes.success && attendanceRes.records) {
+        // Enrich attendance records with staff info
+        const enriched = attendanceRes.records.map((record: AttendanceRecord) => {
+          const staff = staffRes.staff?.find((s: any) => s.id === record.user_id);
+          const branch = branchesRes.branches?.find((b: Branch) => b.id === staff?.branch_id);
+          return {
+            ...record,
+            staff_name: staff ? [staff.first_name, staff.middle_name, staff.last_name].filter(Boolean).join(' ') : `User ${record.user_id}`,
+            staff_email: staff?.email,
+            department: staff?.department,
+            branch_name: branch?.name
+          };
+        });
+        setAttendanceRecords(enriched);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to load attendance data');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle manual attendance
+  const handleManualAttendance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const response = await createManualAttendance({
+        date: manualForm.date,
+        check_in_time: manualForm.check_in_time,
+        check_out_time: manualForm.check_out_time,
+        status: manualForm.status,
+        location_coordinates: { longitude: 0, latitude: 0 },
+        location_address: 'Manual entry',
+      });
+
+      if (response.success) {
+        setSuccessMessage('Manual attendance recorded successfully');
+        setShowManualAttendanceModal(false);
+        resetManualForm();
+        loadData();
+        setTimeout(() => setSuccessMessage(null), 3000);
+      } else {
+        setError(response.message || 'Failed to record attendance');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to record attendance');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateAttendance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRecord) return;
+
+    setLoading(true);
+    try {
+      const response = await updateAttendanceRecord(selectedRecord.id, editForm);
+      if (response.success) {
+        setSuccessMessage('Attendance record updated successfully');
+        setShowEditModal(false);
+        setSelectedRecord(null);
+        loadData();
+        setTimeout(() => setSuccessMessage(null), 3000);
+      } else {
+        setError(response.message || 'Failed to update attendance');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to update attendance');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetManualForm = () => {
+    setManualForm({
+      user_id: 0,
+      date: new Date().toISOString().split('T')[0],
+      check_in_time: '09:00:00',
+      check_out_time: '17:00:00',
+      status: 'present',
+      notes: '',
+    });
+  };
+
+  const openEditModal = (record: AttendanceWithStaff) => {
+    setSelectedRecord(record);
+    setEditForm({
+      status: record.status,
+      check_in_time: record.check_in_time || '',
+      check_out_time: record.check_out_time || '',
+      notes: record.notes || '',
+    });
+    setShowEditModal(true);
+  };
+
+  // Filter records
+  const filteredRecords = attendanceRecords.filter(record => {
+    const matchesSearch = searchTerm === '' ||
+      record.staff_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.staff_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.department?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesBranch = !selectedBranch || record.branch_name === branches.find(b => b.id === selectedBranch)?.name;
+
+    const matchesStatus = selectedStatus === 'all' || record.status === selectedStatus;
+
+    const recordDate = new Date(record.date);
+    const startDate = new Date(dateRange.start);
+    const endDate = new Date(dateRange.end);
+    const matchesDateRange = recordDate >= startDate && recordDate <= endDate;
+
+    return matchesSearch && matchesBranch && matchesStatus && matchesDateRange;
+  });
+
+  // Calculate statistics
+  const totalRecords = filteredRecords.length;
+  const presentCount = filteredRecords.filter(r => r.status === 'present').length;
+  const lateCount = filteredRecords.filter(r => r.status === 'late').length;
+  const absentCount = filteredRecords.filter(r => r.status === 'absent').length;
+  const attendanceRate = totalRecords > 0 ? Math.round((presentCount / totalRecords) * 100) : 0;
+
+  // Calendar helpers
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDay = firstDay.getDay();
+
+    return { daysInMonth, startingDay, year, month };
+  };
+
+  const getAttendanceForDate = (day: number) => {
+    const dateStr = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), day).toISOString().split('T')[0];
+    return filteredRecords.filter(r => r.date === dateStr);
+  };
+
+  const renderListView = () => (
     <div className="space-y-6">
-      {/* Action buttons section */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          {/* Attendance Mode Toggle */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">Attendance Mode:</span>
-            <label className="switch">
-              <input
-                type="checkbox"
-                checked={attendanceMode === 'automatic'}
-                onChange={(e) => updateAttendanceMode(e.target.checked ? 'automatic' : 'manual')}
-                disabled={modeLoading}
-              />
-              <span className="slider round"></span>
-            </label>
-            <span className="text-sm">
-              {modeLoading ? 'Updating...' : attendanceMode === 'automatic' ? 'Automatic' : 'Manual'}
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <button className="btn btn-outline">
+      {/* Action Bar */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <button
+            className={`btn ${activeView === 'list' ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => setActiveView('list')}
+          >
             <Filter className="w-4 h-4 mr-2" />
-            Filter
+            List
           </button>
-          <button className="btn btn-primary">
-            <Download className="w-4 h-4 mr-2" />
-            Export
+          <button
+            className={`btn ${activeView === 'calendar' ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => setActiveView('calendar')}
+          >
+            <Calendar className="w-4 h-4 mr-2" />
+            Calendar
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowManualAttendanceModal(true)}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Manual Entry
+          </button>
+          <button
+            className="btn btn-outline"
+            onClick={loadData}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
           </button>
         </div>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md-grid-cols-2 lg-grid-cols-4 gap-6">
-        {/* Present Today Card */}
-        <div className="card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="icon-wrapper bg-green">
-              <UserCheck className="w-5 h-5 text-white" />
-            </div>
-          </div>
-          <div>
-            <p className="text-muted">Present Today</p>
-            <h3 className="mt-1">234 / 248</h3>
-            <p className="text-muted mt-1">94.4% attendance rate</p>
-          </div>
-        </div>
-
-        {/* Late Arrivals Card */}
-        <div className="card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="icon-wrapper bg-orange">
-              <Clock className="w-5 h-5 text-white" />
-            </div>
-          </div>
-          <div>
-            <p className="text-muted">Late Arrivals</p>
-            <h3 className="mt-1">14</h3>
-            <p className="text-muted mt-1">5.6% of total employees</p>
-          </div>
-        </div>
-
-        {/* Average Working Hours Card */}
-        <div className="card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="icon-wrapper bg-blue">
-              <TrendingUp className="w-5 h-5 text-white" />
-            </div>
-          </div>
-          <div>
-            <p className="text-muted">Avg. Working Hours</p>
-            <h3 className="mt-1">8.4 hrs</h3>
-            <p className="text-muted mt-1">+0.3 hrs from last month</p>
-          </div>
-        </div>
-
-        {/* On Leave Card */}
-        <div className="card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="icon-wrapper bg-purple">
-              <Calendar className="w-5 h-5 text-white" />
-            </div>
-          </div>
-          <div>
-            <p className="text-muted">On Leave</p>
-            <h3 className="mt-1">8</h3>
-            <p className="text-muted mt-1">5 approved, 3 pending</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Attendance Chart Component */}
-      <AttendanceChart />
-
-      {/* Today's Attendance Table */}
-      <div className="card">
-        <div className="p-6 border-b">
-          <div className="flex items-center justify-between">
+      {/* Filters */}
+      {showFilters && (
+        <div className="card p-4 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <h3>Today's Attendance</h3>
-              <p className="text-muted">Wednesday, November 5, 2025</p>
+              <label className="block text-sm font-medium mb-1">Search</label>
+              <input
+                type="text"
+                className="input w-full"
+                placeholder="Name, email, department..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-            <div className="flex items-center gap-2">
-              <span className="badge badge-secondary">{todayAttendanceRecords.length} Total</span>
-              <span className="badge badge-default">{todayAttendanceRecords.filter(r => r.status === 'Present').length} Present</span>
+            <div>
+              <label className="block text-sm font-medium mb-1">Branch</label>
+              <select
+                className="input w-full"
+                value={selectedBranch}
+                onChange={(e) => setSelectedBranch(e.target.value ? Number(e.target.value) : '')}
+              >
+                <option value="">All Branches</option>
+                {branches.map(branch => (
+                  <option key={branch.id} value={branch.id}>{branch.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Status</label>
+              <select
+                className="input w-full"
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+              >
+                <option value="all">All Statuses</option>
+                <option value="present">Present</option>
+                <option value="late">Late</option>
+                <option value="absent">Absent</option>
+                <option value="leave">Leave</option>
+                <option value="holiday">Holiday</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Date Range</label>
+              <input
+                type="date"
+                className="input w-full"
+                value={dateRange.start}
+                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+              />
             </div>
           </div>
         </div>
-        <div style={{ overflowX: 'auto' }}>
-          {recordsLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mr-3"></div>
-              <span>Loading today's attendance records...</span>
+      )}
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="card p-4 transition-all hover-lift">
+          <div className="flex items-center gap-3">
+            <div className="icon-wrapper" style={{ backgroundColor: '#dbeafe', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem' }}>
+              <Users className="w-5 h-5" style={{ color: '#2563eb' }} />
             </div>
-          ) : recordsError ? (
-            <div className="alert alert-warning p-4 m-4">
-              <p>{recordsError}</p>
-              <button className="btn btn-sm" onClick={refreshData}>Retry</button>
+            <div>
+              <p className="text-muted" style={{ fontSize: '0.75rem' }}>Total Records</p>
+              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{totalRecords}</p>
             </div>
-          ) : (
-            <table className="table">
-              <thead className="table-header">
+          </div>
+        </div>
+        <div className="card p-4 transition-all hover-lift">
+          <div className="flex items-center gap-3">
+            <div className="icon-wrapper" style={{ backgroundColor: '#dcfce7', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem' }}>
+              <CheckCircle className="w-5 h-5" style={{ color: '#16a34a' }} />
+            </div>
+            <div>
+              <p className="text-muted" style={{ fontSize: '0.75rem' }}>Present</p>
+              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{presentCount}</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-4 transition-all hover-lift">
+          <div className="flex items-center gap-3">
+            <div className="icon-wrapper" style={{ backgroundColor: '#fef3c7', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem' }}>
+              <Clock className="w-5 h-5" style={{ color: '#ca8a04' }} />
+            </div>
+            <div>
+              <p className="text-muted" style={{ fontSize: '0.75rem' }}>Late</p>
+              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{lateCount}</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-4 transition-all hover-lift">
+          <div className="flex items-center gap-3">
+            <div className="icon-wrapper" style={{ backgroundColor: '#fee2e2', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem' }}>
+              <XCircle className="w-5 h-5" style={{ color: '#dc2626' }} />
+            </div>
+            <div>
+              <p className="text-muted" style={{ fontSize: '0.75rem' }}>Absent</p>
+              <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{absentCount}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Attendance Rate Card */}
+      <div className="card p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold mb-2">Attendance Rate</h3>
+            <p className="text-muted text-sm">Based on filtered records</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-3xl font-bold" style={{ color: attendanceRate >= 90 ? '#16a34a' : attendanceRate >= 70 ? '#ca8a04' : '#dc2626' }}>
+                {attendanceRate}%
+              </p>
+              <div className="flex items-center gap-1 mt-1">
+                {attendanceRate >= 90 ? (
+                  <TrendingUp className="w-4 h-4 text-green-600" />
+                ) : attendanceRate >= 70 ? (
+                  <TrendingDown className="w-4 h-4 text-yellow-600" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-red-600" />
+                )}
+                <span className={`text-sm ${attendanceRate >= 90 ? 'text-green-600' : attendanceRate >= 70 ? 'text-yellow-600' : 'text-red-600'}`}>
+                  {attendanceRate >= 90 ? 'Excellent' : attendanceRate >= 70 ? 'Good' : 'Needs Attention'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="mt-4">
+          <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${attendanceRate}%`,
+                backgroundColor: attendanceRate >= 90 ? '#16a34a' : attendanceRate >= 70 ? '#ca8a04' : '#dc2626'
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Attendance Table */}
+      <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="table">
+            <thead className="table-header">
+              <tr>
+                <th className="table-header-cell">Employee</th>
+                <th className="table-header-cell">Date</th>
+                <th className="table-header-cell">Check-in</th>
+                <th className="table-header-cell">Check-out</th>
+                <th className="table-header-cell">Hours Worked</th>
+                <th className="table-header-cell">Status</th>
+                <th className="table-header-cell">Branch</th>
+                <th className="table-header-cell right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
                 <tr>
-                  <th className="table-header-cell">Employee</th>
-                  <th className="table-header-cell">Check In</th>
-                  <th className="table-header-cell">Check Out</th>
-                  <th className="table-header-cell">Hours</th>
-                  <th className="table-header-cell">Status</th>
-                  <th className="table-header-cell right">Actions</th>
+                  <td colSpan={8} className="px-6 py-12 text-center">
+                    <div className="flex justify-center items-center gap-2">
+                      <RefreshCw className="w-5 h-5 animate-spin text-blue-600" />
+                      <span className="text-gray-600">Loading attendance records...</span>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {todayAttendanceRecords.map((record) => (
+              ) : filteredRecords.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-6 py-12 text-center">
+                    <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
+                      <Calendar className="w-8 h-8 text-blue-500" />
+                    </div>
+                    <p className="text-gray-500 font-medium mb-1">No attendance records found</p>
+                    <p className="text-gray-400 text-sm">Adjust filters or add manual attendance</p>
+                  </td>
+                </tr>
+              ) : (
+                filteredRecords.map((record) => (
                   <tr key={record.id} className="table-row">
                     <td className="table-cell">
-                      <div className="employee-info">
-                        <div className="avatar">{record.name.split(' ').map(n => n[0]).join('')}</div>
-                        <div className="employee-details">
-                          <span className="employee-name">{record.name}</span>
-                        </div>
+                      <div>
+                        <p style={{ fontWeight: 500 }}>{record.staff_name || `User ${record.user_id}`}</p>
+                        <p className="text-xs text-muted">{record.staff_email}</p>
                       </div>
                     </td>
-                    <td className="table-cell">{record.checkIn}</td>
-                    <td className="table-cell">{record.checkOut}</td>
-                    <td className="table-cell">{record.hours}</td>
+                    <td className="table-cell">
+                      <span className="text-sm">{new Date(record.date).toLocaleDateString()}</span>
+                    </td>
+                    <td className="table-cell">
+                      {record.check_in_time ? (
+                        <span className="badge badge-secondary">{record.check_in_time.substring(0, 5)}</span>
+                      ) : (
+                        <span className="text-muted">-</span>
+                      )}
+                    </td>
+                    <td className="table-cell">
+                      {record.check_out_time ? (
+                        <span className="badge badge-secondary">{record.check_out_time.substring(0, 5)}</span>
+                      ) : (
+                        <span className="text-muted">-</span>
+                      )}
+                    </td>
+                    <td className="table-cell">
+                      {record.actual_working_hours ? (
+                        <span style={{ fontWeight: 500 }}>{record.actual_working_hours.toFixed(2)}h</span>
+                      ) : (
+                        <span className="text-muted">-</span>
+                      )}
+                    </td>
                     <td className="table-cell">
                       <span className={`badge ${
-                        record.status === 'Present' ? 'badge-default' :
-                        record.status === 'Late' ? 'badge-secondary' :
+                        record.status === 'present' ? 'badge-success' :
+                        record.status === 'late' ? 'badge-warning' :
+                        record.status === 'absent' ? 'badge-error' :
                         'badge-secondary'
-                      }`} style={{
-                        backgroundColor: record.status === 'Present' ? '#16a34a' :
-                                       record.status === 'Late' ? '#f59e0b' :
-                                       record.status === 'Absent' ? '#dc2626' :
-                                       '#94a3b8',
-                        color: '#ffffff'
-                      }}>
+                      }`}>
                         {record.status}
                       </span>
                     </td>
+                    <td className="table-cell">
+                      <span className="text-sm">{record.branch_name || '-'}</span>
+                    </td>
                     <td className="table-cell right">
-                      <button className="btn btn-sm btn-ghost">View Details</button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => openEditModal(record)}
+                          className="btn btn-sm btn-outline green"
+                        >
+                          <Edit3 className="w-3 h-3" />
+                        </button>
+                        <button className="btn btn-sm btn-outline red">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-
-      {/* Monthly Summary Section */}
-      <div className="card">
-        <div className="p-6 border-b">
-          <h3>Monthly Summary</h3>
-          <p className="text-muted">Attendance statistics for recent months</p>
-        </div>
-        <div className="p-6">
-          {monthlyStatsLoading ? (
-            <div className="py-8 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500 mr-3"></div>
-              <span>Loading monthly statistics...</span>
-            </div>
-          ) : monthlyStatsError ? (
-            <div className="py-8 text-center text-red-500">
-              Error loading monthly statistics: {monthlyStatsError}
-              <button className="btn btn-sm ml-3" onClick={refreshData}>Retry</button>
-            </div>
-          ) : monthlyStats.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4">
-              {monthlyStats.map((stat, index) => (
-                <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p style={{ fontWeight: 500 }}>{stat.month}</p>
-                  </div>
-                  <div className="flex items-center gap-6">
-                    <div className="text-right">
-                      <p className="text-muted">Present</p>
-                      <p style={{ fontWeight: 500 }}>{stat.present} days</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-muted">Absent</p>
-                      <p style={{ fontWeight: 500 }}>{stat.absent} days</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-muted">Late</p>
-                      <p style={{ fontWeight: 500 }}>{stat.late} days</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-muted">Leaves</p>
-                      <p style={{ fontWeight: 500 }}>{stat.leaves} days</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="py-8 text-center text-muted">
-              No monthly statistics available
-            </div>
-          )}
-        </div>
-      </div>
-      {/* Second Stats Overview Section */}
-      <div className="space-y-6">
-        {/* Additional Stats Cards */}
-        <div className="grid grid-cols-1 md-grid-cols-2 lg-grid-cols-4 gap-6">
-          {/* Active Branches Card */}
-          <div className="card p-4">
-            <div className="flex items-center gap-3">
-              <div className="icon-wrapper" style={{ backgroundColor: '#dbeafe' }}>
-                <Building className="w-5 h-5" style={{ color: '#2563eb' }} />
-              </div>
-              <div>
-                <p className="text-muted" style={{ fontSize: '0.75rem' }}>Active Branches</p>
-                <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{computedActiveBranches}</p>
-              </div>
-            </div>
-          </div>
-          {/* Attendance Rate Card */}
-          <div className="card p-4">
-            <div className="flex items-center gap-3">
-              <div className="icon-wrapper" style={{ backgroundColor: '#f0fdf4' }}>
-                <TrendingUp className="w-5 h-5" style={{ color: '#16a34a' }} />
-              </div>
-              <div>
-                <p className="text-muted" style={{ fontSize: '0.75rem' }}>Attendance Rate</p>
-                <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{metrics.avgAttendanceRate}%</p>
-              </div>
-            </div>
-          </div>
-          {/* Total Present Card */}
-          <div className="card p-4">
-            <div className="flex items-center gap-3">
-              <div className="icon-wrapper" style={{ backgroundColor: '#fef3c7' }}>
-                <Clock className="w-5 h-5" style={{ color: '#f59e0b' }} />
-              </div>
-              <div>
-                <p className="text-muted" style={{ fontSize: '0.75rem' }}>Total Present</p>
-                <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{metrics.totalPresent}</p>
-              </div>
-            </div>
-          </div>
-          {/* Total Absences Card */}
-          <div className="card p-4">
-            <div className="flex items-center gap-3">
-              <div className="icon-wrapper" style={{ backgroundColor: '#fef2f2' }}>
-                <TrendingDown className="w-5 h-5" style={{ color: '#dc2626' }} />
-              </div>
-              <div>
-                <p className="text-muted" style={{ fontSize: '0.75rem' }}>Total Absences</p>
-                <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{metrics.totalAbsent}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Filters and Search Section */}
-        <div className="card p-4">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              {/* Search Input */}
-              <div className="input-wrapper" style={{ width: 'auto', flex: 1, minWidth: '250px' }}>
-                <div className="input-icon">
-                  <Search className="w-4 h-4" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search by name, department, or ID..."
-                  className="input input-with-icon"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              {/* Filter and Export Buttons */}
-              <div className="flex items-center gap-2">
-                <button
-                  className={`btn btn-sm ${showFilters ? 'btn-primary' : 'btn-outline'}`}
-                  onClick={() => setShowFilters(!showFilters)}
-                >
-                  <Filter className="w-4 h-4 mr-2" />
-                  Filters
-                </button>
-                <button className="btn btn-sm btn-outline">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                </button>
-              </div>
-            </div>
-
-            {/* Expandable Filter Panel */}
-            {showFilters && (
-              <div className="grid grid-cols-1 md-grid-cols-2 lg-grid-cols-4 gap-4 p-4 rounded" style={{ backgroundColor: '#f9fafb' }}>
-                {/* Branch Filter */}
-                <div>
-                  <label style={{ fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', display: 'block' }}>
-                    Branch
-                  </label>
-                  <select
-                    className="input"
-                    value={selectedBranch}
-                    onChange={(e) => setSelectedBranch(e.target.value)}
-                  >
-                    <option value="all">All Branches</option>
-                    {BRANCHES.map((b) => (
-                      <option key={b} value={b}>{b}</option>
-                    ))}
-                  </select>
-                </div>
-                {/* Date Range Filter */}
-                <div>
-                  <label style={{ fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', display: 'block' }}>
-                    Date Range
-                  </label>
-                  <select
-                    className="input"
-                    value={dateRange}
-                    onChange={(e) => setDateRange(e.target.value)}
-                  >
-                    <option value="today">Today</option>
-                    <option value="week">This Week</option>
-                    <option value="month">This Month</option>
-                    <option value="quarter">This Quarter</option>
-                    <option value="year">This Year</option>
-                    <option value="custom">Custom Range</option>
-                  </select>
-                </div>
-                {/* Status Filter */}
-                <div>
-                  <label style={{ fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', display: 'block' }}>
-                    Filter By
-                  </label>
-                  <select
-                    className="input"
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value as any)}
-                  >
-                    <option value="all">All Staff</option>
-                    <option value="early">Early Arrivals</option>
-                    <option value="late">Late Arrivals</option>
-                    <option value="absent">Absent</option>
-                  </select>
-                </div>
-                {/* Sort By Filter */}
-                <div>
-                  <label style={{ fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', display: 'block' }}>
-                    Sort By
-                  </label>
-                  <select className="input">
-                    <option value="name">Name</option>
-                    <option value="department">Department</option>
-                    <option value="present">Present Days</option>
-                    <option value="late">Late Days</option>
-                    <option value="absent">Absent Days</option>
-                  </select>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Attendance Report Table */}
-        <div className="card">
-          <div className="p-4 border-b">
-            <h3>Attendance Report</h3>
-            <p className="text-muted" style={{ marginTop: '0.25rem' }}>
-              Showing {filteredData.length} staff members for {dateRange === 'month' ? 'November 2024' : dateRange}
-            </p>
-          </div>
-          {staffDataLoading ? (
-            <div className="p-8 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500 mr-3"></div>
-              <span>Loading staff attendance data...</span>
-            </div>
-          ) : staffDataError ? (
-            <div className="p-8 text-center text-red-500">
-              Error loading staff attendance data: {staffDataError}
-              <button className="btn btn-sm ml-3" onClick={refreshData}>Retry</button>
-            </div>
-          ) : (
-            <div className="table-container">
-              {filteredData.length > 0 ? (
-                <table className="table">
-                  <thead className="table-header">
-                    <tr>
-                      <th className="table-header-cell">S/N</th>
-                      <th className="table-header-cell">Full Name</th>
-                      <th className="table-header-cell">Department</th>
-                      <th className="table-header-cell">Present</th>
-                      <th className="table-header-cell">Early</th>
-                      <th className="table-header-cell">Late</th>
-                      <th className="table-header-cell">Permitted</th>
-                      <th className="table-header-cell">Absent</th>
-                      <th className="table-header-cell">Off</th>
-                      <th className="table-header-cell">Leave</th>
-                      <th className="table-header-cell">Avg. Time</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredData.map((record, index) => (
-                      <tr key={record.id} className="table-row">
-                        <td className="table-cell">{index + 1}</td>
-                        <td className="table-cell">
-                          <div>
-                            <p style={{ fontWeight: 500 }}>{record.fullName}</p>
-                            <p className="text-xs text-muted">{record.id}</p>
-                          </div>
-                        </td>
-                        <td className="table-cell">{record.department}</td>
-                        <td className="table-cell">
-                          <span className="badge badge-success">{record.present}</span>
-                        </td>
-                        <td className="table-cell">
-                          <span style={{ color: '#16a34a', fontWeight: 500 }}>{record.early}</span>
-                        </td>
-                        <td className="table-cell">
-                          <span style={{ color: record.late > 3 ? '#dc2626' : '#f59e0b', fontWeight: 500 }}>
-                            {record.late}
-                          </span>
-                        </td>
-                        <td className="table-cell">{record.permitted}</td>
-                        <td className="table-cell">
-                          <span style={{ color: record.absent > 0 ? '#dc2626' : '#64748b', fontWeight: 500 }}>
-                            {record.absent}
-                          </span>
-                        </td>
-                        <td className="table-cell">{record.offDays}</td>
-                        <td className="table-cell">{record.leaveDays}</td>
-                        <td className="table-cell">
-                          <span style={{ fontWeight: 500 }}>{record.averageTime}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="p-8 flex flex-col items-center justify-center">
-                  <Clock className="w-12 h-12" style={{ color: '#e5e7eb' }} />
-                  <p className="text-muted" style={{ marginTop: '0.5rem' }}>No attendance records found</p>
-                </div>
+                ))
               )}
-            </div>
-          )}
-        </div>
-
-        {/* Summary Stats Section */}
-        <div className="grid grid-cols-1 md-grid-cols-2 gap-6">
-          {/* Monthly Summary Card */}
-          <div className="card p-4">
-            <h3 style={{ marginBottom: '1rem' }}>Monthly Summary</h3>
-            {metricsLoading ? (
-              <div className="py-4 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500 mr-3"></div>
-                <span>Loading metrics...</span>
-              </div>
-            ) : metricsError ? (
-              <div className="py-4 text-center text-red-500">
-                Error loading metrics: {metricsError}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted">Total Working Days</span>
-                  <span style={{ fontWeight: 600 }}>{metrics.totalWorkingDays}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted">Total Present</span>
-                  <span style={{ fontWeight: 600, color: '#16a34a' }}>{metrics.totalPresent}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted">Total Early</span>
-                  <span style={{ fontWeight: 600, color: '#16a34a' }}>{metrics.totalEarly}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted">Total Late</span>
-                  <span style={{ fontWeight: 600, color: '#f59e0b' }}>{metrics.totalLate}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted">Total Absent</span>
-                  <span style={{ fontWeight: 600, color: '#dc2626' }}>{metrics.totalAbsent}</span>
-                </div>
-              </div>
-            )}
-          </div>
-          {/* Performance Metrics Card */}
-          <div className="card p-4">
-            <h3 style={{ marginBottom: '1rem' }}>Performance Metrics</h3>
-            {metricsLoading ? (
-              <div className="py-4 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500 mr-3"></div>
-                <span>Loading metrics...</span>
-              </div>
-            ) : metricsError ? (
-              <div className="py-4 text-center text-red-500">
-                Error loading metrics: {metricsError}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {/* Punctuality Rate */}
-                <div>
-                  <div className="flex items-center justify-between" style={{ marginBottom: '0.5rem' }}>
-                    <span className="text-muted">Punctuality Rate</span>
-                    <span style={{ fontWeight: 600 }}>
-                      {metrics.totalPresent > 0 ? ((metrics.totalEarly / metrics.totalPresent) * 100).toFixed(1) : 0}%
-                    </span>
-                  </div>
-                  <div className="progress-bar">
-                    <div
-                      className="progress-fill"
-                      style={{ width: `${metrics.totalPresent > 0 ? (metrics.totalEarly / metrics.totalPresent) * 100 : 0}%`, backgroundColor: '#16a34a' }}
-                    ></div>
-                  </div>
-                </div>
-                {/* Late Arrival Rate */}
-                <div>
-                  <div className="flex items-center justify-between" style={{ marginBottom: '0.5rem' }}>
-                    <span className="text-muted">Late Arrival Rate</span>
-                    <span style={{ fontWeight: 600 }}>
-                      {metrics.totalPresent > 0 ? ((metrics.totalLate / metrics.totalPresent) * 100).toFixed(1) : 0}%
-                    </span>
-                  </div>
-                  <div className="progress-bar">
-                    <div
-                      className="progress-fill"
-                      style={{ width: `${metrics.totalPresent > 0 ? (metrics.totalLate / metrics.totalPresent) * 100 : 0}%`, backgroundColor: '#f59e0b' }}
-                    ></div>
-                  </div>
-                </div>
-                {/* Absence Rate */}
-                <div>
-                  <div className="flex items-center justify-between" style={{ marginBottom: '0.5rem' }}>
-                    <span className="text-muted">Absence Rate</span>
-                    <span style={{ fontWeight: 600 }}>
-                      {staffAttendanceData.length > 0 ? ((metrics.totalAbsent / (staffAttendanceData.length * metrics.totalWorkingDays)) * 100).toFixed(1) : 0}%
-                    </span>
-                  </div>
-                  <div className="progress-bar">
-                    <div
-                      className="progress-fill"
-                      style={{ width: `${staffAttendanceData.length > 0 ? (metrics.totalAbsent / (staffAttendanceData.length * metrics.totalWorkingDays)) * 100 : 0}%`, backgroundColor: '#dc2626' }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
   );
-}
 
-// Add CSS for the toggle switch
-const toggleStyles = `
-  .switch {
-    position: relative;
-    display: inline-block;
-    width: 50px;
-    height: 24px;
-  }
+  const renderCalendarView = () => {
+    const { daysInMonth, startingDay, year, month } = getDaysInMonth(calendarDate);
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-  .switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-  }
+    return (
+      <div className="space-y-6">
+        {/* Calendar Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              className="btn btn-outline"
+              onClick={() => setCalendarDate(new Date(year, month - 1, 1))}
+            >
+              ← Previous
+            </button>
+            <h2 className="text-xl font-bold">
+              {monthNames[month]} {year}
+            </h2>
+            <button
+              className="btn btn-outline"
+              onClick={() => setCalendarDate(new Date(year, month + 1, 1))}
+            >
+              Next →
+            </button>
+          </div>
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowManualAttendanceModal(true)}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Manual Entry
+          </button>
+        </div>
 
-  .slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #ccc;
-    transition: .4s;
-  }
+        {/* Calendar Grid */}
+        <div className="card overflow-hidden">
+          <div className="grid grid-cols-7 border-b">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+              <div key={day} className="p-3 text-center font-medium text-sm bg-gray-50 border-r last:border-r-0">
+                {day}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7">
+            {/* Empty cells for days before the first day of the month */}
+            {Array.from({ length: startingDay }).map((_, i) => (
+              <div key={`empty-${i}`} className="p-2 min-h-[100px] bg-gray-50 border-r border-b last:border-r-0" />
+            ))}
+            {/* Days of the month */}
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const day = i + 1;
+              const dayAttendance = getAttendanceForDate(day);
+              const presentCount = dayAttendance.filter(a => a.status === 'present').length;
+              const lateCount = dayAttendance.filter(a => a.status === 'late').length;
+              const absentCount = dayAttendance.filter(a => a.status === 'absent').length;
 
-  .slider:before {
-    position: absolute;
-    content: "";
-    height: 16px;
-    width: 16px;
-    left: 4px;
-    bottom: 4px;
-    background-color: white;
-    transition: .4s;
-  }
+              return (
+                <div key={day} className="p-2 min-h-[100px] border-r border-b last:border-r-0 relative">
+                  <div className="text-sm font-medium mb-1">{day}</div>
+                  {dayAttendance.length > 0 && (
+                    <div className="space-y-1">
+                      {presentCount > 0 && (
+                        <div className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded">
+                          ✓ {presentCount} present
+                        </div>
+                      )}
+                      {lateCount > 0 && (
+                        <div className="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded">
+                          ⚠ {lateCount} late
+                        </div>
+                      )}
+                      {absentCount > 0 && (
+                        <div className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded">
+                          ✗ {absentCount} absent
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
-  input:checked + .slider {
-    background-color: #2196F3;
-  }
+        {/* Legend */}
+        <div className="card p-4">
+          <h4 className="font-medium mb-3">Legend</h4>
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-green-100 rounded"></div>
+              <span className="text-sm">Present</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-yellow-100 rounded"></div>
+              <span className="text-sm">Late</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-red-100 rounded"></div>
+              <span className="text-sm">Absent</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
-  input:checked + .slider:before {
-    transform: translateX(26px);
-  }
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Attendance Management</h1>
+        <p className="text-gray-600 mt-1">Track and manage employee attendance records</p>
+      </div>
 
-  .slider.round {
-    border-radius: 24px;
-  }
+      {/* Success/Error Messages */}
+      {successMessage && (
+        <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
+          <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-green-900">{successMessage}</p>
+          </div>
+          <button onClick={() => setSuccessMessage(null)} className="ml-auto text-green-600 hover:text-green-800">×</button>
+        </div>
+      )}
 
-  .slider.round:before {
-    border-radius: 50%;
-  }
-`;
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-red-900">{error}</p>
+          </div>
+          <button onClick={() => setError(null)} className="ml-auto text-red-600 hover:text-red-800">×</button>
+        </div>
+      )}
 
-// Add the styles to the document
-if (!document.querySelector('#toggle-styles')) {
-  const styleElement = document.createElement('style');
-  styleElement.id = 'toggle-styles';
-  styleElement.textContent = toggleStyles;
-  document.head.appendChild(styleElement);
-}
+      {/* View Toggle and Filters */}
+      <div className="card p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              className={`btn ${activeView === 'list' ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setActiveView('list')}
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              List View
+            </button>
+            <button
+              className={`btn ${activeView === 'calendar' ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setActiveView('calendar')}
+            >
+              <Calendar className="w-4 h-4 mr-2" />
+              Calendar View
+            </button>
+          </div>
+          <button
+            className={`btn ${showFilters ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <Filter className="w-4 h-4 mr-2" />
+            {showFilters ? 'Hide' : 'Show'} Filters
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      {activeView === 'list' ? renderListView() : renderCalendarView()}
+
+      {/* Manual Attendance Modal */}
+      {showManualAttendanceModal && (
+        <>
+          <div className="modal-overlay" onClick={() => setShowManualAttendanceModal(false)}></div>
+          <div className="modal" style={{ maxWidth: '32rem' }}>
+            <div className="modal-header">
+              <h3>Manual Attendance Entry</h3>
+              <button className="btn btn-ghost btn-icon" onClick={() => setShowManualAttendanceModal(false)}>×</button>
+            </div>
+            <form onSubmit={handleManualAttendance}>
+              <div className="modal-content space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Employee *</label>
+                  <select
+                    className="input w-full"
+                    value={manualForm.user_id || ''}
+                    onChange={(e) => setManualForm({ ...manualForm, user_id: Number(e.target.value) })}
+                    required
+                  >
+                    <option value="">Select Employee</option>
+                    {staffMembers.map(staff => (
+                      <option key={staff.id} value={staff.id}>
+                        {staff.name} ({staff.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Date *</label>
+                  <input
+                    type="date"
+                    className="input w-full"
+                    value={manualForm.date}
+                    onChange={(e) => setManualForm({ ...manualForm, date: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Check-in Time *</label>
+                    <input
+                      type="time"
+                      className="input w-full"
+                      value={manualForm.check_in_time}
+                      onChange={(e) => setManualForm({ ...manualForm, check_in_time: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Check-out Time *</label>
+                    <input
+                      type="time"
+                      className="input w-full"
+                      value={manualForm.check_out_time}
+                      onChange={(e) => setManualForm({ ...manualForm, check_out_time: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Status *</label>
+                  <select
+                    className="input w-full"
+                    value={manualForm.status}
+                    onChange={(e) => setManualForm({ ...manualForm, status: e.target.value as any })}
+                    required
+                  >
+                    <option value="present">Present</option>
+                    <option value="late">Late</option>
+                    <option value="half_day">Half Day</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Notes</label>
+                  <textarea
+                    className="input w-full"
+                    rows={3}
+                    value={manualForm.notes}
+                    onChange={(e) => setManualForm({ ...manualForm, notes: e.target.value })}
+                    placeholder="Reason for manual entry..."
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-outline" onClick={() => setShowManualAttendanceModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={loading}>
+                  {loading ? 'Saving...' : 'Record Attendance'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </>
+      )}
+
+      {/* Edit Attendance Modal */}
+      {showEditModal && selectedRecord && (
+        <>
+          <div className="modal-overlay" onClick={() => setShowEditModal(false)}></div>
+          <div className="modal" style={{ maxWidth: '32rem' }}>
+            <div className="modal-header">
+              <h3>Edit Attendance Record</h3>
+              <button className="btn btn-ghost btn-icon" onClick={() => setShowEditModal(false)}>×</button>
+            </div>
+            <form onSubmit={handleUpdateAttendance}>
+              <div className="modal-content space-y-4">
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-sm font-medium">{selectedRecord.staff_name}</p>
+                  <p className="text-xs text-muted">{new Date(selectedRecord.date).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Status *</label>
+                  <select
+                    className="input w-full"
+                    value={editForm.status}
+                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                    required
+                  >
+                    <option value="present">Present</option>
+                    <option value="late">Late</option>
+                    <option value="absent">Absent</option>
+                    <option value="half_day">Half Day</option>
+                    <option value="leave">Leave</option>
+                    <option value="holiday">Holiday</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Check-in Time</label>
+                    <input
+                      type="time"
+                      className="input w-full"
+                      value={editForm.check_in_time}
+                      onChange={(e) => setEditForm({ ...editForm, check_in_time: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Check-out Time</label>
+                    <input
+                      type="time"
+                      className="input w-full"
+                      value={editForm.check_out_time}
+                      onChange={(e) => setEditForm({ ...editForm, check_out_time: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Notes</label>
+                  <textarea
+                    className="input w-full"
+                    rows={3}
+                    value={editForm.notes}
+                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                    placeholder="Add notes..."
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-outline" onClick={() => setShowEditModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={loading}>
+                  {loading ? 'Saving...' : 'Update Record'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+export default AttendanceView;

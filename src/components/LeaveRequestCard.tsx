@@ -51,18 +51,18 @@ const  LeaveRequestCard = () => {
         // Fetch all leave requests
         const response = await getAllLeaveRequests();
         if (response.success && response.leaveRequests) {
-          // Filter for pending requests and transform to match UI interface
+          // Filter for pending requests (API uses 'submitted' for pending)
           const pendingRequests = response.leaveRequests
-            .filter(req => req.status === 'pending')
+            .filter(req => req.status === 'submitted' || req.status === 'pending')
             .slice(0, 4) // Limit to 4 most recent pending requests
             .map(req => ({
               id: req.id,
-              name: `User ${req.userId}`, // In a real app, you'd fetch user details
-              avatar: `U${req.userId}`.substring(0, 2), // Generate avatar initials
-              type: getLeaveTypeName(req.leaveTypeId),
-              duration: `${Math.floor((new Date(req.endDate).getTime() - new Date(req.startDate).getTime()) / (1000 * 60 * 60 * 24) + 1)} days`, // Calculate actual duration
-              dates: `${new Date(req.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(req.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
-              status: req.status.charAt(0).toUpperCase() + req.status.slice(1)
+              name: req.user_name || `User ${req.user_id || req.userId}`, // Use user_name from API if available
+              avatar: (req.user_name || `U${req.user_id || req.userId}`).substring(0, 2), // Generate avatar initials
+              type: req.leave_type_name || getLeaveTypeName(req.leaveTypeId),
+              duration: `${Math.floor((new Date(req.end_date || req.endDate).getTime() - new Date(req.start_date || req.startDate).getTime()) / (1000 * 60 * 60 * 24) + 1)} days`, // Calculate actual duration
+              dates: `${new Date(req.start_date || req.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(req.end_date || req.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+              status: 'Pending'
             }));
 
           setLeaveRequests(pendingRequests);
@@ -73,7 +73,7 @@ const  LeaveRequestCard = () => {
         }
       } catch (err) {
         console.error('Error fetching pending leave requests:', err);
-        
+
         // Set to empty array in case of error
         setLeaveRequests([]);
       } finally {
