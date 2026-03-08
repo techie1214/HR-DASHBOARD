@@ -1,16 +1,16 @@
 import axios from 'axios';
 import { API_ENDPOINT } from '../config/config';
 
-// Define interfaces for attendance data
+// Define interfaces for attendance data (snake_case to match backend)
 export interface AttendanceLocation {
-  id: string;
+  id: number;
   name: string;
   location_coordinates: string; // e.g., "POINT(3.3869 6.4458)"
   location_radius_meters: number;
   branch_id: number;
   is_active: boolean;
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // Define the structure for staff attendance records used in the UI
@@ -39,21 +39,30 @@ export interface MonthlyStat {
 }
 
 export interface AttendanceRecord {
-  id: string;
-  staff_id: string;
+  id: number;
+  user_id: number;
   date: string;
   check_in_time?: string;
   check_out_time?: string;
-  status: 'present' | 'late' | 'absent' | 'half_day' | 'on_leave';
-  location_coordinates?: {
-    longitude: number;
-    latitude: number;
-  };
+  status: 'present' | 'late' | 'absent' | 'half_day' | 'leave' | 'holiday';
+  location_coordinates?: string; // POINT format from backend
   location_address?: string;
   location_verified?: boolean;
-  hours_worked?: number;
-  createdAt: string;
-  updatedAt: string;
+  actual_working_hours?: number;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// For pagination support
+export interface AttendanceRecordsResponse {
+  records: AttendanceRecord[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+  };
 }
 
 export interface AttendanceSummary {
@@ -79,8 +88,14 @@ export interface DailyAttendanceRecord {
   date: string;
 }
 
-// Get all attendance records
-export const getAllAttendanceRecords = async (): Promise<{ success: boolean; records?: AttendanceRecord[]; message?: string }> => {
+// Get all attendance records (with pagination support)
+export const getAllAttendanceRecords = async (
+  page: number = 1,
+  limit: number = 20,
+  userId?: number,
+  startDate?: string,
+  endDate?: string
+): Promise<{ success: boolean; records?: AttendanceRecord[]; pagination?: AttendanceRecordsResponse['pagination']; message?: string }> => {
   try {
     const token = localStorage.getItem('authToken');
     if (!token) {
@@ -90,34 +105,38 @@ export const getAllAttendanceRecords = async (): Promise<{ success: boolean; rec
       };
     }
 
-    const response = await axios.get(`${API_ENDPOINT}/attendance`, {
+    // Build query params
+    const params = new URLSearchParams();
+    params.append('page', page.toString());
+    params.append('limit', limit.toString());
+    if (userId) params.append('userId', userId.toString());
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+
+    const response = await axios.get(`${API_ENDPOINT}/attendance/records?${params.toString()}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
 
-    // Handle different possible response structures
-    let responseData = response.data;
-    if (response.data.data) {
-      responseData = response.data.data;
+    const responseData = response.data;
+    
+    if (!responseData.success) {
+      return {
+        success: false,
+        message: responseData.message || 'Failed to fetch attendance records',
+      };
     }
 
-    // Extract records array from different possible field names
-    let recordsArray: AttendanceRecord[] = [];
-    if (Array.isArray(responseData)) {
-      recordsArray = responseData;
-    } else if (responseData.attendance && Array.isArray(responseData.attendance)) {
-      recordsArray = responseData.attendance;
-    } else if (responseData.data && Array.isArray(responseData.data)) {
-      recordsArray = responseData.data;
-    } else if (responseData.results && Array.isArray(responseData.results)) {
-      recordsArray = responseData.results;
-    }
+    const data = responseData.data;
+    const recordsArray: AttendanceRecord[] = data.attendanceRecords || data.records || data.data || [];
+    const pagination = data.pagination;
 
     return {
       success: true,
       records: recordsArray,
+      pagination: pagination,
     };
   } catch (error: any) {
     console.error('Error fetching attendance records:', error);
@@ -311,12 +330,13 @@ export const createManualAttendance = async (manualData: {
 
 // Update attendance record
 export const updateAttendanceRecord = async (
-  recordId: string,
+  recordId: number,
   updateData: {
     status?: string;
     check_in_time?: string;
     check_out_time?: string;
     location_verified?: boolean;
+    notes?: string;
   }
 ): Promise<{ success: boolean; record?: AttendanceRecord; message?: string }> => {
   try {
@@ -338,6 +358,7 @@ export const updateAttendanceRecord = async (
     return {
       success: true,
       record: response.data.data?.attendance || response.data.attendance,
+      message: response.data.message || 'Attendance record updated successfully',
     };
   } catch (error: any) {
     console.error('Error updating attendance record:', error);
@@ -350,6 +371,58 @@ export const updateAttendanceRecord = async (
     return {
       success: false,
       message: error.response?.data?.message || error.message || 'Failed to update attendance record',
+    };
+  }
+};
+
+// Delete attendance record
+// ⚠️ BACKEND REQUIRED: This endpoint needs to be implemented on the backend
+// Expected endpoint: DELETE /api/attendance/:id
+export const deleteAttendanceRecord = async (
+  recordId: number
+): Promise<{ success: boolean; message?: string }> => {
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      return {
+        success: false,
+        message: 'Authentication token not found. Please log in again.'
+      };
+    }
+
+    await axios.delete(`${API_ENDPOINT}/attendance/${recordId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Attendance record deleted successfully',
+    };
+  } catch (error: any) {
+    console.error('Error deleting attendance record:', error);
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      return {
+        success: false,
+        message: 'Access denied. Please check your permissions or log in again.'
+      };
+    }
+    if (error.response?.status === 404) {
+      return {
+        success: false,
+        message: 'Attendance record not found',
+      };
+    }
+    if (error.response?.status === 405) {
+      return {
+        success: false,
+        message: 'Delete endpoint not implemented on backend. Please contact backend team to implement DELETE /api/attendance/:id',
+      };
+    }
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Failed to delete attendance record',
     };
   }
 };
@@ -410,7 +483,7 @@ export const getAttendanceSummary = async (
 };
 
 // Get all attendance locations
-export const getAllAttendanceLocations = async (): Promise<{ success: boolean; locations?: AttendanceLocation[]; message?: string }> => {
+export const getAllAttendanceLocations = async (branchId?: number, isActive?: boolean): Promise<{ success: boolean; locations?: AttendanceLocation[]; message?: string }> => {
   try {
     const token = localStorage.getItem('authToken');
     if (!token) {
@@ -420,7 +493,11 @@ export const getAllAttendanceLocations = async (): Promise<{ success: boolean; l
       };
     }
 
-    const response = await axios.get(`${API_ENDPOINT}/attendance/attendance-locations`, {
+    const params = new URLSearchParams();
+    if (branchId) params.append('branchId', branchId.toString());
+    if (isActive !== undefined) params.append('isActive', isActive.toString());
+
+    const response = await axios.get(`${API_ENDPOINT}/attendance-locations${params.toString() ? '?' + params.toString() : ''}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -429,7 +506,7 @@ export const getAllAttendanceLocations = async (): Promise<{ success: boolean; l
 
     return {
       success: true,
-      locations: response.data.data?.locations || response.data.locations || [],
+      locations: response.data.data?.attendanceLocations || response.data.data?.locations || response.data.locations || [],
     };
   } catch (error: any) {
     console.error('Error fetching attendance locations:', error);
@@ -447,7 +524,7 @@ export const getAllAttendanceLocations = async (): Promise<{ success: boolean; l
 };
 
 // Get attendance location by ID
-export const getAttendanceLocationById = async (locationId: string): Promise<{ success: boolean; location?: AttendanceLocation; message?: string }> => {
+export const getAttendanceLocationById = async (locationId: number): Promise<{ success: boolean; location?: AttendanceLocation; message?: string }> => {
   try {
     const token = localStorage.getItem('authToken');
     if (!token) {
@@ -457,7 +534,7 @@ export const getAttendanceLocationById = async (locationId: string): Promise<{ s
       };
     }
 
-    const response = await axios.get(`${API_ENDPOINT}/attendance/attendance-locations/${locationId}`, {
+    const response = await axios.get(`${API_ENDPOINT}/attendance-locations/${locationId}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -466,7 +543,7 @@ export const getAttendanceLocationById = async (locationId: string): Promise<{ s
 
     return {
       success: true,
-      location: response.data.data?.location || response.data.location,
+      location: response.data.data?.attendanceLocation || response.data.data?.location || response.data.location,
     };
   } catch (error: any) {
     console.error('Error fetching attendance location:', error);
@@ -500,7 +577,7 @@ export const createAttendanceLocation = async (locationData: {
       };
     }
 
-    const response = await axios.post(`${API_ENDPOINT}/attendance/attendance-locations`, locationData, {
+    const response = await axios.post(`${API_ENDPOINT}/attendance-locations`, locationData, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -509,7 +586,8 @@ export const createAttendanceLocation = async (locationData: {
 
     return {
       success: true,
-      location: response.data.data?.location || response.data.location,
+      location: response.data.data?.attendanceLocation || response.data.data?.location || response.data.location,
+      message: response.data.message || 'Attendance location created successfully',
     };
   } catch (error: any) {
     console.error('Error creating attendance location:', error);
@@ -528,10 +606,13 @@ export const createAttendanceLocation = async (locationData: {
 
 // Update attendance location
 export const updateAttendanceLocation = async (
-  locationId: string,
+  locationId: number,
   updateData: {
     name?: string;
+    location_coordinates?: string;
     location_radius_meters?: number;
+    branch_id?: number;
+    is_active?: boolean;
   }
 ): Promise<{ success: boolean; location?: AttendanceLocation; message?: string }> => {
   try {
@@ -543,7 +624,7 @@ export const updateAttendanceLocation = async (
       };
     }
 
-    const response = await axios.put(`${API_ENDPOINT}/attendance/attendance-locations/${locationId}`, updateData, {
+    const response = await axios.put(`${API_ENDPOINT}/attendance-locations/${locationId}`, updateData, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -552,7 +633,8 @@ export const updateAttendanceLocation = async (
 
     return {
       success: true,
-      location: response.data.data?.location || response.data.location,
+      location: response.data.data?.attendanceLocation || response.data.data?.location || response.data.location,
+      message: response.data.message || 'Attendance location updated successfully',
     };
   } catch (error: any) {
     console.error('Error updating attendance location:', error);
@@ -570,7 +652,7 @@ export const updateAttendanceLocation = async (
 };
 
 // Delete attendance location
-export const deleteAttendanceLocation = async (locationId: string): Promise<{ success: boolean; message?: string }> => {
+export const deleteAttendanceLocation = async (locationId: number): Promise<{ success: boolean; message?: string }> => {
   try {
     const token = localStorage.getItem('authToken');
     if (!token) {
@@ -580,7 +662,7 @@ export const deleteAttendanceLocation = async (locationId: string): Promise<{ su
       };
     }
 
-    await axios.delete(`${API_ENDPOINT}/attendance/attendance-locations/${locationId}`, {
+    await axios.delete(`${API_ENDPOINT}/attendance-locations/${locationId}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
@@ -749,6 +831,247 @@ export const getMonthlyStats = async (): Promise<{ success: boolean; stats?: Mon
     return {
       success: false,
       message: error.response?.data?.message || error.message || 'Failed to fetch monthly attendance statistics',
+    };
+  }
+};
+
+// ============ PROCESS ATTENDANCE ============
+
+// Process attendance for a specific date (single user or all users)
+export const processAttendance = async (
+  date: string,
+  userId?: number
+): Promise<{ success: boolean; data?: { processed: number; failed: number }; message?: string }> => {
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      return {
+        success: false,
+        message: 'Authentication token not found. Please log in again.'
+      };
+    }
+
+    const body: { date: string; userId?: number } = { date };
+    if (userId) {
+      body.userId = userId;
+    }
+
+    const response = await axios.post(`${API_ENDPOINT}/attendance/process`, body, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    return {
+      success: true,
+      data: response.data.data,
+      message: response.data.message || 'Attendance processed successfully',
+    };
+  } catch (error: any) {
+    console.error('Error processing attendance:', error);
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      return {
+        success: false,
+        message: 'Access denied. Please check your permissions or log in again.'
+      };
+    }
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Failed to process attendance',
+    };
+  }
+};
+
+// Process attendance for multiple users in batch
+export const processBatchAttendance = async (
+  date: string,
+  userIds: number[]
+): Promise<{ success: boolean; data?: { processed: number; failed: number; failures?: any[] }; message?: string }> => {
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      return {
+        success: false,
+        message: 'Authentication token not found. Please log in again.'
+      };
+    }
+
+    const response = await axios.post(
+      `${API_ENDPOINT}/attendance/process-batch`,
+      { date, userIds },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    return {
+      success: true,
+      data: response.data.data,
+      message: response.data.message || 'Attendance batch processed successfully',
+    };
+  } catch (error: any) {
+    console.error('Error processing batch attendance:', error);
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      return {
+        success: false,
+        message: 'Access denied. Please check your permissions or log in again.'
+      };
+    }
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Failed to process batch attendance',
+    };
+  }
+};
+
+// Get monthly attendance report
+export const getMonthlyReport = async (
+  year: number,
+  month: number,
+  userId?: number
+): Promise<{ success: boolean; report?: any; message?: string }> => {
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      return {
+        success: false,
+        message: 'Authentication token not found. Please log in again.'
+      };
+    }
+
+    const params = new URLSearchParams();
+    params.append('year', year.toString());
+    params.append('month', month.toString());
+    if (userId) params.append('userId', userId.toString());
+
+    const response = await axios.get(
+      `${API_ENDPOINT}/attendance/reports/monthly?${params.toString()}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    return {
+      success: true,
+      report: response.data.data,
+      message: response.data.message,
+    };
+  } catch (error: any) {
+    console.error('Error fetching monthly report:', error);
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      return {
+        success: false,
+        message: 'Access denied. Please check your permissions or log in again.'
+      };
+    }
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Failed to fetch monthly report',
+    };
+  }
+};
+
+// Get my attendance (current user)
+export const getMyAttendance = async (
+  startDate?: string,
+  endDate?: string,
+  status?: string
+): Promise<{ success: boolean; records?: AttendanceRecord[]; message?: string }> => {
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      return {
+        success: false,
+        message: 'Authentication token not found. Please log in again.'
+      };
+    }
+
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    if (status) params.append('status', status);
+
+    const response = await axios.get(
+      `${API_ENDPOINT}/attendance/my${params.toString() ? '?' + params.toString() : ''}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    return {
+      success: true,
+      records: response.data.data?.attendanceRecords || response.data.data?.records || response.data.data || [],
+      message: response.data.message,
+    };
+  } catch (error: any) {
+    console.error('Error fetching my attendance:', error);
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      return {
+        success: false,
+        message: 'Access denied. Please check your permissions or log in again.'
+      };
+    }
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Failed to fetch my attendance',
+    };
+  }
+};
+
+// Get my attendance summary (current user)
+export const getMyAttendanceSummary = async (
+  startDate?: string,
+  endDate?: string
+): Promise<{ success: boolean; summary?: any; message?: string }> => {
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      return {
+        success: false,
+        message: 'Authentication token not found. Please log in again.'
+      };
+    }
+
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+
+    const response = await axios.get(
+      `${API_ENDPOINT}/attendance/my/summary${params.toString() ? '?' + params.toString() : ''}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    return {
+      success: true,
+      summary: response.data.data?.summary || response.data.data,
+      message: response.data.message,
+    };
+  } catch (error: any) {
+    console.error('Error fetching my attendance summary:', error);
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      return {
+        success: false,
+        message: 'Access denied. Please check your permissions or log in again.'
+      };
+    }
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Failed to fetch my attendance summary',
     };
   }
 };

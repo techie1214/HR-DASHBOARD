@@ -76,6 +76,8 @@ const LeaveManagementView = () => {
   const [showCancelModal, setShowCancelModal] = useState(false);
   // State for showing details modal
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  // State for selected leave request details (full details from API)
+  const [selectedRequestDetails, setSelectedRequestDetails] = useState<any | null>(null);
   // State for showing create leave type modal
   const [showCreateLeaveTypeModal, setShowCreateLeaveTypeModal] = useState(false);
   // State for showing edit leave type modal
@@ -1549,7 +1551,7 @@ const LeaveManagementView = () => {
           {/* Details Modal - BAM Design */}
           {showDetailsModal && selectedRequest && (
             <>
-              <div className="bam-overlay" onClick={() => setShowDetailsModal(false)}></div>
+              <div className="bam-overlay" onClick={() => { setShowDetailsModal(false); setSelectedRequestDetails(null); }}></div>
               <div className="bam-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px' }}>
                 {/* Header */}
                 <div className="bam-header">
@@ -1576,7 +1578,7 @@ const LeaveManagementView = () => {
                       </p>
                     </div>
                   </div>
-                  <button className="bam-btn-close" onClick={() => setShowDetailsModal(false)} title="Close">
+                  <button className="bam-btn-close" onClick={() => { setShowDetailsModal(false); setSelectedRequestDetails(null); }} title="Close">
                     <X className="w-[18px] h-[18px]" />
                   </button>
                 </div>
@@ -1821,7 +1823,7 @@ const LeaveManagementView = () => {
 
                 {/* Footer */}
                 <div className="bam-footer">
-                  <button className="bam-btn bam-btn-ghost" onClick={() => setShowDetailsModal(false)}>Close</button>
+                  <button className="bam-btn bam-btn-ghost" onClick={() => { setShowDetailsModal(false); setSelectedRequestDetails(null); }}>Close</button>
                 </div>
               </div>
             </>

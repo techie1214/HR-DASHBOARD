@@ -8,13 +8,18 @@ import {
   markAttendanceCheckOut,
   createManualAttendance,
   updateAttendanceRecord,
-  AttendanceRecord
+  deleteAttendanceRecord,
+  AttendanceRecord,
+  AttendanceRecordsResponse
 } from '../services/attendanceService';
 import { getAllStaff } from '../services/staffManagementService';
 import { getAllBranches, Branch } from '../services/branchManagementService';
+import ProcessAttendanceModal from './ProcessAttendanceModal';
+import { holidayService } from '../services/holidayService';
 import {
   Calendar, Clock, CheckCircle, XCircle, AlertCircle, Search, Filter, Download,
-  Plus, Edit3, Trash2, Users, Building, TrendingUp, TrendingDown, RefreshCw
+  Plus, Edit3, Trash2, Users, Building, TrendingUp, TrendingDown, RefreshCw,
+  ChevronLeft, ChevronRight, RotateCcw
 } from 'lucide-react';
 
 interface StaffMember {
@@ -42,6 +47,7 @@ const AttendanceView = () => {
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceWithStaff[]>([]);
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [holidays, setHolidays] = useState<any[]>([]);
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -53,10 +59,43 @@ const AttendanceView = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
 
+  // Advanced filter state
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('');
+  const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
+  // Bulk action state
+  const [selectedRecords, setSelectedRecords] = useState<number[]>([]);
+  const [showBulkActions, setShowBulkActions] = useState(false);
+
+  // View details modal state
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [viewingRecord, setViewingRecord] = useState<AttendanceWithStaff | null>(null);
+
+  // Responsive state
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  // Detect mobile viewport
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [pagination, setPagination] = useState<AttendanceRecordsResponse['pagination'] | undefined>();
+
   // Modal state
   const [showManualAttendanceModal, setShowManualAttendanceModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showProcessModal, setShowProcessModal] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<AttendanceWithStaff | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Manual attendance form
   const [manualForm, setManualForm] = useState({
@@ -82,17 +121,30 @@ const AttendanceView = () => {
   // Load data
   useEffect(() => {
     loadData();
-  }, []);
+  }, [currentPage, pageSize]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+    } else {
+      loadData();
+    }
+  }, [dateRange.start, dateRange.end, selectedBranch, selectedStatus]);
 
   const loadData = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const [attendanceRes, staffRes, branchesRes] = await Promise.all([
-        getAllAttendanceRecords(),
+      const startDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1).toISOString().split('T')[0];
+      const endDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 0).toISOString().split('T')[0];
+
+      const [attendanceRes, staffRes, branchesRes, holidaysRes] = await Promise.all([
+        getAllAttendanceRecords(currentPage, pageSize, undefined, dateRange.start, dateRange.end),
         getAllStaff(1, 1000),
-        getAllBranches()
+        getAllBranches(),
+        holidayService.getHolidays({ startDate, endDate })
       ]);
 
       if (staffRes.success && staffRes.staff) {
@@ -110,7 +162,18 @@ const AttendanceView = () => {
         setBranches(branchesRes.branches);
       }
 
+      if (holidaysRes.success && holidaysRes.data && holidaysRes.data.holidays) {
+        setHolidays(holidaysRes.data.holidays);
+      }
+
       if (attendanceRes.success && attendanceRes.records) {
+        // Update pagination info
+        if (attendanceRes.pagination) {
+          setPagination(attendanceRes.pagination);
+          setTotalRecords(attendanceRes.pagination.totalItems);
+          setTotalPages(attendanceRes.pagination.totalPages);
+        }
+
         // Enrich attendance records with staff info
         const enriched = attendanceRes.records.map((record: AttendanceRecord) => {
           const staff = staffRes.staff?.find((s: any) => s.id === record.user_id);
@@ -209,6 +272,73 @@ const AttendanceView = () => {
     setShowEditModal(true);
   };
 
+  const openDeleteModal = (record: AttendanceWithStaff) => {
+    setSelectedRecord(record);
+    setShowDeleteModal(true);
+  };
+
+  // Export to CSV
+  const exportToCSV = (selectedOnly = false) => {
+    const dataToExport = selectedOnly 
+      ? filteredRecords.filter(r => selectedRecords.includes(r.id))
+      : filteredRecords;
+
+    const headers = ['Employee', 'Email', 'Date', 'Check-in', 'Check-out', 'Hours Worked', 'Status', 'Branch'];
+    const rows = dataToExport.map(r => [
+      r.staff_name || `User ${r.user_id}`,
+      r.staff_email || '',
+      new Date(r.date).toLocaleDateString(),
+      r.check_in_time || '-',
+      r.check_out_time || '-',
+      r.actual_working_hours ? r.actual_working_hours.toFixed(2) : '-',
+      r.status,
+      r.branch_name || '-'
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `attendance_export_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  // View record details
+  const openDetailsModal = (record: AttendanceWithStaff) => {
+    setViewingRecord(record);
+    setShowDetailsModal(true);
+  };
+
+  const handleDeleteAttendance = async () => {
+    if (!selectedRecord) return;
+
+    setDeleteLoading(true);
+    try {
+      const response = await deleteAttendanceRecord(selectedRecord.id);
+      if (response.success) {
+        setSuccessMessage('Attendance record deleted successfully');
+        setShowDeleteModal(false);
+        setSelectedRecord(null);
+        loadData();
+        setTimeout(() => setSuccessMessage(null), 3000);
+      } else {
+        setError(response.message || 'Failed to delete attendance');
+        setShowDeleteModal(false);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete attendance');
+      setShowDeleteModal(false);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   // Filter records
   const filteredRecords = attendanceRecords.filter(record => {
     const matchesSearch = searchTerm === '' ||
@@ -228,12 +358,12 @@ const AttendanceView = () => {
     return matchesSearch && matchesBranch && matchesStatus && matchesDateRange;
   });
 
-  // Calculate statistics
-  const totalRecords = filteredRecords.length;
+  // Calculate statistics (using filteredRecords for client-side filtering)
+  const displayedRecordsCount = filteredRecords.length;
   const presentCount = filteredRecords.filter(r => r.status === 'present').length;
   const lateCount = filteredRecords.filter(r => r.status === 'late').length;
   const absentCount = filteredRecords.filter(r => r.status === 'absent').length;
-  const attendanceRate = totalRecords > 0 ? Math.round((presentCount / totalRecords) * 100) : 0;
+  const attendanceRate = displayedRecordsCount > 0 ? Math.round((presentCount / displayedRecordsCount) * 100) : 0;
 
   // Calendar helpers
   const getDaysInMonth = (date: Date) => {
@@ -250,6 +380,11 @@ const AttendanceView = () => {
   const getAttendanceForDate = (day: number) => {
     const dateStr = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), day).toISOString().split('T')[0];
     return filteredRecords.filter(r => r.date === dateStr);
+  };
+
+  const isHoliday = (day: number) => {
+    const dateStr = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), day).toISOString().split('T')[0];
+    return holidays.find(h => h.date === dateStr);
   };
 
   const renderListView = () => (
@@ -274,6 +409,20 @@ const AttendanceView = () => {
         </div>
         <div className="flex items-center gap-2">
           <button
+            className="btn btn-outline"
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          >
+            <Filter className="w-4 h-4 mr-2" />
+            {showAdvancedFilters ? 'Hide' : 'Show'} Filters
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowProcessModal(true)}
+          >
+            <CheckCircle className="w-4 h-4 mr-2" />
+            Process Attendance
+          </button>
+          <button
             className="btn btn-primary"
             onClick={() => setShowManualAttendanceModal(true)}
           >
@@ -290,10 +439,53 @@ const AttendanceView = () => {
         </div>
       </div>
 
-      {/* Filters */}
-      {showFilters && (
-        <div className="card p-4 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Bulk Actions Toolbar */}
+      {selectedRecords.length > 0 && (
+        <div className="card p-4 bg-blue-50 border border-blue-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                className="checkbox"
+                checked={selectedRecords.length === filteredRecords.length}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedRecords(filteredRecords.map(r => r.id));
+                  } else {
+                    setSelectedRecords([]);
+                  }
+                }}
+              />
+              <span className="text-sm font-medium text-blue-900">
+                {selectedRecords.length} record(s) selected
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                className="btn btn-sm btn-outline"
+                onClick={() => {
+                  // Export selected
+                  exportToCSV(true);
+                }}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export Selected
+              </button>
+              <button
+                className="btn btn-sm btn-outline"
+                onClick={() => setSelectedRecords([])}
+              >
+                Deselect All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Advanced Filters */}
+      {showAdvancedFilters && (
+        <div className="card p-4">
+          <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 md:grid-cols-4'}`}>
             <div>
               <label className="block text-sm font-medium mb-1">Search</label>
               <input
@@ -333,15 +525,35 @@ const AttendanceView = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Date Range</label>
-              <input
-                type="date"
+              <label className="block text-sm font-medium mb-1">Department</label>
+              <select
                 className="input w-full"
-                value={dateRange.start}
-                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-              />
+                value={selectedDepartment}
+                onChange={(e) => setSelectedDepartment(e.target.value)}
+              >
+                <option value="">All Departments</option>
+                {Array.from(new Set(staffMembers.map(s => s.department).filter(Boolean))).map(dept => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
             </div>
           </div>
+          {isMobile && (
+            <div className="mt-4 flex gap-2">
+              <button
+                className="btn btn-sm btn-outline flex-1"
+                onClick={() => {
+                  setSearchTerm('');
+                  setSelectedBranch('');
+                  setSelectedStatus('all');
+                  setSelectedDepartment('');
+                }}
+              >
+                <RotateCcw className="w-3 h-3 mr-2" />
+                Clear Filters
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -436,23 +648,37 @@ const AttendanceView = () => {
       {/* Attendance Table */}
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="table">
+          <table className="table min-w-full">
             <thead className="table-header">
               <tr>
-                <th className="table-header-cell">Employee</th>
-                <th className="table-header-cell">Date</th>
-                <th className="table-header-cell">Check-in</th>
-                <th className="table-header-cell">Check-out</th>
-                <th className="table-header-cell">Hours Worked</th>
-                <th className="table-header-cell">Status</th>
-                <th className="table-header-cell">Branch</th>
-                <th className="table-header-cell right">Actions</th>
+                <th className="table-header-cell" style={{ width: '40px' }}>
+                  <input
+                    type="checkbox"
+                    className="checkbox"
+                    checked={selectedRecords.length === filteredRecords.length && filteredRecords.length > 0}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedRecords(filteredRecords.map(r => r.id));
+                      } else {
+                        setSelectedRecords([]);
+                      }
+                    }}
+                  />
+                </th>
+                <th className="table-header-cell whitespace-nowrap">Employee</th>
+                <th className="table-header-cell whitespace-nowrap">Date</th>
+                <th className="table-header-cell whitespace-nowrap">Check-in</th>
+                <th className="table-header-cell whitespace-nowrap">Check-out</th>
+                <th className="table-header-cell whitespace-nowrap">Hours Worked</th>
+                <th className="table-header-cell whitespace-nowrap">Status</th>
+                <th className="table-header-cell whitespace-nowrap">Branch</th>
+                <th className="table-header-cell right whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center">
+                  <td colSpan={9} className="px-6 py-12 text-center">
                     <div className="flex justify-center items-center gap-2">
                       <RefreshCw className="w-5 h-5 animate-spin text-blue-600" />
                       <span className="text-gray-600">Loading attendance records...</span>
@@ -461,7 +687,7 @@ const AttendanceView = () => {
                 </tr>
               ) : filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center">
+                  <td colSpan={9} className="px-6 py-12 text-center">
                     <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
                       <Calendar className="w-8 h-8 text-blue-500" />
                     </div>
@@ -472,6 +698,20 @@ const AttendanceView = () => {
               ) : (
                 filteredRecords.map((record) => (
                   <tr key={record.id} className="table-row">
+                    <td className="table-cell">
+                      <input
+                        type="checkbox"
+                        className="checkbox"
+                        checked={selectedRecords.includes(record.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedRecords([...selectedRecords, record.id]);
+                          } else {
+                            setSelectedRecords(selectedRecords.filter(id => id !== record.id));
+                          }
+                        }}
+                      />
+                    </td>
                     <td className="table-cell">
                       <div>
                         <p style={{ fontWeight: 500 }}>{record.staff_name || `User ${record.user_id}`}</p>
@@ -518,12 +758,24 @@ const AttendanceView = () => {
                     <td className="table-cell right">
                       <div className="flex items-center justify-end gap-2">
                         <button
+                          onClick={() => openDetailsModal(record)}
+                          className="btn btn-sm btn-outline"
+                          title="View details"
+                        >
+                          <Search className="w-3 h-3" />
+                        </button>
+                        <button
                           onClick={() => openEditModal(record)}
                           className="btn btn-sm btn-outline green"
+                          title="Edit record"
                         >
                           <Edit3 className="w-3 h-3" />
                         </button>
-                        <button className="btn btn-sm btn-outline red">
+                        <button
+                          onClick={() => openDeleteModal(record)}
+                          className="btn btn-sm btn-outline red"
+                          title="Delete record"
+                        >
                           <Trash2 className="w-3 h-3" />
                         </button>
                       </div>
@@ -534,6 +786,77 @@ const AttendanceView = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <p className="text-sm text-gray-600">
+                  Showing <span className="font-medium">{((currentPage - 1) * pageSize) + 1}</span> to{' '}
+                  <span className="font-medium">{Math.min(currentPage * pageSize, totalRecords)}</span> of{' '}
+                  <span className="font-medium">{totalRecords}</span> records
+                </p>
+                <select
+                  className="input input-sm"
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  style={{ width: 'auto', padding: '0.375rem 0.5rem' }}
+                >
+                  <option value={10}>10 / page</option>
+                  <option value={20}>20 / page</option>
+                  <option value={50}>50 / page</option>
+                  <option value={100}>100 / page</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  className="btn btn-sm btn-outline"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Previous
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        className={`btn btn-sm ${currentPage === pageNum ? 'btn-primary' : 'btn-outline'}`}
+                        onClick={() => setCurrentPage(pageNum)}
+                        style={{ minWidth: '2.5rem' }}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  className="btn btn-sm btn-outline"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -590,15 +913,29 @@ const AttendanceView = () => {
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
               const dayAttendance = getAttendanceForDate(day);
+              const holiday = isHoliday(day);
               const presentCount = dayAttendance.filter(a => a.status === 'present').length;
               const lateCount = dayAttendance.filter(a => a.status === 'late').length;
               const absentCount = dayAttendance.filter(a => a.status === 'absent').length;
+              const isWeekend = [0, 6].includes(new Date(year, month, day).getDay());
 
               return (
-                <div key={day} className="p-2 min-h-[100px] border-r border-b last:border-r-0 relative">
-                  <div className="text-sm font-medium mb-1">{day}</div>
+                <div
+                  key={day}
+                  className={`p-2 min-h-[100px] border-r border-b last:border-r-0 relative ${
+                    holiday ? 'bg-red-50' : isWeekend ? 'bg-gray-50' : ''
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-medium">{day}</div>
+                    {holiday && (
+                      <span className="text-xs text-red-600 font-medium" title={holiday.name}>
+                        🎉 {holiday.name}
+                      </span>
+                    )}
+                  </div>
                   {dayAttendance.length > 0 && (
-                    <div className="space-y-1">
+                    <div className="space-y-1 mt-1">
                       {presentCount > 0 && (
                         <div className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded">
                           ✓ {presentCount} present
@@ -637,6 +974,14 @@ const AttendanceView = () => {
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-red-100 rounded"></div>
               <span className="text-sm">Absent</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-red-50 border border-red-200 rounded"></div>
+              <span className="text-sm">Holiday</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-gray-50 rounded"></div>
+              <span className="text-sm">Weekend</span>
             </div>
           </div>
         </div>
@@ -868,6 +1213,187 @@ const AttendanceView = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && selectedRecord && (
+        <>
+          <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}></div>
+          <div className="modal" style={{ maxWidth: '28rem' }}>
+            <div className="modal-header">
+              <h3>Delete Attendance Record</h3>
+              <button className="btn btn-ghost btn-icon" onClick={() => setShowDeleteModal(false)}>×</button>
+            </div>
+            <div className="modal-content space-y-4">
+              <div className="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-red-900">Warning: This action cannot be undone</p>
+                  <p className="text-xs text-red-700 mt-1">Are you sure you want to delete this attendance record?</p>
+                </div>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="text-sm font-medium">{selectedRecord.staff_name}</p>
+                <p className="text-xs text-muted">{new Date(selectedRecord.date).toLocaleDateString()}</p>
+                <p className="text-xs text-muted mt-1">Status: <span className="font-medium">{selectedRecord.status}</span></p>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button 
+                type="button" 
+                className="btn btn-outline" 
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleteLoading}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-danger"
+                onClick={handleDeleteAttendance}
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Record
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Process Attendance Modal */}
+      <ProcessAttendanceModal
+        isOpen={showProcessModal}
+        onClose={() => setShowProcessModal(false)}
+        onSuccess={loadData}
+      />
+
+      {/* View Record Details Modal */}
+      {showDetailsModal && viewingRecord && (
+        <>
+          <div className="modal-overlay" onClick={() => setShowDetailsModal(false)}></div>
+          <div className="modal" style={{ maxWidth: '36rem' }}>
+            <div className="modal-header">
+              <h3>Attendance Record Details</h3>
+              <button className="btn btn-ghost btn-icon" onClick={() => setShowDetailsModal(false)}>×</button>
+            </div>
+            <div className="modal-content space-y-4">
+              {/* Employee Info Card */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-semibold">
+                    {viewingRecord.staff_name?.charAt(0) || 'U'}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-blue-900">{viewingRecord.staff_name || `User ${viewingRecord.user_id}`}</p>
+                    <p className="text-sm text-blue-700">{viewingRecord.staff_email}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
+                  <div>
+                    <span className="text-blue-600">Department:</span>
+                    <span className="ml-2 font-medium">{viewingRecord.department || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-blue-600">Branch:</span>
+                    <span className="ml-2 font-medium">{viewingRecord.branch_name || '-'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Attendance Details Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Date</p>
+                  <p className="font-semibold">{new Date(viewingRecord.date).toLocaleDateString()}</p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Status</p>
+                  <span className={`badge ${
+                    viewingRecord.status === 'present' ? 'badge-success' :
+                    viewingRecord.status === 'late' ? 'badge-warning' :
+                    viewingRecord.status === 'absent' ? 'badge-error' :
+                    'badge-secondary'
+                  }`}>
+                    {viewingRecord.status}
+                  </span>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Check-in Time</p>
+                  <p className="font-semibold">{viewingRecord.check_in_time ? viewingRecord.check_in_time.substring(0, 5) : '-'}</p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Check-out Time</p>
+                  <p className="font-semibold">{viewingRecord.check_out_time ? viewingRecord.check_out_time.substring(0, 5) : '-'}</p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Hours Worked</p>
+                  <p className="font-semibold">{viewingRecord.actual_working_hours ? `${viewingRecord.actual_working_hours.toFixed(2)}h` : '-'}</p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Location Verified</p>
+                  <p className="font-semibold">{viewingRecord.location_verified ? '✓ Yes' : '✗ No'}</p>
+                </div>
+              </div>
+
+              {/* Location Info */}
+              {(viewingRecord.location_coordinates || viewingRecord.location_address) && (
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Location</p>
+                  {viewingRecord.location_address && (
+                    <p className="font-medium text-sm">{viewingRecord.location_address}</p>
+                  )}
+                  {viewingRecord.location_coordinates && (
+                    <p className="text-xs text-gray-500 font-mono mt-1">{viewingRecord.location_coordinates}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Notes */}
+              {viewingRecord.notes && (
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Notes</p>
+                  <p className="text-sm">{viewingRecord.notes}</p>
+                </div>
+              )}
+
+              {/* Metadata */}
+              <div className="text-xs text-gray-500 pt-2 border-t">
+                <p>Created: {new Date(viewingRecord.created_at).toLocaleString()}</p>
+                <p>Updated: {new Date(viewingRecord.updated_at).toLocaleString()}</p>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setShowDetailsModal(false)}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  setShowDetailsModal(false);
+                  openEditModal(viewingRecord);
+                }}
+              >
+                <Edit3 className="w-4 h-4 mr-2" />
+                Edit Record
+              </button>
+            </div>
           </div>
         </>
       )}

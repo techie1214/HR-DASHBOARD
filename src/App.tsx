@@ -19,6 +19,8 @@ import PayrollView from "./components/PayrollView";
 import AppraisalView from "./components/AppraisalView";
 import LeaveManagementView from "./components/LeaveManagementView";
 import LeaveAllocationView from "./components/LeaveAllocationView";
+import AttendanceLocationsView from "./components/AttendanceLocationsView";
+import AttendanceReportView from "./components/AttendanceReportView";
 import PerformanceMetrics from "./components/PerformanceMetrics";
 import { EmployeeTable } from "./components/EmployeeTable";
 import KPIView from "./components/KPIView";
@@ -47,7 +49,8 @@ import {
   DollarSign,
   Award,
   Target,
-  CalendarDays
+  CalendarDays,
+  MapPin
 } from "lucide-react";
 import { Login } from "./components/Login";
 import RoleManagementView from "./components/RoleManagementView";
@@ -154,6 +157,26 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 <span>Attendance</span>
               </button>
             </li>
+            <li className="sidebar-menu-item" style={{ paddingLeft: '1rem' }}>
+              <button
+                onClick={() => onNavigate("attendance-locations")}
+                className={`sidebar-menu-button ${activeView === "attendance-locations" ? "active" : ""}`}
+                style={{ fontSize: '0.875rem' }}
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                <span>Locations</span>
+              </button>
+            </li>
+            <li className="sidebar-menu-item" style={{ paddingLeft: '1rem' }}>
+              <button
+                onClick={() => onNavigate("attendance-reports")}
+                className={`sidebar-menu-button ${activeView === "attendance-reports" ? "active" : ""}`}
+                style={{ fontSize: '0.875rem' }}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Reports</span>
+              </button>
+            </li>
             <li className="sidebar-menu-item">
               <button
                 onClick={() => onNavigate("branches")}
@@ -172,7 +195,7 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 <span>Department Management</span>
               </button>
             </li>
-            {/* <li className="sidebar-menu-item">
+            <li className="sidebar-menu-item">
               <button
                 onClick={() => onNavigate("timemanagement")}
                 className={`sidebar-menu-button ${activeView === "timemanagement" ? "active" : ""}`}
@@ -180,7 +203,7 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 <Clock className="w-4 h-4" />
                 <span>Time Management</span>
               </button>
-            </li> */}
+            </li>
             {/* <li className="sidebar-menu-item">
               <button
                 onClick={() => onNavigate("payroll")}
@@ -674,6 +697,12 @@ export default function App() {
       case "attendance":
         return <AttendanceView />;
 
+      case "attendance-locations":
+        return <AttendanceLocationsView />;
+
+      case "attendance-reports":
+        return <AttendanceReportView />;
+
       case "branches":
         return <BranchManagementView />;
 
@@ -748,6 +777,16 @@ export default function App() {
         return {
           title: "Attendance Tracking",
           subtitle: "Monitor employee attendance and work hours"
+        };
+      case "attendance-locations":
+        return {
+          title: "Attendance Locations",
+          subtitle: "Manage approved GPS check-in locations"
+        };
+      case "attendance-reports":
+        return {
+          title: "Attendance Reports",
+          subtitle: "Comprehensive attendance analytics and reporting"
         };
       case "branches":
         return {
