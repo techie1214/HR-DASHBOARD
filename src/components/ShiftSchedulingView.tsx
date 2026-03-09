@@ -827,10 +827,10 @@ const ShiftSchedulingView = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
+      {/* <div>
         <h1 className="text-2xl font-bold text-gray-900">Shift Scheduling</h1>
         <p className="text-gray-600 mt-1">Manage templates, assignments, and exceptions</p>
-      </div>
+      </div> */}
 
       {/* Success/Error Messages */}
       {successMessage && (

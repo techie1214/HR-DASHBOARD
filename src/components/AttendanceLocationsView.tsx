@@ -237,14 +237,6 @@ const AttendanceLocationsView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Attendance Locations</h1>
-        <p className="text-gray-600 mt-1">
-          Manage approved GPS locations where employees can check in
-        </p>
-      </div>
-
       {/* Success/Error Messages */}
       {successMessage && (
         <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">

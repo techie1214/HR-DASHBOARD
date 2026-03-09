@@ -50,7 +50,8 @@ import {
   Award,
   Target,
   CalendarDays,
-  MapPin
+  MapPin,
+  ChevronRight
 } from "lucide-react";
 import { Login } from "./components/Login";
 import RoleManagementView from "./components/RoleManagementView";
@@ -84,6 +85,15 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
     }
     // Default initials if no name is available
     return 'AU'; // Anonymous User
+  };
+
+  // Submenu state
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
+    attendance: false,
+  });
+
+  const toggleMenu = (menu: string) => {
+    setExpandedMenus(prev => ({ ...prev, [menu]: !prev[menu] }));
   };
 
   return (
@@ -154,28 +164,45 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 className={`sidebar-menu-button ${activeView === "attendance" ? "active" : ""}`}
               >
                 <Clock className="w-4 h-4" />
-                <span>Attendance</span>
+                <span className="flex-1">Attendance</span>
+                <ChevronRight
+                  className={`w-3 h-3 transition-transform ${
+                    expandedMenus.attendance ? 'rotate-90' : ''
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleMenu('attendance');
+                  }}
+                  style={{ cursor: 'pointer' }}
+                />
               </button>
-            </li>
-            <li className="sidebar-menu-item" style={{ paddingLeft: '1rem' }}>
-              <button
-                onClick={() => onNavigate("attendance-locations")}
-                className={`sidebar-menu-button ${activeView === "attendance-locations" ? "active" : ""}`}
-                style={{ fontSize: '0.875rem' }}
-              >
-                <MapPin className="w-3.5 h-3.5" />
-                <span>Locations</span>
-              </button>
-            </li>
-            <li className="sidebar-menu-item" style={{ paddingLeft: '1rem' }}>
-              <button
-                onClick={() => onNavigate("attendance-reports")}
-                className={`sidebar-menu-button ${activeView === "attendance-reports" ? "active" : ""}`}
-                style={{ fontSize: '0.875rem' }}
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>Reports</span>
-              </button>
+              {/* Submenu */}
+              {expandedMenus.attendance && (
+                <ul className="sidebar-submenu">
+                  <li className="sidebar-submenu-item">
+                    <button
+                      onClick={() => onNavigate("attendance-locations")}
+                      className={`sidebar-submenu-button ${
+                        activeView === "attendance-locations" ? "active" : ""
+                      }`}
+                    >
+                      <MapPin className="w-3 h-3" />
+                      <span>Locations</span>
+                    </button>
+                  </li>
+                  <li className="sidebar-submenu-item">
+                    <button
+                      onClick={() => onNavigate("attendance-reports")}
+                      className={`sidebar-submenu-button ${
+                        activeView === "attendance-reports" ? "active" : ""
+                      }`}
+                    >
+                      <FileText className="w-3 h-3" />
+                      <span>Reports</span>
+                    </button>
+                  </li>
+                </ul>
+              )}
             </li>
             <li className="sidebar-menu-item">
               <button

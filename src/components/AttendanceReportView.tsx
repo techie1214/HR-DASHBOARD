@@ -148,14 +148,6 @@ const AttendanceReportView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Attendance Reports</h1>
-        <p className="text-gray-600 mt-1">
-          Comprehensive attendance analytics and reporting
-        </p>
-      </div>
-
       {/* Error Message */}
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">

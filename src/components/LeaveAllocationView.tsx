@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
   Plus,
-  Edit,
   Edit3,
   Trash2,
   Search,
@@ -13,7 +12,14 @@ import {
   Download,
   RefreshCw,
   UserPlus,
-  TrendingUp
+  TrendingUp,
+  X,
+  ChevronDown,
+  Eye,
+  FileText,
+  CalendarDays,
+  Clock,
+  DollarSign
 } from 'lucide-react';
 import {
   getAllAllocations,
@@ -46,7 +52,7 @@ const LeaveAllocationView = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  
+
   // Pagination state
   const [pagination, setPagination] = useState<{
     currentPage: number;
@@ -55,26 +61,33 @@ const LeaveAllocationView = () => {
     totalPages: number;
   } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [limit] = useState(20);
-  
+  const [limit, setLimit] = useState(20);
+
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUserId, setSelectedUserId] = useState<number | ''>('');
   const [selectedLeaveTypeId, setSelectedLeaveTypeId] = useState<number | ''>('');
+  const [selectedYear, setSelectedYear] = useState<number | ''>('');
   const [showFilters, setShowFilters] = useState(false);
-  
+
   // Data
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
-  
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
+
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [showBulkAllModal, setShowBulkAllModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedAllocation, setSelectedAllocation] = useState<LeaveAllocation | null>(null);
-  
+
+  // Bulk selection
+  const [selectedAllocationIds, setSelectedAllocationIds] = useState<number[]>([]);
+  const [selectAllMode, setSelectAllMode] = useState<'none' | 'current' | 'all'>('none');
+
   // Form states
   const [createForm, setCreateForm] = useState<CreateAllocationRequest>({
     user_id: 0,
@@ -84,7 +97,7 @@ const LeaveAllocationView = () => {
     cycle_end_date: new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0],
     carried_over_days: 0,
   });
-  
+
   const [bulkForm, setBulkForm] = useState<Partial<BulkAllocationRequest>>({
     leave_type_id: 0,
     allocated_days: 21,
@@ -96,7 +109,7 @@ const LeaveAllocationView = () => {
 
   // Staff search for bulk modal
   const [bulkStaffSearch, setBulkStaffSearch] = useState('');
-  
+
   const [bulkAllForm, setBulkAllForm] = useState<Omit<BulkAllocationRequest, 'user_ids'>>({
     leave_type_id: 0,
     allocated_days: 21,
@@ -104,7 +117,7 @@ const LeaveAllocationView = () => {
     cycle_end_date: new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0],
     carried_over_days: 0,
   });
-  
+
   const [editForm, setEditForm] = useState<UpdateAllocationRequest>({
     allocated_days: 0,
     used_days: 0,
@@ -116,12 +129,22 @@ const LeaveAllocationView = () => {
     fetchData();
     loadLeaveTypes();
     loadStaffMembers();
-  }, [currentPage, selectedUserId, selectedLeaveTypeId]);
+    extractAvailableYears();
+  }, [currentPage, limit, selectedUserId, selectedLeaveTypeId, selectedYear]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedUserId, selectedLeaveTypeId]);
+  }, [selectedUserId, selectedLeaveTypeId, selectedYear]);
+
+  const extractAvailableYears = () => {
+    const years = new Set<number>();
+    const currentYear = new Date().getFullYear();
+    years.add(currentYear);
+    years.add(currentYear - 1);
+    years.add(currentYear + 1);
+    setAvailableYears(Array.from(years).sort((a, b) => b - a));
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -176,21 +199,16 @@ const LeaveAllocationView = () => {
 
   const loadStaffMembers = async () => {
     try {
-      // Fetch all staff without pagination limits (use large limit)
       const result = await getAllStaff(1, 1000);
       if (result.success && result.staff) {
         console.log('Loaded staff members:', result.staff.length);
         console.log('Sample staff data:', result.staff[0]);
-        // Map the API response to our StaffMember interface
         const mappedStaff = result.staff.map((s: any) => {
-          // Try multiple field name variations for name
           const firstName = s.first_name || s.firstName || s.firstname || '';
           const lastName = s.last_name || s.lastName || s.lastname || '';
           const middleName = s.middle_name || s.middleName || s.middlename || '';
-          
-          // Build full name
           const fullName = [firstName, middleName, lastName].filter(n => n).join(' ').trim();
-          
+
           return {
             id: s.id,
             name: fullName || s.name || s.full_name || s.staff_name || s.email || 'Unknown',
@@ -236,13 +254,13 @@ const LeaveAllocationView = () => {
 
   const handleBulkAllocate = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       if (!bulkForm.user_ids || bulkForm.user_ids.length === 0) {
         setError('Please select at least one user');
         return;
       }
-      
+
       const result = await bulkAllocateSelected({
         leave_type_id: Number(bulkForm.leave_type_id),
         allocated_days: Number(bulkForm.allocated_days),
@@ -251,7 +269,7 @@ const LeaveAllocationView = () => {
         carried_over_days: Number(bulkForm.carried_over_days || 0),
         user_ids: bulkForm.user_ids,
       });
-      
+
       if (result.success) {
         setSuccessMessage(result.message || 'Bulk allocation successful');
         setShowBulkModal(false);
@@ -268,7 +286,7 @@ const LeaveAllocationView = () => {
 
   const handleBulkAllocateAll = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       const result = await bulkAllocateAll({
         leave_type_id: Number(bulkAllForm.leave_type_id),
@@ -277,7 +295,7 @@ const LeaveAllocationView = () => {
         cycle_end_date: bulkAllForm.cycle_end_date!,
         carried_over_days: Number(bulkAllForm.carried_over_days || 0),
       });
-      
+
       if (result.success) {
         setSuccessMessage(result.message || 'Allocation to all users successful');
         setShowBulkAllModal(false);
@@ -294,10 +312,10 @@ const LeaveAllocationView = () => {
 
   const handleDeleteAllocation = async () => {
     if (!selectedAllocation) return;
-    
+
     try {
       const result = await deleteAllocation(selectedAllocation.id);
-      
+
       if (result.success) {
         setSuccessMessage(result.message || 'Allocation deleted successfully');
         setShowDeleteModal(false);
@@ -309,6 +327,23 @@ const LeaveAllocationView = () => {
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred while deleting allocation');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedAllocationIds.length === 0) return;
+
+    try {
+      const deletePromises = selectedAllocationIds.map(id => deleteAllocation(id));
+      await Promise.all(deletePromises);
+
+      setSuccessMessage(`Successfully deleted ${selectedAllocationIds.length} allocations`);
+      setSelectedAllocationIds([]);
+      setSelectAllMode('none');
+      fetchData();
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      setError(err.message || 'An error occurred during bulk delete');
     }
   };
 
@@ -354,6 +389,11 @@ const LeaveAllocationView = () => {
     setShowDeleteModal(true);
   };
 
+  const openDetailsModal = (allocation: LeaveAllocation) => {
+    setSelectedAllocation(allocation);
+    setShowDetailsModal(true);
+  };
+
   // Reset forms
   const resetCreateForm = () => {
     setCreateForm({
@@ -395,130 +435,190 @@ const LeaveAllocationView = () => {
     });
   };
 
-  // Filter allocations
+  // Toggle selection
+  const toggleSelection = (id: number) => {
+    setSelectedAllocationIds(prev =>
+      prev.includes(id) ? prev.filter(aid => aid !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectAllMode === 'all') {
+      setSelectedAllocationIds([]);
+      setSelectAllMode('none');
+    } else if (selectAllMode === 'none') {
+      setSelectedAllocationIds(allocations.map(a => a.id));
+      setSelectAllMode('current');
+    } else {
+      setSelectedAllocationIds([]);
+      setSelectAllMode('none');
+    }
+  };
+
+  const isSelected = (id: number) => {
+    if (selectAllMode === 'all') return true;
+    return selectedAllocationIds.includes(id);
+  };
+
+  // Export to CSV
+  const exportToCSV = () => {
+    const headers = ['Staff Name', 'Email', 'Leave Type', 'Allocated Days', 'Used Days', 'Remaining Days', 'Carried Over', 'Cycle Start', 'Cycle End'];
+    const data = allocations.map(a => [
+      a.user_name || '',
+      staffMembers.find(s => s.id === a.user_id)?.email || '',
+      a.leave_type_name || '',
+      Number(a.allocated_days),
+      Number(a.used_days),
+      Number(a.allocated_days) - Number(a.used_days),
+      Number(a.carried_over_days),
+      new Date(a.cycle_start_date).toLocaleDateString(),
+      new Date(a.cycle_end_date).toLocaleDateString()
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `leave_allocations_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
+
+  // Calculate stats
+  const totalAllocated = allocations.reduce((sum, a) => sum + (Number(a.allocated_days) || 0), 0);
+  const totalUsed = allocations.reduce((sum, a) => sum + (Number(a.used_days) || 0), 0);
+  const totalRemaining = totalAllocated - totalUsed;
+  const avgUtilization = totalAllocated > 0 ? (totalUsed / totalAllocated) * 100 : 0;
+
+  // Get cycle year from cycle_end_date
+  const getCycleYear = (dateString: string) => {
+    return new Date(dateString).getFullYear();
+  };
+
+  // Filter allocations by year
   const filteredAllocations = allocations.filter(allocation => {
-    const matchesSearch = searchTerm === '' || 
+    const matchesSearch = searchTerm === '' ||
                          allocation.user_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          allocation.leave_type_name?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesUser = !selectedUserId || allocation.user_id === Number(selectedUserId);
     const matchesLeaveType = !selectedLeaveTypeId || allocation.leave_type_id === Number(selectedLeaveTypeId);
+    const matchesYear = !selectedYear || getCycleYear(allocation.cycle_end_date) === selectedYear;
 
-    return matchesSearch && matchesUser && matchesLeaveType;
+    return matchesSearch && matchesUser && matchesLeaveType && matchesYear;
   });
 
   // Calculate remaining days
   const calculateRemaining = (allocated: number, used: number) => allocated - used;
 
+  // Get remaining color class
+  const getRemainingColor = (remaining: number) => {
+    if (remaining < 5) return 'text-red-600 bg-red-50';
+    if (remaining < 10) return 'text-yellow-600 bg-yellow-50';
+    return 'text-green-600 bg-green-50';
+  };
+
+  // Get progress bar color
+  const getProgressColor = (percentage: number) => {
+    if (percentage > 90) return 'bg-red-500';
+    if (percentage > 70) return 'bg-yellow-500';
+    return 'bg-green-500';
+  };
+
   return (
     <div className="p-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Leave Allocations</h1>
-        <p className="text-gray-600 mt-1">Manage employee leave allocations and balances</p>
+        <h1 className="text-2xl font-bold text-primary">Leave Allocations</h1>
+        <p className="text-secondary mt-1">Manage employee leave day allocations and balances</p>
       </div>
 
       {/* Success/Error Messages */}
       {successMessage && (
-        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
-          <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
+        <div className="mb-6 p-4 bg-success-100 border border-success-500 rounded-lg flex items-start gap-3 animate-fade-in">
+          <CheckCircle className="w-5 h-5 text-success-500 mt-0.5" />
           <div>
-            <p className="text-sm font-medium text-green-900">{successMessage}</p>
+            <p className="text-sm font-medium text-success-700">{successMessage}</p>
           </div>
           <button
             onClick={() => setSuccessMessage(null)}
-            className="ml-auto text-green-600 hover:text-green-800"
+            className="ml-auto text-success-600 hover:text-success-800"
           >
-            ×
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+        <div className="mb-6 p-4 bg-error-100 border border-error-500 rounded-lg flex items-start gap-3 animate-fade-in">
+          <AlertCircle className="w-5 h-5 text-error-500 mt-0.5" />
           <div>
-            <p className="text-sm font-medium text-red-900">{error}</p>
+            <p className="text-sm font-medium text-error-700">{error}</p>
           </div>
           <button
             onClick={() => setError(null)}
-            className="ml-auto text-red-600 hover:text-red-800"
+            className="ml-auto text-error-600 hover:text-error-800"
           >
-            ×
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Stats Cards - Compact design to fit all 4 on one line */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {/* Total Allocations Card */}
-        <div
-          className="card p-3 transition-all hover-lift"
-        >
-          <div className="flex items-center gap-2">
-            <div className="icon-wrapper" style={{ backgroundColor: '#dbeafe', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
-              <Users className="w-3 h-3" style={{ color: '#2563eb' }} />
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="card p-4 transition-all hover-lift">
+          <div className="flex items-center gap-3">
+            <div className="icon-wrapper" style={{ backgroundColor: 'var(--primary-100)', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Users className="w-5 h-5" style={{ color: 'var(--primary-600)' }} />
             </div>
             <div>
-              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Total Allocations</p>
-              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{allocations.length}</p>
+              <p className="text-muted">Total Allocations</p>
+              <p className="text-2xl font-bold text-primary">{allocations.length}</p>
             </div>
           </div>
         </div>
 
-        {/* Total Days Allocated Card */}
-        <div
-          className="card p-3 transition-all hover-lift"
-        >
-          <div className="flex items-center gap-2">
-            <div className="icon-wrapper" style={{ backgroundColor: '#dcfce7', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
-              <CheckCircle className="w-3 h-3" style={{ color: '#16a34a' }} />
+        <div className="card p-4 transition-all hover-lift">
+          <div className="flex items-center gap-3">
+            <div className="icon-wrapper" style={{ backgroundColor: 'var(--success-100)', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CheckCircle className="w-5 h-5" style={{ color: 'var(--success-500)' }} />
             </div>
             <div>
-              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Days Allocated</p>
-              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>
-                {allocations.reduce((sum, a) => sum + (Number(a.allocated_days) || 0), 0)}
-              </p>
+              <p className="text-muted">Days Allocated</p>
+              <p className="text-2xl font-bold text-success-600">{totalAllocated}</p>
             </div>
           </div>
         </div>
 
-        {/* Days Used Card */}
-        <div
-          className="card p-3 transition-all hover-lift"
-        >
-          <div className="flex items-center gap-2">
-            <div className="icon-wrapper" style={{ backgroundColor: '#fef9c3', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
-              <Calendar className="w-3 h-3" style={{ color: '#ca8a04' }} />
+        <div className="card p-4 transition-all hover-lift">
+          <div className="flex items-center gap-3">
+            <div className="icon-wrapper" style={{ backgroundColor: 'var(--warning-100)', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Calendar className="w-5 h-5" style={{ color: 'var(--warning-500)' }} />
             </div>
             <div>
-              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Days Used</p>
-              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>
-                {allocations.reduce((sum, a) => sum + (Number(a.used_days) || 0), 0)}
-              </p>
+              <p className="text-muted">Days Used</p>
+              <p className="text-2xl font-bold text-warning-600">{totalUsed}</p>
             </div>
           </div>
         </div>
 
-        {/* Days Remaining Card */}
-        <div
-          className="card p-3 transition-all hover-lift"
-        >
-          <div className="flex items-center gap-2">
-            <div className="icon-wrapper" style={{ backgroundColor: '#d1fae5', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
-              <TrendingUp className="w-3 h-3" style={{ color: '#10b981' }} />
+        <div className="card p-4 transition-all hover-lift">
+          <div className="flex items-center gap-3">
+            <div className="icon-wrapper" style={{ backgroundColor: '#d1fae5', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <TrendingUp className="w-5 h-5" style={{ color: 'var(--success-500)' }} />
             </div>
             <div>
-              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Days Remaining</p>
-              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>
-                {allocations.reduce((sum, a) => sum + ((Number(a.allocated_days) || 0) - (Number(a.used_days) || 0)), 0)}
-              </p>
+              <p className="text-muted">Days Remaining</p>
+              <p className="text-2xl font-bold text-success-600">{totalRemaining}</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Action Buttons and Search - Similar to Leave Management */}
+      {/* Action Buttons and Search */}
       <div className="card p-4 mb-6">
         <div className="flex items-center gap-4 flex-wrap">
           <button
@@ -551,7 +651,26 @@ const LeaveAllocationView = () => {
             Allocate to All
           </button>
 
+          {selectedAllocationIds.length > 0 || selectAllMode !== 'none' ? (
+            <button
+              onClick={handleBulkDelete}
+              className="btn btn-sm btn-danger"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete ({selectAllMode === 'all' ? 'All' : selectedAllocationIds.length})
+            </button>
+          ) : null}
+
           <div className="flex-1"></div>
+
+          <button
+            onClick={exportToCSV}
+            className="btn btn-sm btn-outline"
+            title="Export to CSV"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export
+          </button>
 
           <div className="input-wrapper" style={{ minWidth: '250px' }}>
             <div className="input-icon">
@@ -585,53 +704,74 @@ const LeaveAllocationView = () => {
 
         {/* Filters Panel */}
         {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 p-4 rounded" style={{ backgroundColor: '#f9fafb', border: '1px solid #e5e7eb' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4 p-4 rounded" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-light)' }}>
             <div>
-              <label style={{ fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', display: 'block', color: '#374151' }}>
-                Filter by Staff
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <CalendarDays className="w-4 h-4 inline mr-1" />
+                Cycle Year
+              </label>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value ? Number(e.target.value) : '')}
+                className="input w-full"
+                style={{ backgroundColor: 'white', color: '#1f2937' }}
+              >
+                <option value="">All Years</option>
+                {availableYears.map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Users className="w-4 h-4 inline mr-1" />
+                Staff Member
               </label>
               <select
                 value={selectedUserId}
                 onChange={(e) => setSelectedUserId(e.target.value ? Number(e.target.value) : '')}
-                className="input"
+                className="input w-full"
                 style={{ backgroundColor: 'white', color: '#1f2937' }}
               >
                 <option value="">All Staff</option>
                 {staffMembers.map(staff => (
-                  <option key={staff.id} value={staff.id} style={{ color: '#1f2937' }}>
+                  <option key={staff.id} value={staff.id}>
                     {staff.name} {staff.staff_id ? `(${staff.staff_id})` : ''}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', display: 'block', color: '#374151' }}>
-                Filter by Leave Type
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <FileText className="w-4 h-4 inline mr-1" />
+                Leave Type
               </label>
               <select
                 value={selectedLeaveTypeId}
                 onChange={(e) => setSelectedLeaveTypeId(e.target.value ? Number(e.target.value) : '')}
-                className="input"
+                className="input w-full"
                 style={{ backgroundColor: 'white', color: '#1f2937' }}
               >
                 <option value="">All Leave Types</option>
                 {leaveTypes.map(type => (
-                  <option key={type.id} value={type.id} style={{ color: '#1f2937' }}>
+                  <option key={type.id} value={type.id}>
                     {type.name}
                   </option>
                 ))}
               </select>
             </div>
-            {(selectedUserId || selectedLeaveTypeId) && (
-              <div className="md:col-span-2">
+            {(selectedUserId || selectedLeaveTypeId || selectedYear) && (
+              <div className="lg:col-span-3">
                 <button
                   type="button"
                   onClick={() => {
                     setSelectedUserId('');
                     setSelectedLeaveTypeId('');
+                    setSelectedYear('');
                   }}
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  className="text-sm text-primary-600 hover:text-primary-800 font-medium flex items-center gap-1"
                 >
+                  <X className="w-3 h-3" />
                   Clear All Filters
                 </button>
               </div>
@@ -640,12 +780,40 @@ const LeaveAllocationView = () => {
         )}
       </div>
 
+      {/* Bulk Selection Info */}
+      {(selectedAllocationIds.length > 0 || selectAllMode !== 'none') && (
+        <div className="mb-4 p-3 bg-primary-50 border border-primary-200 rounded-lg flex items-center justify-between">
+          <span className="text-sm text-primary-800">
+            {selectAllMode === 'all'
+              ? 'All allocations selected'
+              : `${selectedAllocationIds.length} allocation${selectedAllocationIds.length > 1 ? 's' : ''} selected`}
+          </span>
+          <button
+            onClick={() => {
+              setSelectedAllocationIds([]);
+              setSelectAllMode('none');
+            }}
+            className="text-sm text-primary-600 hover:text-primary-800 font-medium"
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
+
       {/* Allocations Table */}
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="table">
             <thead className="table-header">
               <tr>
+                <th className="table-header-cell" style={{ width: '50px' }}>
+                  <input
+                    type="checkbox"
+                    checked={selectAllMode !== 'none'}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                </th>
                 <th className="table-header-cell">Staff Member</th>
                 <th className="table-header-cell">Leave Type</th>
                 <th className="table-header-cell">Allocated</th>
@@ -659,18 +827,18 @@ const LeaveAllocationView = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center">
+                  <td colSpan={9} className="px-6 py-12 text-center">
                     <div className="flex justify-center items-center gap-2">
-                      <RefreshCw className="w-5 h-5 animate-spin text-blue-600" />
+                      <RefreshCw className="w-5 h-5 animate-spin text-primary-600" />
                       <span className="text-gray-600">Loading allocations...</span>
                     </div>
                   </td>
                 </tr>
               ) : filteredAllocations.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center">
-                    <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
-                      <Users className="w-8 h-8 text-blue-500" />
+                  <td colSpan={9} className="px-6 py-12 text-center">
+                    <div className="w-16 h-16 rounded-full bg-primary-50 flex items-center justify-center mx-auto mb-4">
+                      <Users className="w-8 h-8 text-primary-500" />
                     </div>
                     <p className="text-gray-500 font-medium mb-1">No allocations found</p>
                     <p className="text-gray-400 text-sm">Create a new allocation to get started</p>
@@ -684,86 +852,89 @@ const LeaveAllocationView = () => {
                   const percentage = allocated > 0 ? (used / allocated) * 100 : 0;
 
                   return (
-                    <tr key={allocation.id} className="table-row">
+                    <tr key={allocation.id} className="table-row hover:bg-gray-50">
+                      <td className="table-cell">
+                        <input
+                          type="checkbox"
+                          checked={isSelected(allocation.id)}
+                          onChange={() => toggleSelection(allocation.id)}
+                          className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        />
+                      </td>
                       <td className="table-cell">
                         <div>
-                          <p style={{ fontWeight: 500, fontSize: '0.875rem' }}>
-                            {allocation.user_name || `User ${allocation.user_id}`}
-                          </p>
+                          <p className="font-medium text-primary">{allocation.user_name || `User ${allocation.user_id}`}</p>
                           <p className="text-xs text-muted">ID: {allocation.user_id}</p>
                         </div>
                       </td>
                       <td className="table-cell">
-                        <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                        <span className="text-sm font-medium text-gray-700">
                           {allocation.leave_type_name || `Type ${allocation.leave_type_id}`}
                         </span>
                       </td>
                       <td className="table-cell">
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', borderRadius: '0.375rem', backgroundColor: '#dcfce7' }}>
-                          <CheckCircle className="w-3 h-3" style={{ color: '#16a34a' }} />
-                          <span style={{ fontWeight: 600, fontSize: '0.875rem', color: '#16a34a' }}>
-                            {allocated}
-                          </span>
+                        <div className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-success-50">
+                          <CheckCircle className="w-3 h-3 text-success-600" />
+                          <span className="font-semibold text-sm text-success-700">{allocated}</span>
                         </div>
                       </td>
                       <td className="table-cell">
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', borderRadius: '0.375rem', backgroundColor: '#fef3c7' }}>
-                          <Calendar className="w-3 h-3" style={{ color: '#f59e0b' }} />
-                          <span style={{ fontWeight: 600, fontSize: '0.875rem', color: '#f59e0b' }}>
-                            {used}
-                          </span>
+                        <div className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-warning-50">
+                          <Calendar className="w-3 h-3 text-warning-600" />
+                          <span className="font-semibold text-sm text-warning-700">{used}</span>
                         </div>
                       </td>
                       <td className="table-cell">
                         <div>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-sm font-medium ${
-                              remaining < 5 ? 'text-red-600' :
-                              remaining < 10 ? 'text-yellow-600' : 'text-green-600'
-                            }`}>
-                              {remaining} days
-                            </span>
+                          <div className={`inline-flex items-center gap-2 px-2 py-1 rounded-md ${getRemainingColor(remaining)}`}>
+                            <span className="font-semibold text-sm">{remaining} days</span>
                           </div>
                           <div className="mt-1 w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
                             <div
-                              className={`h-full rounded-full ${
-                                percentage > 90 ? 'bg-red-500' :
-                                percentage > 70 ? 'bg-yellow-500' : 'bg-green-500'
-                              }`}
+                              className={`h-full rounded-full transition-all ${getProgressColor(percentage)}`}
                               style={{ width: `${Math.min(percentage, 100)}%` }}
                             />
                           </div>
                         </div>
                       </td>
                       <td className="table-cell">
-                        <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                        <span className="text-sm text-gray-600">
                           {Number(allocation.carried_over_days) || 0}
                         </span>
                         <span className="text-xs text-muted ml-1">days</span>
                       </td>
                       <td className="table-cell">
                         <div>
-                          <p style={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                          <p className="text-sm font-medium text-gray-700">
                             <Calendar className="inline w-3 h-3 mr-1" />
-                            {new Date(allocation.cycle_start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            {new Date(allocation.cycle_start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </p>
                           <p className="text-xs text-muted">
-                            to {new Date(allocation.cycle_end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            to {new Date(allocation.cycle_end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </p>
                         </div>
                       </td>
                       <td className="table-cell right">
                         <div className="flex items-center justify-end gap-2">
                           <button
+                            onClick={() => openDetailsModal(allocation)}
+                            className="btn btn-sm btn-outline"
+                            title="View Details"
+                          >
+                            <Eye className="w-3 h-3" />
+                          </button>
+                          <button
                             onClick={() => openEditModal(allocation)}
-                            className="btn btn-sm btn-outline green"
+                            className="btn btn-sm btn-outline"
+                            style={{ borderColor: '#059669', color: '#059669' }}
                             title="Edit"
                           >
-                            <Edit className="w-3 h-3" />
+                            <Edit3 className="w-3 h-3" />
                           </button>
                           <button
                             onClick={() => openDeleteModal(allocation)}
-                            className="btn btn-sm btn-outline red"
+                            className="btn btn-sm btn-outline"
+                            style={{ borderColor: '#dc2626', color: '#dc2626' }}
                             title="Delete"
                           >
                             <Trash2 className="w-3 h-3" />
@@ -780,19 +951,32 @@ const LeaveAllocationView = () => {
 
         {/* Pagination */}
         {pagination && pagination.totalPages > 1 && (
-          <div className="p-4 border-t" style={{ backgroundColor: '#f9fafb' }}>
+          <div className="p-4 border-t" style={{ backgroundColor: 'var(--bg-secondary)' }}>
             <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div className="text-sm" style={{ color: '#6b7280' }}>
-                Showing <span style={{ fontWeight: 600, color: '#111827' }}>{((currentPage - 1) * limit) + 1}</span> to{' '}
-                <span style={{ fontWeight: 600, color: '#111827' }}>{Math.min(currentPage * limit, pagination.totalRecords)}</span> of{' '}
-                <span style={{ fontWeight: 600, color: '#111827' }}>{pagination.totalRecords}</span> allocations
+              <div className="flex items-center gap-4">
+                <div className="text-sm text-gray-600">
+                  Showing <span className="font-semibold text-gray-900">{((currentPage - 1) * limit) + 1}</span> to{' '}
+                  <span className="font-semibold text-gray-900">{Math.min(currentPage * limit, pagination.totalRecords)}</span> of{' '}
+                  <span className="font-semibold text-gray-900">{pagination.totalRecords}</span> allocations
+                </div>
+                <select
+                  value={limit}
+                  onChange={(e) => setLimit(Number(e.target.value))}
+                  className="input input-sm"
+                  style={{ backgroundColor: 'white', color: '#1f2937', padding: '0.25rem 0.5rem' }}
+                >
+                  <option value={10}>10 / page</option>
+                  <option value={20}>20 / page</option>
+                  <option value={50}>50 / page</option>
+                  <option value={100}>100 / page</option>
+                </select>
               </div>
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
                   className="flex items-center gap-1 px-3 py-1.5 border rounded-lg hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                  style={{ 
+                  style={{
                     backgroundColor: currentPage === 1 ? '#f3f4f6' : 'white',
                     borderColor: '#e5e7eb',
                     color: currentPage === 1 ? '#9ca3af' : '#374151',
@@ -824,8 +1008,8 @@ const LeaveAllocationView = () => {
                       onClick={() => setCurrentPage(pageNum)}
                       className="min-w-[2.5rem] px-2 py-1.5 border rounded-lg transition-all"
                       style={{
-                        backgroundColor: currentPage === pageNum ? '#2563eb' : 'white',
-                        borderColor: currentPage === pageNum ? '#2563eb' : '#e5e7eb',
+                        backgroundColor: currentPage === pageNum ? 'var(--primary-600)' : 'white',
+                        borderColor: currentPage === pageNum ? 'var(--primary-600)' : '#e5e7eb',
                         color: currentPage === pageNum ? 'white' : '#374151',
                         fontSize: '0.875rem',
                         fontWeight: currentPage === pageNum ? 600 : 500,
@@ -841,7 +1025,7 @@ const LeaveAllocationView = () => {
                   onClick={() => setCurrentPage(prev => Math.min(pagination.totalPages, prev + 1))}
                   disabled={currentPage === pagination.totalPages}
                   className="flex items-center gap-1 px-3 py-1.5 border rounded-lg hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                  style={{ 
+                  style={{
                     backgroundColor: currentPage === pagination.totalPages ? '#f3f4f6' : 'white',
                     borderColor: '#e5e7eb',
                     color: currentPage === pagination.totalPages ? '#9ca3af' : '#374151',
@@ -863,38 +1047,26 @@ const LeaveAllocationView = () => {
       {/* Create Allocation Modal */}
       {showCreateModal && (
         <>
-          <div className="modal-overlay" onClick={() => { setShowCreateModal(false); resetCreateForm(); }} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(15, 23, 42, 0.5)' }}></div>
-          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100000, maxWidth: '42rem', width: 'calc(100% - 2rem)', margin: 0, backgroundColor: 'white', borderRadius: '1rem', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
-            <div className="modal-header" style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e5e7eb' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: '#2563eb',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
+          <div className="modal-overlay" onClick={() => { setShowCreateModal(false); resetCreateForm(); }}></div>
+          <div className="modal modal-lg">
+            <div className="modal-header">
+              <div className="flex items-center gap-3">
+                <div className="icon-wrapper" style={{ backgroundColor: 'var(--primary-600)', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Plus className="w-5 h-5" style={{ color: 'white' }} />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0, color: '#111827' }}>Create Leave Allocation</h3>
-                  <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>Allocate leave days to a staff member</p>
+                  <h3 className="modal-title">Create Leave Allocation</h3>
+                  <p className="text-sm text-muted">Allocate leave days to a staff member</p>
                 </div>
               </div>
               <button
                 className="btn btn-ghost btn-icon"
-                style={{ width: '2.25rem', height: '2.25rem', borderRadius: '0.5rem' }}
                 onClick={() => { setShowCreateModal(false); resetCreateForm(); }}
-                title="Close modal"
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="modal-content" style={{ padding: '1.5rem' }}>
+            <div className="modal-content">
               <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -987,7 +1159,7 @@ const LeaveAllocationView = () => {
                 </div>
               </div>
             </div>
-            <div className="modal-footer" style={{ padding: '1rem 1.5rem', backgroundColor: '#f9fafb', borderTop: '1px solid #e5e7eb' }}>
+            <div className="modal-footer">
               <button
                 type="button"
                 onClick={() => { setShowCreateModal(false); resetCreateForm(); }}
@@ -1010,38 +1182,26 @@ const LeaveAllocationView = () => {
       {/* Bulk Allocation Modal */}
       {showBulkModal && (
         <>
-          <div className="modal-overlay" onClick={() => setShowBulkModal(false)} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(15, 23, 42, 0.5)' }}></div>
-          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100000, maxWidth: '48rem', width: 'calc(100% - 2rem)', margin: 0, backgroundColor: 'white', borderRadius: '1rem', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
-            <div className="modal-header" style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e5e7eb' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ 
-                  width: '2.5rem', 
-                  height: '2.5rem', 
-                  borderRadius: '0.5rem', 
-                  backgroundColor: '#2563eb', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center' 
-                }}>
+          <div className="modal-overlay" onClick={() => setShowBulkModal(false)}></div>
+          <div className="modal modal-lg">
+            <div className="modal-header">
+              <div className="flex items-center gap-3">
+                <div className="icon-wrapper" style={{ backgroundColor: 'var(--primary-600)', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Users className="w-5 h-5" style={{ color: 'white' }} />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>Bulk Allocate to Selected Users</h3>
-                  <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>Allocate leave days to multiple staff members</p>
+                  <h3 className="modal-title">Bulk Allocate to Selected Users</h3>
+                  <p className="text-sm text-muted">Allocate leave days to multiple staff members</p>
                 </div>
               </div>
-              <button 
-                className="btn btn-ghost btn-icon" 
-                style={{ width: '2.25rem', height: '2.25rem', borderRadius: '0.5rem' }} 
+              <button
+                className="btn btn-ghost btn-icon"
                 onClick={() => setShowBulkModal(false)}
-                title="Close modal"
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="modal-content" style={{ padding: '1.5rem' }}>
+            <div className="modal-content">
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1050,7 +1210,7 @@ const LeaveAllocationView = () => {
                   <select
                     value={bulkForm.leave_type_id || ''}
                     onChange={(e) => setBulkForm({ ...bulkForm, leave_type_id: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="input w-full"
                     required
                     style={{ backgroundColor: 'white', color: '#1f2937' }}
                   >
@@ -1071,7 +1231,7 @@ const LeaveAllocationView = () => {
                     min="0"
                     value={bulkForm.allocated_days || ''}
                     onChange={(e) => setBulkForm({ ...bulkForm, allocated_days: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="input w-full"
                     required
                   />
                 </div>
@@ -1087,45 +1247,41 @@ const LeaveAllocationView = () => {
                         placeholder="Search staff by name or email..."
                         value={bulkStaffSearch}
                         onChange={(e) => setBulkStaffSearch(e.target.value)}
-                        className="w-full px-4 py-2.5 pl-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-4 py-2.5 pl-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         style={{ backgroundColor: 'white', color: '#1f2937' }}
                       />
-                      <svg className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
+                      <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     </div>
-                    
+
                     {/* Selected staff pills */}
                     {bulkForm.user_ids && bulkForm.user_ids.length > 0 && (
-                      <div className="flex flex-wrap gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                        <span className="text-xs font-medium text-blue-800 py-1">Selected:</span>
+                      <div className="flex flex-wrap gap-2 p-3 bg-primary-50 rounded-lg border border-primary-200">
+                        <span className="text-xs font-medium text-primary-800 py-1">Selected:</span>
                         {bulkForm.user_ids.map(userId => {
                           const staff = staffMembers.find(s => s.id === userId);
                           if (!staff) return null;
                           return (
-                            <span 
+                            <span
                               key={userId}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-white text-blue-700 rounded-full text-sm border border-blue-300"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-white text-primary-700 rounded-full text-sm border border-primary-300"
                             >
                               {staff.name}
                               <button
                                 type="button"
-                                onClick={() => setBulkForm({ 
-                                  ...bulkForm, 
-                                  user_ids: bulkForm.user_ids.filter(id => id !== userId) 
+                                onClick={() => setBulkForm({
+                                  ...bulkForm,
+                                  user_ids: bulkForm.user_ids?.filter(id => id !== userId)
                                 })}
-                                className="hover:text-blue-900"
+                                className="hover:text-primary-900"
                               >
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                                <X className="w-3.5 h-3.5" />
                               </button>
                             </span>
                           );
                         })}
                       </div>
                     )}
-                    
+
                     {/* Search results */}
                     <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto bg-white" style={{ backgroundColor: 'white' }}>
                       {bulkStaffSearch ? (
@@ -1133,21 +1289,21 @@ const LeaveAllocationView = () => {
                           {staffMembers.filter(staff => {
                             const search = bulkStaffSearch.toLowerCase();
                             const isAlreadySelected = bulkForm.user_ids?.includes(staff.id);
-                            return (staff.name.toLowerCase().includes(search) || 
+                            return (staff.name.toLowerCase().includes(search) ||
                                    staff.email.toLowerCase().includes(search)) &&
                                    !isAlreadySelected;
                           }).map(staff => (
                             <button
                               key={staff.id}
                               type="button"
-                              onClick={() => setBulkForm({ 
-                                ...bulkForm, 
-                                user_ids: [...(bulkForm.user_ids || []), staff.id] 
+                              onClick={() => setBulkForm({
+                                ...bulkForm,
+                                user_ids: [...(bulkForm.user_ids || []), staff.id]
                               })}
-                              className="w-full flex items-center gap-3 p-2 hover:bg-blue-50 rounded-lg transition-colors text-left"
+                              className="w-full flex items-center gap-3 p-2 hover:bg-primary-50 rounded-lg transition-colors text-left"
                             >
-                              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                                <span className="text-xs font-medium text-blue-600">
+                              <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
+                                <span className="text-xs font-medium text-primary-600">
                                   {staff.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                                 </span>
                               </div>
@@ -1155,15 +1311,13 @@ const LeaveAllocationView = () => {
                                 <div className="text-sm font-medium text-gray-900">{staff.name}</div>
                                 <div className="text-xs text-gray-500 truncate">{staff.email}</div>
                               </div>
-                              <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                              </svg>
+                              <Plus className="w-5 h-5 text-gray-400" />
                             </button>
                           ))}
                           {staffMembers.filter(staff => {
                             const search = bulkStaffSearch.toLowerCase();
                             const isAlreadySelected = bulkForm.user_ids?.includes(staff.id);
-                            return (staff.name.toLowerCase().includes(search) || 
+                            return (staff.name.toLowerCase().includes(search) ||
                                    staff.email.toLowerCase().includes(search)) &&
                                    !isAlreadySelected;
                           }).length === 0 && (
@@ -1178,13 +1332,13 @@ const LeaveAllocationView = () => {
                         </div>
                       )}
                     </div>
-                    
+
                     {/* Quick actions */}
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={() => setBulkForm({ ...bulkForm, user_ids: staffMembers.map(s => s.id) })}
-                        className="text-xs px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors font-medium"
+                        className="text-xs px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg hover:bg-primary-100 transition-colors font-medium"
                       >
                         Select All ({staffMembers.length})
                       </button>
@@ -1209,7 +1363,7 @@ const LeaveAllocationView = () => {
                       type="date"
                       value={bulkForm.cycle_start_date}
                       onChange={(e) => setBulkForm({ ...bulkForm, cycle_start_date: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="input w-full"
                       required
                     />
                   </div>
@@ -1221,7 +1375,7 @@ const LeaveAllocationView = () => {
                       type="date"
                       value={bulkForm.cycle_end_date}
                       onChange={(e) => setBulkForm({ ...bulkForm, cycle_end_date: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="input w-full"
                       required
                     />
                   </div>
@@ -1235,12 +1389,12 @@ const LeaveAllocationView = () => {
                     min="0"
                     value={bulkForm.carried_over_days || ''}
                     onChange={(e) => setBulkForm({ ...bulkForm, carried_over_days: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="input w-full"
                   />
                 </div>
               </div>
             </div>
-            <div className="modal-footer" style={{ padding: '1rem 1.5rem', backgroundColor: '#f9fafb' }}>
+            <div className="modal-footer">
               <button
                 type="button"
                 onClick={() => {
@@ -1267,38 +1421,26 @@ const LeaveAllocationView = () => {
       {/* Bulk Allocate All Modal */}
       {showBulkAllModal && (
         <>
-          <div className="modal-overlay" onClick={() => setShowBulkAllModal(false)} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(15, 23, 42, 0.5)' }}></div>
-          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100000, maxWidth: '42rem', width: 'calc(100% - 2rem)', margin: 0, backgroundColor: 'white', borderRadius: '1rem', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
-            <div className="modal-header" style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e5e7eb' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: '#2563eb',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <Users className="w-5 h-5" style={{ color: 'white' }} />
+          <div className="modal-overlay" onClick={() => setShowBulkAllModal(false)}></div>
+          <div className="modal modal-md">
+            <div className="modal-header">
+              <div className="flex items-center gap-3">
+                <div className="icon-wrapper" style={{ backgroundColor: 'var(--primary-600)', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <UserPlus className="w-5 h-5" style={{ color: 'white' }} />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>Allocate to All Active Users</h3>
-                  <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>Create allocations for all active staff members</p>
+                  <h3 className="modal-title">Allocate to All Active Users</h3>
+                  <p className="text-sm text-muted">Create allocations for all active staff members</p>
                 </div>
               </div>
-              <button 
-                className="btn btn-ghost btn-icon" 
-                style={{ width: '2.25rem', height: '2.25rem', borderRadius: '0.5rem' }} 
+              <button
+                className="btn btn-ghost btn-icon"
                 onClick={() => setShowBulkAllModal(false)}
-                title="Close modal"
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="modal-content" style={{ padding: '1.5rem' }}>
+            <div className="modal-content">
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1307,7 +1449,7 @@ const LeaveAllocationView = () => {
                   <select
                     value={bulkAllForm.leave_type_id || ''}
                     onChange={(e) => setBulkAllForm({ ...bulkAllForm, leave_type_id: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="input w-full"
                     required
                     style={{ backgroundColor: 'white', color: '#1f2937' }}
                   >
@@ -1328,7 +1470,7 @@ const LeaveAllocationView = () => {
                     min="0"
                     value={bulkAllForm.allocated_days || ''}
                     onChange={(e) => setBulkAllForm({ ...bulkAllForm, allocated_days: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="input w-full"
                     required
                   />
                 </div>
@@ -1341,7 +1483,7 @@ const LeaveAllocationView = () => {
                       type="date"
                       value={bulkAllForm.cycle_start_date}
                       onChange={(e) => setBulkAllForm({ ...bulkAllForm, cycle_start_date: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="input w-full"
                       required
                     />
                   </div>
@@ -1353,7 +1495,7 @@ const LeaveAllocationView = () => {
                       type="date"
                       value={bulkAllForm.cycle_end_date}
                       onChange={(e) => setBulkAllForm({ ...bulkAllForm, cycle_end_date: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="input w-full"
                       required
                     />
                   </div>
@@ -1367,12 +1509,12 @@ const LeaveAllocationView = () => {
                     min="0"
                     value={bulkAllForm.carried_over_days || ''}
                     onChange={(e) => setBulkAllForm({ ...bulkAllForm, carried_over_days: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="input w-full"
                   />
                 </div>
               </div>
             </div>
-            <div className="modal-footer" style={{ padding: '1rem 1.5rem', backgroundColor: '#f9fafb' }}>
+            <div className="modal-footer">
               <button
                 type="button"
                 onClick={() => {
@@ -1398,28 +1540,20 @@ const LeaveAllocationView = () => {
 
       {/* Edit Allocation Modal */}
       {showEditModal && selectedAllocation && (
-        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(15, 23, 42, 0.5)' }} onClick={() => { setShowEditModal(false); setSelectedAllocation(null); resetEditForm(); }}>
-          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100000, maxWidth: '28rem', width: 'calc(100% - 2rem)', margin: 0, backgroundColor: 'white', borderRadius: '1rem', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
-            <div className="modal-header" style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e5e7eb' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: '0.5rem',
-                  backgroundColor: '#059669',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
+        <div className="modal-overlay" onClick={() => { setShowEditModal(false); setSelectedAllocation(null); resetEditForm(); }}>
+          <div className="modal modal-md">
+            <div className="modal-header">
+              <div className="flex items-center gap-3">
+                <div className="icon-wrapper" style={{ backgroundColor: '#059669', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Edit3 className="w-5 h-5" style={{ color: 'white' }} />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0, color: '#111827' }}>Edit Leave Allocation</h3>
-                  <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>Update allocation details</p>
+                  <h3 className="modal-title">Edit Leave Allocation</h3>
+                  <p className="text-sm text-muted">Update allocation details</p>
                 </div>
               </div>
             </div>
-            <form onSubmit={handleEditAllocation} className="p-6">
+            <form onSubmit={handleEditAllocation} className="modal-content">
               <div className="space-y-4">
                 <div className="bg-gray-50 p-3 rounded-lg">
                   <div className="text-sm text-gray-600">
@@ -1438,7 +1572,7 @@ const LeaveAllocationView = () => {
                     min="0"
                     value={editForm.allocated_days || ''}
                     onChange={(e) => setEditForm({ ...editForm, allocated_days: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="input w-full"
                     required
                   />
                 </div>
@@ -1451,11 +1585,11 @@ const LeaveAllocationView = () => {
                     min="0"
                     value={editForm.used_days || ''}
                     onChange={(e) => setEditForm({ ...editForm, used_days: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="input w-full"
                     required
                   />
                   {editForm.used_days > (editForm.allocated_days + editForm.carried_over_days) && (
-                    <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                    <p className="mt-1 text-sm text-error-600 flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" />
                       Used days cannot exceed allocated + carried over days ({editForm.allocated_days + editForm.carried_over_days})
                     </p>
@@ -1470,19 +1604,19 @@ const LeaveAllocationView = () => {
                     min="0"
                     value={editForm.carried_over_days || ''}
                     onChange={(e) => setEditForm({ ...editForm, carried_over_days: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="input w-full"
                   />
                 </div>
-                <div className="bg-blue-50 p-3 rounded-lg">
-                  <p className="text-sm text-blue-800">
+                <div className="bg-primary-50 p-3 rounded-lg">
+                  <p className="text-sm text-primary-800">
                     <strong>Remaining Days:</strong>{' '}
-                    <span className={editForm.allocated_days + editForm.carried_over_days - editForm.used_days < 0 ? 'text-red-600 font-semibold' : 'text-blue-600 font-semibold'}>
+                    <span className={editForm.allocated_days + editForm.carried_over_days - editForm.used_days < 0 ? 'text-error-600 font-semibold' : 'text-primary-600 font-semibold'}>
                       {editForm.allocated_days + editForm.carried_over_days - editForm.used_days}
                     </span>
                   </p>
                 </div>
               </div>
-              <div className="flex gap-3 mt-6">
+              <div className="modal-footer" style={{ padding: '1rem 0 0 0', backgroundColor: 'transparent' }}>
                 <button
                   type="button"
                   onClick={() => {
@@ -1490,14 +1624,14 @@ const LeaveAllocationView = () => {
                     setSelectedAllocation(null);
                     resetEditForm();
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="btn btn-outline flex-1"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={editForm.used_days > (editForm.allocated_days + editForm.carried_over_days)}
-                  className="flex-1 px-4 py-2 bg-black text-dark rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn btn-primary flex-1"
                 >
                   Update Allocation
                 </button>
@@ -1507,14 +1641,177 @@ const LeaveAllocationView = () => {
         </div>
       )}
 
+      {/* Details Modal */}
+      {showDetailsModal && selectedAllocation && (
+        <div className="modal-overlay" onClick={() => { setShowDetailsModal(false); setSelectedAllocation(null); }}>
+          <div className="modal modal-md">
+            <div className="modal-header">
+              <div className="flex items-center gap-3">
+                <div className="icon-wrapper" style={{ backgroundColor: 'var(--primary-600)', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Eye className="w-5 h-5" style={{ color: 'white' }} />
+                </div>
+                <div>
+                  <h3 className="modal-title">Allocation Details</h3>
+                  <p className="text-sm text-muted">View complete allocation information</p>
+                </div>
+              </div>
+              <button
+                className="btn btn-ghost btn-icon"
+                onClick={() => { setShowDetailsModal(false); setSelectedAllocation(null); }}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="modal-content">
+              <div className="space-y-4">
+                {/* Staff Info */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Staff Information
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-gray-500">Name:</span>
+                      <p className="font-medium text-gray-900">{selectedAllocation.user_name || `User ${selectedAllocation.user_id}`}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">User ID:</span>
+                      <p className="font-medium text-gray-900">{selectedAllocation.user_id}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Leave Type Info */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    Leave Type
+                  </h4>
+                  <div className="text-sm">
+                    <span className="text-gray-500">Type:</span>
+                    <p className="font-medium text-gray-900">{selectedAllocation.leave_type_name || `Type ${selectedAllocation.leave_type_id}`}</p>
+                  </div>
+                </div>
+
+                {/* Allocation Details */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <CalendarDays className="w-4 h-4" />
+                    Allocation Details
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-gray-500">Allocated Days:</span>
+                      <p className="font-semibold text-success-600">{Number(selectedAllocation.allocated_days)}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Used Days:</span>
+                      <p className="font-semibold text-warning-600">{Number(selectedAllocation.used_days)}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Remaining Days:</span>
+                      <p className={`font-semibold ${(Number(selectedAllocation.allocated_days) - Number(selectedAllocation.used_days)) < 5 ? 'text-error-600' : 'text-success-600'}`}>
+                        {Number(selectedAllocation.allocated_days) - Number(selectedAllocation.used_days)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Carried Over:</span>
+                      <p className="font-medium text-gray-900">{Number(selectedAllocation.carried_over_days)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cycle Period */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    Cycle Period
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-gray-500">Start Date:</span>
+                      <p className="font-medium text-gray-900">{new Date(selectedAllocation.cycle_start_date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">End Date:</span>
+                      <p className="font-medium text-gray-900">{new Date(selectedAllocation.cycle_end_date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Usage Progress */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4" />
+                    Usage Progress
+                  </h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Utilization</span>
+                      <span className="font-medium text-gray-900">
+                        {((Number(selectedAllocation.used_days) / Number(selectedAllocation.allocated_days)) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${getProgressColor((Number(selectedAllocation.used_days) / Number(selectedAllocation.allocated_days)) * 100)}`}
+                        style={{ width: `${Math.min((Number(selectedAllocation.used_days) / Number(selectedAllocation.allocated_days)) * 100, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Metadata */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    Metadata
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3 text-xs text-gray-500">
+                    <div>
+                      <span>Created:</span>
+                      <p className="font-medium text-gray-700">{new Date(selectedAllocation.created_at).toLocaleDateString()}</p>
+                    </div>
+                    <div>
+                      <span>Last Updated:</span>
+                      <p className="font-medium text-gray-700">{new Date(selectedAllocation.updated_at).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                onClick={() => { setShowDetailsModal(false); setSelectedAllocation(null); }}
+                className="btn btn-outline"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDetailsModal(false);
+                  openEditModal(selectedAllocation);
+                }}
+                className="btn btn-primary"
+              >
+                Edit Allocation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Confirmation Modal */}
       {showDeleteModal && selectedAllocation && (
-        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(15, 23, 42, 0.5)' }} onClick={() => { setShowDeleteModal(false); setSelectedAllocation(null); }}>
-          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100000, maxWidth: '24rem', width: 'calc(100% - 2rem)', margin: 0, backgroundColor: 'white', borderRadius: '1rem', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+        <div className="modal-overlay" onClick={() => { setShowDeleteModal(false); setSelectedAllocation(null); }}>
+          <div className="modal modal-sm">
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
-                  <AlertCircle className="w-6 h-6 text-red-600" />
+                <div className="w-12 h-12 rounded-full bg-error-100 flex items-center justify-center">
+                  <AlertCircle className="w-6 h-6 text-error-500" />
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">Delete Allocation</h3>
@@ -1523,7 +1820,7 @@ const LeaveAllocationView = () => {
               </div>
               <p className="text-gray-600 mb-6">
                 Are you sure you want to delete this allocation for{' '}
-                <strong>{selectedAllocation.user?.name || `User ${selectedAllocation.userId}`}</strong>?
+                <strong>{selectedAllocation.user_name || `User ${selectedAllocation.user_id}`}</strong>?
               </p>
               <div className="flex gap-3">
                 <button
@@ -1539,7 +1836,7 @@ const LeaveAllocationView = () => {
                 <button
                   type="button"
                   onClick={handleDeleteAllocation}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                  className="flex-1 px-4 py-2 bg-error-500 text-white rounded-lg hover:bg-error-600 transition-colors"
                 >
                   Delete
                 </button>

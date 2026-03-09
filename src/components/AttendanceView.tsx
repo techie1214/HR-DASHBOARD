@@ -992,10 +992,10 @@ const AttendanceView = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
+      {/* <div>
         <h1 className="text-2xl font-bold text-gray-900">Attendance Management</h1>
         <p className="text-gray-600 mt-1">Track and manage employee attendance records</p>
-      </div>
+      </div> */}
 
       {/* Success/Error Messages */}
       {successMessage && (
