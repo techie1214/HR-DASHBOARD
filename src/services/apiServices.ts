@@ -229,6 +229,240 @@ export const apiServices = {
     }
   },
 
+  // Holiday Duty Roster methods
+  async getHolidayDutyRosters(params?: {
+    holidayId?: number;
+    userId?: number;
+  }) {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await axios.get(`${API_ENDPOINT}/holiday-duty-roster`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        params
+      });
+
+      return {
+        success: true,
+        message: "Holiday duty rosters retrieved successfully",
+        data: { rosters: response.data.data?.rosters || response.data.rosters || [] }
+      };
+    } catch (error: any) {
+      console.error('Error fetching holiday duty rosters:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to fetch holiday duty rosters',
+        data: { rosters: [] }
+      };
+    }
+  },
+
+  async getHolidayDutyRosterById(id: number) {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await axios.get(`${API_ENDPOINT}/holiday-duty-roster/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      return {
+        success: true,
+        message: "Holiday duty roster retrieved successfully",
+        data: { roster: response.data.data?.roster || response.data.roster }
+      };
+    } catch (error: any) {
+      console.error('Error fetching holiday duty roster:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to fetch holiday duty roster',
+        data: { roster: null }
+      };
+    }
+  },
+
+  async getHolidayDutyRosterByHolidayId(holidayId: number) {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await axios.get(`${API_ENDPOINT}/holiday-duty-roster/${holidayId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      return {
+        success: true,
+        message: "Holiday duty roster retrieved successfully",
+        data: { rosters: response.data.data?.rosters || response.data.rosters || [] }
+      };
+    } catch (error: any) {
+      console.error('Error fetching holiday duty roster by holiday ID:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to fetch holiday duty roster',
+        data: { rosters: [] }
+      };
+    }
+  },
+
+  async getHolidayDutyRosterByUserId(userId: number) {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await axios.get(`${API_ENDPOINT}/holiday-duty-roster/user/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      return {
+        success: true,
+        message: "User holiday duty rosters retrieved successfully",
+        data: { rosters: response.data.data?.rosters || response.data.rosters || [] }
+      };
+    } catch (error: any) {
+      console.error('Error fetching user holiday duty rosters:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to fetch user holiday duty rosters',
+        data: { rosters: [] }
+      };
+    }
+  },
+
+  async createHolidayDutyRoster(data: any) {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await axios.post(`${API_ENDPOINT}/holiday-duty-roster`, data, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      return {
+        success: true,
+        message: "Holiday duty roster created successfully",
+        data: { roster: response.data.data?.roster || response.data.roster }
+      };
+    } catch (error: any) {
+      console.error('Error creating holiday duty roster:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to create holiday duty roster',
+        data: { roster: null }
+      };
+    }
+  },
+
+  async createBulkHolidayDutyRoster(data: any) {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await axios.post(`${API_ENDPOINT}/holiday-duty-roster/bulk`, data, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      return {
+        success: true,
+        message: "Holiday duty rosters created successfully",
+        data: { rosters: response.data.data?.rosters || response.data.rosters || [] }
+      };
+    } catch (error: any) {
+      console.error('Error creating bulk holiday duty rosters:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to create bulk holiday duty rosters',
+        data: { rosters: [] }
+      };
+    }
+  },
+
+  async updateHolidayDutyRoster(id: number, data: any) {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await axios.put(`${API_ENDPOINT}/holiday-duty-roster/${id}`, data, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      return {
+        success: true,
+        message: "Holiday duty roster updated successfully",
+        data: { roster: response.data.data?.roster || response.data.roster }
+      };
+    } catch (error: any) {
+      console.error('Error updating holiday duty roster:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to update holiday duty roster',
+        data: { roster: null }
+      };
+    }
+  },
+
+  async deleteHolidayDutyRoster(id: number) {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      await axios.delete(`${API_ENDPOINT}/holiday-duty-roster/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        }
+      });
+
+      return {
+        success: true,
+        message: "Holiday duty roster deleted successfully"
+      };
+    } catch (error: any) {
+      console.error('Error deleting holiday duty roster:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to delete holiday duty roster'
+      };
+    }
+  },
+
   // Shift Template methods
   async getShiftTemplates() {
     try {
@@ -237,7 +471,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.get(`${API_ENDPOINT}/shift-templates`, {
+      const response = await axios.get(`${API_ENDPOINT}/shift-scheduling/shift-templates`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -266,7 +500,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.get(`${API_ENDPOINT}/shift-templates/${id}`, {
+      const response = await axios.get(`${API_ENDPOINT}/shift-scheduling/shift-templates/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -295,7 +529,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.post(`${API_ENDPOINT}/shift-templates`, data, {
+      const response = await axios.post(`${API_ENDPOINT}/shift-scheduling/shift-templates`, data, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -324,7 +558,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.put(`${API_ENDPOINT}/shift-templates/${id}`, data, {
+      const response = await axios.put(`${API_ENDPOINT}/shift-scheduling/shift-templates/${id}`, data, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -353,7 +587,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      await axios.delete(`${API_ENDPOINT}/shift-templates/${id}`, {
+      await axios.delete(`${API_ENDPOINT}/shift-scheduling/shift-templates/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         }
@@ -380,7 +614,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.get(`${API_ENDPOINT}/employee-shift-assignments`, {
+      const response = await axios.get(`${API_ENDPOINT}/shift-scheduling/employee-shift-assignments`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -409,7 +643,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.get(`${API_ENDPOINT}/employee-shift-assignments/${id}`, {
+      const response = await axios.get(`${API_ENDPOINT}/shift-scheduling/employee-shift-assignments/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -438,7 +672,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.post(`${API_ENDPOINT}/employee-shift-assignments`, data, {
+      const response = await axios.post(`${API_ENDPOINT}/shift-scheduling/employee-shift-assignments`, data, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -467,7 +701,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.put(`${API_ENDPOINT}/employee-shift-assignments/${id}`, data, {
+      const response = await axios.put(`${API_ENDPOINT}/shift-scheduling/employee-shift-assignments/${id}`, data, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -496,7 +730,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.post(`${API_ENDPOINT}/employee-shift-assignments/bulk`, { assignments }, {
+      const response = await axios.post(`${API_ENDPOINT}/shift-scheduling/employee-shift-assignments/bulk`, { assignments }, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -526,7 +760,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.get(`${API_ENDPOINT}/schedule-requests`, {
+      const response = await axios.get(`${API_ENDPOINT}/shift-scheduling/schedule-requests`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -556,7 +790,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.get(`${API_ENDPOINT}/schedule-requests/${id}`, {
+      const response = await axios.get(`${API_ENDPOINT}/shift-scheduling/schedule-requests/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -585,7 +819,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.post(`${API_ENDPOINT}/schedule-requests`, data, {
+      const response = await axios.post(`${API_ENDPOINT}/shift-scheduling/schedule-requests`, data, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -614,7 +848,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.put(`${API_ENDPOINT}/schedule-requests/${id}`, data, {
+      const response = await axios.put(`${API_ENDPOINT}/shift-scheduling/schedule-requests/${id}`, data, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -643,7 +877,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      await axios.delete(`${API_ENDPOINT}/schedule-requests/${id}`, {
+      await axios.delete(`${API_ENDPOINT}/shift-scheduling/schedule-requests/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         }
@@ -669,7 +903,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.patch(`${API_ENDPOINT}/schedule-requests/${id}/approve`, {}, {
+      const response = await axios.patch(`${API_ENDPOINT}/shift-scheduling/schedule-requests/${id}/approve`, {}, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -698,7 +932,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.patch(`${API_ENDPOINT}/schedule-requests/${id}/reject`, {}, {
+      const response = await axios.patch(`${API_ENDPOINT}/shift-scheduling/schedule-requests/${id}/reject`, {}, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -728,7 +962,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.get(`${API_ENDPOINT}/time-off-banks`, {
+      const response = await axios.get(`${API_ENDPOINT}/shift-scheduling/time-off-banks`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -758,7 +992,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.get(`${API_ENDPOINT}/time-off-banks/my-balance`, {
+      const response = await axios.get(`${API_ENDPOINT}/shift-scheduling/time-off-banks/my-balance`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -787,7 +1021,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.post(`${API_ENDPOINT}/time-off-banks`, data, {
+      const response = await axios.post(`${API_ENDPOINT}/shift-scheduling/time-off-banks`, data, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -817,7 +1051,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.get(`${API_ENDPOINT}/shift-schedules`, {
+      const response = await axios.get(`${API_ENDPOINT}/shift-scheduling/shift-schedules`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -847,7 +1081,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.post(`${API_ENDPOINT}/shift-schedules`, data, {
+      const response = await axios.post(`${API_ENDPOINT}/shift-scheduling/shift-schedules`, data, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -876,7 +1110,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.put(`${API_ENDPOINT}/shift-schedules/${id}`, data, {
+      const response = await axios.put(`${API_ENDPOINT}/shift-scheduling/shift-schedules/${id}`, data, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -905,7 +1139,7 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      await axios.delete(`${API_ENDPOINT}/shift-schedules/${id}`, {
+      await axios.delete(`${API_ENDPOINT}/shift-scheduling/shift-schedules/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         }
@@ -920,6 +1154,208 @@ export const apiServices = {
       return {
         success: false,
         message: error.response?.data?.message || error.message || 'Failed to delete shift schedule'
+      };
+    }
+  },
+
+  // Shift Exception methods
+  async getShiftExceptions(userId: number, params?: { startDate?: string; endDate?: string; }) {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await axios.get(`${API_ENDPOINT}/shift-scheduling/exceptions/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        params
+      });
+
+      return {
+        success: true,
+        message: "Shift exceptions retrieved successfully",
+        data: { exceptions: response.data.data?.exceptions || [] }
+      };
+    } catch (error: any) {
+      console.error('Error fetching shift exceptions:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to fetch shift exceptions',
+        data: { exceptions: [] }
+      };
+    }
+  },
+
+  async getShiftExceptionById(id: number) {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await axios.get(`${API_ENDPOINT}/shift-scheduling/exceptions/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      return {
+        success: true,
+        message: "Shift exception retrieved successfully",
+        data: { exception: response.data.data?.exception }
+      };
+    } catch (error: any) {
+      console.error('Error fetching shift exception:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to fetch shift exception',
+        data: { exception: null }
+      };
+    }
+  },
+
+  async createShiftException(data: any) {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await axios.post(`${API_ENDPOINT}/shift-scheduling/exceptions`, data, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      return {
+        success: true,
+        message: "Shift exception created successfully",
+        data: { exception: response.data.data?.exception }
+      };
+    } catch (error: any) {
+      console.error('Error creating shift exception:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to create shift exception',
+        data: { exception: null }
+      };
+    }
+  },
+
+  async updateShiftException(id: number, data: any) {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await axios.put(`${API_ENDPOINT}/shift-scheduling/exceptions/${id}`, data, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      return {
+        success: true,
+        message: "Shift exception updated successfully",
+        data: { exception: response.data.data?.exception }
+      };
+    } catch (error: any) {
+      console.error('Error updating shift exception:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to update shift exception',
+        data: { exception: null }
+      };
+    }
+  },
+
+  async deleteShiftException(id: number) {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      await axios.delete(`${API_ENDPOINT}/shift-scheduling/exceptions/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        }
+      });
+
+      return {
+        success: true,
+        message: "Shift exception deleted successfully"
+      };
+    } catch (error: any) {
+      console.error('Error deleting shift exception:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to delete shift exception'
+      };
+    }
+  },
+
+  async approveShiftException(id: number) {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await axios.post(`${API_ENDPOINT}/shift-scheduling/exceptions/${id}/approve`, {}, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      return {
+        success: true,
+        message: "Shift exception approved successfully",
+        data: { exception: response.data.data?.exception }
+      };
+    } catch (error: any) {
+      console.error('Error approving shift exception:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to approve shift exception',
+        data: { exception: null }
+      };
+    }
+  },
+
+  async rejectShiftException(id: number) {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await axios.post(`${API_ENDPOINT}/shift-scheduling/exceptions/${id}/reject`, {}, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      return {
+        success: true,
+        message: "Shift exception rejected",
+        data: { exception: response.data.data?.exception }
+      };
+    } catch (error: any) {
+      console.error('Error rejecting shift exception:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to reject shift exception',
+        data: { exception: null }
       };
     }
   },

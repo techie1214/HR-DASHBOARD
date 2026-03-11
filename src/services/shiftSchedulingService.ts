@@ -13,6 +13,9 @@ import {
   UpdateScheduleRequestRequest,
   TimeOffBank,
   CreateTimeOffBankRequest,
+  ShiftException,
+  CreateShiftExceptionRequest,
+  UpdateShiftExceptionRequest,
   ApiResponse
 } from './apiInterfaces';
 
@@ -273,6 +276,76 @@ class ShiftSchedulingService {
       return response;
     } catch (error) {
       console.error('Error creating time off bank:', error);
+      throw error;
+    }
+  }
+
+  async getShiftExceptions(userId: number, params?: { startDate?: string; endDate?: string; }) {
+    try {
+      const response = await apiServices.getShiftExceptions(userId, params);
+      return response;
+    } catch (error) {
+      console.error('Error fetching shift exceptions:', error);
+      throw error;
+    }
+  }
+
+  async getShiftExceptionById(id: number) {
+    try {
+      const response = await apiServices.getShiftExceptionById(id);
+      return response;
+    } catch (error) {
+      console.error(`Error fetching shift exception with id ${id}:`, error);
+      throw error;
+    }
+  }
+
+  async createShiftException(data: CreateShiftExceptionRequest) {
+    try {
+      const response = await apiServices.createShiftException(data);
+      return response;
+    } catch (error) {
+      console.error('Error creating shift exception:', error);
+      throw error;
+    }
+  }
+
+  async updateShiftException(id: number, data: UpdateShiftExceptionRequest) {
+    try {
+      const response = await apiServices.updateShiftException(id, data);
+      return response;
+    } catch (error) {
+      console.error(`Error updating shift exception with id ${id}:`, error);
+      throw error;
+    }
+  }
+
+  async deleteShiftException(id: number) {
+    try {
+      const response = await apiServices.deleteShiftException(id);
+      return response;
+    } catch (error) {
+      console.error(`Error deleting shift exception with id ${id}:`, error);
+      throw error;
+    }
+  }
+
+  async approveShiftException(id: number) {
+    try {
+      const response = await apiServices.approveShiftException(id);
+      return response;
+    } catch (error) {
+      console.error(`Error approving shift exception with id ${id}:`, error);
+      throw error;
+    }
+  }
+
+  async rejectShiftException(id: number) {
+    try {
+      const response = await apiServices.rejectShiftException(id);
+      return response;
+    } catch (error) {
+      console.error(`Error rejecting shift exception with id ${id}:`, error);
       throw error;
     }
   }

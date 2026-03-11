@@ -3,29 +3,31 @@
 // Holiday/Off-day interfaces
 export interface Holiday {
   id: number;
-  name: string;
+  holiday_name: string;
   date: string; // ISO date string
-  category: string;
-  description: string;
-  is_recurring: boolean;
+  branch_id: number | null;
+  branch_name?: string; // Optional, for display purposes
+  is_mandatory: boolean;
+  description: string | null;
+  created_by: number | null;
   created_at: string; // ISO datetime string
   updated_at: string; // ISO datetime string
 }
 
 export interface CreateHolidayRequest {
-  name: string;
+  holiday_name: string;
   date: string; // ISO date string
-  category: string;
-  description: string;
-  is_recurring: boolean;
+  branch_id?: number | null;
+  is_mandatory?: boolean;
+  description?: string | null;
 }
 
 export interface UpdateHolidayRequest {
-  name?: string;
+  holiday_name?: string;
   date?: string; // ISO date string
-  category?: string;
-  description?: string;
-  is_recurring?: boolean;
+  branch_id?: number | null;
+  is_mandatory?: boolean;
+  description?: string | null;
 }
 
 // Shift Template interfaces
@@ -209,6 +211,102 @@ export interface ShiftSchedule {
   status: 'confirmed' | 'pending' | 'cancelled';
   created_at: string; // ISO datetime string
   updated_at: string; // ISO datetime string
+}
+
+// Shift Schedule interface
+export interface ShiftSchedule {
+  id: number;
+  employee_id: number;
+  shift_type: string;
+  date: string; // ISO date string
+  start_time: string; // HH:MM format
+  end_time: string; // HH:MM format
+  department: string;
+  status: 'confirmed' | 'pending' | 'cancelled';
+  created_at: string; // ISO datetime string
+  updated_at: string; // ISO datetime string
+}
+
+// Shift Exception interfaces
+export interface ShiftException {
+  id: number;
+  user_id: number;
+  shift_assignment_id?: number | null;
+  exception_date: string; // ISO date string (YYYY-MM-DD)
+  exception_type: 'early_release' | 'late_start' | 'day_off' | 'special_schedule' | 'holiday_work';
+  original_start_time?: string; // HH:MM:SS format
+  original_end_time?: string; // HH:MM:SS format
+  new_start_time: string; // HH:MM:SS format
+  new_end_time: string; // HH:MM:SS format
+  new_break_duration_minutes?: number;
+  reason: string;
+  approved_by?: number | null;
+  approved_at?: string | null; // ISO datetime string
+  status: 'pending' | 'approved' | 'active' | 'rejected' | 'cancelled';
+  created_by?: number | null;
+  created_at: string; // ISO datetime string
+  updated_at: string; // ISO datetime string
+  user_name?: string;
+}
+
+export interface CreateShiftExceptionRequest {
+  user_id: number;
+  exception_date: string; // ISO date string (YYYY-MM-DD)
+  exception_type: 'early_release' | 'late_start' | 'day_off' | 'special_schedule' | 'holiday_work';
+  new_start_time: string; // HH:MM:SS format
+  new_end_time: string; // HH:MM:SS format
+  new_break_duration_minutes?: number;
+  reason: string;
+  status?: 'active' | 'pending';
+}
+
+export interface UpdateShiftExceptionRequest {
+  exception_date?: string;
+  exception_type?: 'early_release' | 'late_start' | 'day_off' | 'special_schedule' | 'holiday_work';
+  new_start_time?: string;
+  new_end_time?: string;
+  new_break_duration_minutes?: number;
+  reason?: string;
+  status?: 'pending' | 'approved' | 'active' | 'rejected' | 'cancelled';
+}
+
+// Holiday Duty Roster interfaces
+export interface HolidayDutyRoster {
+  id: number;
+  holiday_id: number;
+  user_id: number;
+  shift_type: 'morning' | 'afternoon' | 'night' | 'full_day';
+  notes: string | null;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+  user_name?: string;
+  user_email?: string;
+  holiday_name?: string;
+  holiday_date?: string;
+}
+
+export interface CreateHolidayDutyRosterRequest {
+  holiday_id: number;
+  user_id: number;
+  shift_type: 'morning' | 'afternoon' | 'night' | 'full_day';
+  notes?: string | null;
+}
+
+export interface UpdateHolidayDutyRosterRequest {
+  holiday_id?: number;
+  user_id?: number;
+  shift_type?: 'morning' | 'afternoon' | 'night' | 'full_day';
+  notes?: string | null;
+}
+
+export interface BulkCreateHolidayDutyRosterRequest {
+  holiday_id: number;
+  assignments: Array<{
+    user_id: number;
+    shift_type: 'morning' | 'afternoon' | 'night' | 'full_day';
+    notes?: string | null;
+  }>;
 }
 
 // Response interface

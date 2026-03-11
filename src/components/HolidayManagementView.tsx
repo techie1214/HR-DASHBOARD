@@ -1,82 +1,119 @@
 // src/components/HolidayManagementView.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import HolidayList from './HolidayList';
 import {
   holidayService,
-  Holiday
+  Holiday,
+  CreateHolidayRequest
 } from '../services/holidayService';
-import { Calendar, Edit3, Trash2, Plus, Globe, Building, Users } from 'lucide-react';
+import { getAllBranches, Branch } from '../services/branchManagementService';
+import { Calendar, Plus, X, Loader2 } from 'lucide-react';
 
 const HolidayManagementView = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [editingHoliday, setEditingHoliday] = useState<Holiday | null>(null);
-  
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+
   // Form states
-  const [name, setName] = useState('');
+  const [holidayName, setHolidayName] = useState('');
   const [date, setDate] = useState('');
-  const [category, setCategory] = useState('national');
+  const [branchId, setBranchId] = useState<string>('');
+  const [isMandatory, setIsMandatory] = useState(true);
   const [description, setDescription] = useState('');
-  const [isRecurring, setIsRecurring] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Fetch branches on mount
+  useEffect(() => {
+    fetchBranches();
+  }, []);
+
+  const fetchBranches = async () => {
+    try {
+      setLoadingBranches(true);
+      const response = await getAllBranches();
+      if (response.success && response.branches) {
+        setBranches(response.branches);
+      }
+    } catch (error) {
+      console.error('Error fetching branches:', error);
+    } finally {
+      setLoadingBranches(false);
+    }
+  };
 
   const resetForm = () => {
-    setName('');
+    setHolidayName('');
     setDate('');
-    setCategory('national');
+    setBranchId('');
+    setIsMandatory(true);
     setDescription('');
-    setIsRecurring(true);
   };
 
   const handleCreateHoliday = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
 
     try {
-      const newHoliday = {
-        name,
-        date,
-        category,
-        description,
-        is_recurring: isRecurring
+      const newHoliday: CreateHolidayRequest = {
+        holiday_name: holidayName,
+        date: new Date(date).toISOString(),
+        branch_id: branchId ? parseInt(branchId) : null,
+        is_mandatory: isMandatory,
+        description: description || null
       };
 
-      const response = await holidayService.createHoliday({name: newHoliday.name, date: newHoliday.date, category: newHoliday.category, description: newHoliday.description, is_recurring: newHoliday.is_recurring});
+      const response = await holidayService.createHoliday(newHoliday);
 
       if (response.success) {
         setShowCreateForm(false);
         resetForm();
-        // In a real app, we would refresh the list
+        // Trigger refresh in parent component or HolidayList
+        window.dispatchEvent(new CustomEvent('holiday-refresh'));
+      } else {
+        alert(response.message || 'Failed to create holiday');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating holiday:', err);
+      alert(err.response?.data?.message || 'Failed to create holiday');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleUpdateHoliday = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
     if (!editingHoliday) return;
+    
+    setSubmitting(true);
 
     try {
-      const updatedHoliday = {
-        ...editingHoliday,
-        name,
-        date,
-        category,
-        description,
-        is_recurring: isRecurring
+      const updateData = {
+        holiday_name: holidayName,
+        date: new Date(date).toISOString(),
+        branch_id: branchId ? parseInt(branchId) : null,
+        is_mandatory: isMandatory,
+        description: description || null
       };
 
-      const response = await holidayService.updateHoliday(editingHoliday.id, {name: updatedHoliday.name, date: updatedHoliday.date, category: updatedHoliday.category, description: updatedHoliday.description, is_recurring: updatedHoliday.is_recurring});
+      const response = await holidayService.updateHoliday(editingHoliday.id, updateData);
 
       if (response.success) {
         setShowEditForm(false);
         setEditingHoliday(null);
         resetForm();
-        // In a real app, we would refresh the list
+        window.dispatchEvent(new CustomEvent('holiday-refresh'));
+      } else {
+        alert(response.message || 'Failed to update holiday');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error updating holiday:', err);
+      alert(err.response?.data?.message || 'Failed to update holiday');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -86,28 +123,35 @@ const HolidayManagementView = () => {
         const response = await holidayService.deleteHoliday(id);
 
         if (response.success) {
-          // In a real app, we would refresh the list
+          window.dispatchEvent(new CustomEvent('holiday-refresh'));
+        } else {
+          alert(response.message || 'Failed to delete holiday');
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error deleting holiday:', err);
+        alert(err.response?.data?.message || 'Failed to delete holiday');
       }
     }
   };
 
   const startEditing = (holiday: Holiday) => {
     setEditingHoliday(holiday);
-    setName(holiday.name);
-    setDate(holiday.date);
-    setCategory(holiday.category);
-    setDescription(holiday.description);
-    setIsRecurring(holiday.is_recurring);
+    setHolidayName(holiday.holiday_name);
+    setDate(holiday.date.split('T')[0]);
+    setBranchId(holiday.branch_id?.toString() || '');
+    setIsMandatory(holiday.is_mandatory);
+    setDescription(holiday.description || '');
     setShowEditForm(true);
   };
 
   return (
-    <div className="space-y-6">
-      {/* Action buttons section */}
-      <div className="flex items-center justify-end gap-3">
+    <div className="space-y-6 animate-fade-in">
+      {/* Header Section */}
+      <div className="flex items-center justify-between">
+        {/* <div>
+          <h1 className="text-3xl font-bold text-primary mb-1">Holiday Management</h1>
+          <p className="text-secondary">Manage company holidays and off-days</p>
+        </div> */}
         <button
           className="btn btn-primary"
           onClick={() => {
@@ -122,11 +166,11 @@ const HolidayManagementView = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="card p-6">
+        <div className="card p-6 hover-lift">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-muted">Total Holidays</p>
-              <h3 className="text-2xl font-bold">12</h3>
+              <p className="text-muted text-sm">Total Holidays</p>
+              <h3 className="text-2xl font-bold text-primary mt-1">--</h3>
             </div>
             <div className="p-3 rounded-full bg-blue-100">
               <Calendar className="w-6 h-6 text-blue-600" />
@@ -134,38 +178,38 @@ const HolidayManagementView = () => {
           </div>
         </div>
 
-        <div className="card p-6">
+        <div className="card p-6 hover-lift">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-muted">National Holidays</p>
-              <h3 className="text-2xl font-bold">5</h3>
-            </div>
-            <div className="p-3 rounded-full bg-green-100">
-              <Globe className="w-6 h-6 text-green-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-muted">Company Holidays</p>
-              <h3 className="text-2xl font-bold">3</h3>
+              <p className="text-muted text-sm">Company-Wide</p>
+              <h3 className="text-2xl font-bold text-primary mt-1">--</h3>
             </div>
             <div className="p-3 rounded-full bg-purple-100">
-              <Building className="w-6 h-6 text-purple-600" />
+              <Calendar className="w-6 h-6 text-purple-600" />
             </div>
           </div>
         </div>
 
-        <div className="card p-6">
+        <div className="card p-6 hover-lift">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-muted">Recurring</p>
-              <h3 className="text-2xl font-bold">8</h3>
+              <p className="text-muted text-sm">Branch-Specific</p>
+              <h3 className="text-2xl font-bold text-primary mt-1">--</h3>
             </div>
-            <div className="p-3 rounded-full bg-yellow-100">
-              <Calendar className="w-6 h-6 text-yellow-600" />
+            <div className="p-3 rounded-full bg-green-100">
+              <Calendar className="w-6 h-6 text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-6 hover-lift">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-muted text-sm">Upcoming</p>
+              <h3 className="text-2xl font-bold text-primary mt-1">--</h3>
+            </div>
+            <div className="p-3 rounded-full bg-orange-100">
+              <Calendar className="w-6 h-6 text-orange-600" />
             </div>
           </div>
         </div>
@@ -173,106 +217,133 @@ const HolidayManagementView = () => {
 
       {/* Create Holiday Modal */}
       {showCreateForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium">Add New Holiday</h3>
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={() => {
-                  setShowCreateForm(false);
-                  resetForm();
-                }}
+        <div className="modal-overlay" onClick={() => setShowCreateForm(false)}>
+          <div className="modal modal-md" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">Add New Holiday</h2>
+              <button 
+                className="btn btn-ghost btn-sm btn-icon"
+                onClick={() => setShowCreateForm(false)}
               >
-                ×
+                <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleCreateHoliday} className="space-y-4">
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Holiday Name</label>
-                  <input
-                    type="text"
-                    className="input input-bordered w-full"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Date</label>
-                  <input
-                    type="date"
-                    className="input input-bordered w-full"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Category</label>
-                  <select
-                    className="input input-bordered w-full"
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    required
-                  >
-                    <option value="national">National</option>
-                    <option value="regional">Regional</option>
-                    <option value="religious">Religious</option>
-                    <option value="company">Company</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Recurring</label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <label className="flex items-center cursor-pointer">
-                      <input
-                        type="radio"
-                        name="recurring"
-                        className="radio radio-primary"
-                        checked={isRecurring}
-                        onChange={() => setIsRecurring(true)}
-                      />
-                      <span className="ml-2">Yes</span>
-                    </label>
-                    <label className="flex items-center cursor-pointer">
-                      <input
-                        type="radio"
-                        name="recurring"
-                        className="radio radio-primary"
-                        checked={!isRecurring}
-                        onChange={() => setIsRecurring(false)}
-                      />
-                      <span className="ml-2">No</span>
-                    </label>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Description</label>
-                  <textarea
-                    className="input input-bordered w-full"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    rows={3}
-                  />
+              <div>
+                <label className="label" htmlFor="holiday-name">
+                  <span className="label-text">Holiday Name</span>
+                  <span className="label-text text-error">*</span>
+                </label>
+                <input
+                  id="holiday-name"
+                  type="text"
+                  className="input"
+                  value={holidayName}
+                  onChange={(e) => setHolidayName(e.target.value)}
+                  placeholder="e.g., Independence Day"
+                  required
+                  disabled={submitting}
+                />
+              </div>
+
+              <div>
+                <label className="label" htmlFor="holiday-date">
+                  <span className="label-text">Date</span>
+                  <span className="label-text text-error">*</span>
+                </label>
+                <input
+                  id="holiday-date"
+                  type="date"
+                  className="input"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  required
+                  disabled={submitting}
+                />
+              </div>
+
+              <div>
+                <label className="label" htmlFor="holiday-branch">
+                  <span className="label-text">Branch (Optional)</span>
+                  <span className="label-text-muted">Leave empty for company-wide</span>
+                </label>
+                <select
+                  id="holiday-branch"
+                  className="input"
+                  value={branchId}
+                  onChange={(e) => setBranchId(e.target.value)}
+                  disabled={submitting || loadingBranches}
+                >
+                  <option value="">All Branches (Company-Wide)</option>
+                  {branches.map(branch => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="label">
+                  <span className="label-text">Mandatory Holiday</span>
+                </label>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center cursor-pointer gap-2">
+                    <input
+                      type="radio"
+                      name="isMandatory"
+                      className="radio radio-primary"
+                      checked={isMandatory}
+                      onChange={() => setIsMandatory(true)}
+                      disabled={submitting}
+                    />
+                    <span className="text-sm">Yes - All employees get this off</span>
+                  </label>
+                  <label className="flex items-center cursor-pointer gap-2">
+                    <input
+                      type="radio"
+                      name="isMandatory"
+                      className="radio radio-primary"
+                      checked={!isMandatory}
+                      onChange={() => setIsMandatory(false)}
+                      disabled={submitting}
+                    />
+                    <span className="text-sm">No - Optional/Observance only</span>
+                  </label>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-4">
+              <div>
+                <label className="label" htmlFor="holiday-description">
+                  <span className="label-text">Description</span>
+                </label>
+                <textarea
+                  id="holiday-description"
+                  className="input min-h-[100px]"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Optional description or notes about this holiday"
+                  disabled={submitting}
+                />
+              </div>
+
+              <div className="modal-footer">
                 <button
                   type="button"
-                  className="btn btn-outline"
-                  onClick={() => {
-                    setShowCreateForm(false);
-                    resetForm();
-                  }}
+                  className="btn btn-ghost"
+                  onClick={() => setShowCreateForm(false)}
+                  disabled={submitting}
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  Add Holiday
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                  disabled={submitting}
+                >
+                  {submitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                  {submitting ? 'Creating...' : 'Create Holiday'}
                 </button>
               </div>
             </form>
@@ -282,108 +353,132 @@ const HolidayManagementView = () => {
 
       {/* Edit Holiday Modal */}
       {showEditForm && editingHoliday && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium">Edit Holiday: {editingHoliday.name}</h3>
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={() => {
-                  setShowEditForm(false);
-                  setEditingHoliday(null);
-                  resetForm();
-                }}
+        <div className="modal-overlay " onClick={() => setShowEditForm(false)}>
+          <div className="modal modal-md" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">Edit Holiday</h2>
+              <button 
+                className="btn btn-ghost btn-sm btn-icon"
+                onClick={() => setShowEditForm(false)}
               >
-                ×
+                <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleUpdateHoliday} className="space-y-4">
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Holiday Name</label>
-                  <input
-                    type="text"
-                    className="input input-bordered w-full"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Date</label>
-                  <input
-                    type="date"
-                    className="input input-bordered w-full"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Category</label>
-                  <select
-                    className="input input-bordered w-full"
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    required
-                  >
-                    <option value="national">National</option>
-                    <option value="regional">Regional</option>
-                    <option value="religious">Religious</option>
-                    <option value="company">Company</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Recurring</label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <label className="flex items-center cursor-pointer">
-                      <input
-                        type="radio"
-                        name="recurring"
-                        className="radio radio-primary"
-                        checked={isRecurring}
-                        onChange={() => setIsRecurring(true)}
-                      />
-                      <span className="ml-2">Yes</span>
-                    </label>
-                    <label className="flex items-center cursor-pointer">
-                      <input
-                        type="radio"
-                        name="recurring"
-                        className="radio radio-primary"
-                        checked={!isRecurring}
-                        onChange={() => setIsRecurring(false)}
-                      />
-                      <span className="ml-2">No</span>
-                    </label>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Description</label>
-                  <textarea
-                    className="input input-bordered w-full"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    rows={3}
-                  />
+              <div>
+                <label className="label" htmlFor="edit-holiday-name">
+                  <span className="label-text">Holiday Name</span>
+                  <span className="label-text text-error">*</span>
+                </label>
+                <input
+                  id="edit-holiday-name"
+                  type="text"
+                  className="input"
+                  value={holidayName}
+                  onChange={(e) => setHolidayName(e.target.value)}
+                  required
+                  disabled={submitting}
+                />
+              </div>
+
+              <div>
+                <label className="label" htmlFor="edit-holiday-date">
+                  <span className="label-text">Date</span>
+                  <span className="label-text text-error">*</span>
+                </label>
+                <input
+                  id="edit-holiday-date"
+                  type="date"
+                  className="input"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  required
+                  disabled={submitting}
+                />
+              </div>
+
+              <div>
+                <label className="label" htmlFor="edit-holiday-branch">
+                  <span className="label-text">Branch (Optional)</span>
+                  <span className="label-text-muted">Leave empty for company-wide</span>
+                </label>
+                <select
+                  id="edit-holiday-branch"
+                  className="input"
+                  value={branchId}
+                  onChange={(e) => setBranchId(e.target.value)}
+                  disabled={submitting || loadingBranches}
+                >
+                  <option value="">All Branches (Company-Wide)</option>
+                  {branches.map(branch => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="label">
+                  <span className="label-text">Mandatory Holiday</span>
+                </label>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center cursor-pointer gap-2">
+                    <input
+                      type="radio"
+                      name="editIsMandatory"
+                      className="radio radio-primary"
+                      checked={isMandatory}
+                      onChange={() => setIsMandatory(true)}
+                      disabled={submitting}
+                    />
+                    <span className="text-sm">Yes - All employees get this off</span>
+                  </label>
+                  <label className="flex items-center cursor-pointer gap-2">
+                    <input
+                      type="radio"
+                      name="editIsMandatory"
+                      className="radio radio-primary"
+                      checked={!isMandatory}
+                      onChange={() => setIsMandatory(false)}
+                      disabled={submitting}
+                    />
+                    <span className="text-sm">No - Optional/Observance only</span>
+                  </label>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-4">
+              <div>
+                <label className="label" htmlFor="edit-holiday-description">
+                  <span className="label-text">Description</span>
+                </label>
+                <textarea
+                  id="edit-holiday-description"
+                  className="input min-h-[100px]"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Optional description or notes about this holiday"
+                  disabled={submitting}
+                />
+              </div>
+
+              <div className="modal-footer">
                 <button
                   type="button"
-                  className="btn btn-outline"
-                  onClick={() => {
-                    setShowEditForm(false);
-                    setEditingHoliday(null);
-                    resetForm();
-                  }}
+                  className="btn btn-ghost"
+                  onClick={() => setShowEditForm(false)}
+                  disabled={submitting}
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  Update Holiday
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                  disabled={submitting}
+                >
+                  {submitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                  {submitting ? 'Updating...' : 'Update Holiday'}
                 </button>
               </div>
             </form>
@@ -393,7 +488,7 @@ const HolidayManagementView = () => {
 
       {/* Holidays List */}
       <div>
-        <HolidayList 
+        <HolidayList
           onEdit={startEditing}
           onDelete={handleDeleteHoliday}
         />

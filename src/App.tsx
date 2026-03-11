@@ -25,6 +25,7 @@ import PerformanceMetrics from "./components/PerformanceMetrics";
 import { EmployeeTable } from "./components/EmployeeTable";
 import KPIView from "./components/KPIView";
 import HolidayManagementView from "./components/HolidayManagementView";
+import HolidayDutyRosterView from "./components/HolidayDutyRosterView";
 import ShiftSchedulingView from "./components/ShiftSchedulingView";
 import SettingsView from "./components/SettingsView";
 // import  StaffManagementView  from "./components/StaffManagementView";
@@ -51,7 +52,8 @@ import {
   Target,
   CalendarDays,
   MapPin,
-  ChevronRight
+  ChevronRight,
+  UserCheck
 } from "lucide-react";
 import { Login } from "./components/Login";
 import RoleManagementView from "./components/RoleManagementView";
@@ -265,6 +267,15 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
               >
                 <CalendarDays className="w-4 h-4" />
                 <span>Holidays</span>
+              </button>
+            </li>
+            <li className="sidebar-menu-item">
+              <button
+                onClick={() => onNavigate("holiday-duty-roster")}
+                className={`sidebar-menu-button ${activeView === "holiday-duty-roster" ? "active" : ""}`}
+              >
+                <UserCheck className="w-4 h-4" />
+                <span>Duty Roster</span>
               </button>
             </li>
             <li className="sidebar-menu-item">
@@ -763,6 +774,9 @@ export default function App() {
       case "holidays":
         return <HolidayManagementView />;
 
+      case "holiday-duty-roster":
+        return <HolidayDutyRosterView />;
+
       case "shiftscheduling":
         return <ShiftSchedulingView />;
 
@@ -869,6 +883,11 @@ export default function App() {
         return {
           title: "Holiday Management",
           subtitle: "Manage company holidays and non-working days"
+        };
+      case "holiday-duty-roster":
+        return {
+          title: "Holiday Duty Roster",
+          subtitle: "Assign staff to work during holidays"
         };
       case "shiftscheduling":
         return {

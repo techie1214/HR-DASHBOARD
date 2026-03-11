@@ -27,17 +27,22 @@ const mockPermissions: Record<string, string[]> = {
     'kpi:read', 'kpi:create', 'kpi:update', 'kpi:delete',
     'report:read',
     'holiday:read', 'holiday:create', 'holiday:update', 'holiday:delete',
+    'holiday-duty-roster:read', 'holiday-duty-roster:create', 'holiday-duty-roster:update', 'holiday-duty-roster:delete',
     'shift:read', 'shift:create', 'shift:update', 'shift:delete'
   ],
   manager: [
     'leave:read', 'leave:update',
     'appraisal:read', 'appraisal:update',
-    'report:read'
+    'report:read',
+    'holiday:read',
+    'holiday-duty-roster:read', 'holiday-duty-roster:create', 'holiday-duty-roster:update'
   ],
   employee: [
     'leave:read', 'leave:create',
     'appraisal:read',
-    'report:read'
+    'report:read',
+    'holiday:read',
+    'holiday-duty-roster:read'
   ]
 };
 
@@ -60,11 +65,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (!user) return false;
 
     // Determine user role and check permissions
-    const userRole = user.role || 'employee'; // Default to employee
-    const permissions = mockPermissions[userRole] || mockPermissions.employee;
+    // Handle both roleId (number) and role (string) formats
+    const userRole = user.role || user.roleId || 'admin'; // Default to admin for development
+    
+    // Convert roleId number to string if needed
+    const roleKey = typeof userRole === 'number' 
+      ? userRole === 1 ? 'admin' : userRole === 2 ? 'manager' : 'employee'
+      : userRole.toLowerCase();
+    
+    const permissions = mockPermissions[roleKey] || mockPermissions.admin;
 
     // Check if the user has the specific permission or if they're an admin
-    return permissions.includes(permission) || userRole === 'admin';
+    return permissions.includes(permission) || roleKey === 'admin';
   };
 
   const login = async (credentials: { email: string; password: string }) => {

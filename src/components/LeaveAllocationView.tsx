@@ -137,6 +137,18 @@ const LeaveAllocationView = () => {
     setCurrentPage(1);
   }, [selectedUserId, selectedLeaveTypeId, selectedYear]);
 
+  // Lock body scroll when any modal is open
+  useEffect(() => {
+    const anyModalOpen = showCreateModal || showBulkModal || showBulkAllModal || 
+                         showEditModal || showDeleteModal || showDetailsModal;
+    if (anyModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [showCreateModal, showBulkModal, showBulkAllModal, showEditModal, showDeleteModal, showDetailsModal]);
+
   const extractAvailableYears = () => {
     const years = new Set<number>();
     const currentYear = new Date().getFullYear();
@@ -1046,9 +1058,8 @@ const LeaveAllocationView = () => {
 
       {/* Create Allocation Modal */}
       {showCreateModal && (
-        <>
-          <div className="modal-overlay" onClick={() => { setShowCreateModal(false); resetCreateForm(); }}></div>
-          <div className="modal modal-lg">
+        <div className="modal-overlay" onClick={() => { setShowCreateModal(false); resetCreateForm(); }}>
+          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="flex items-center gap-3">
                 <div className="icon-wrapper" style={{ backgroundColor: 'var(--primary-600)', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1176,14 +1187,13 @@ const LeaveAllocationView = () => {
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* Bulk Allocation Modal */}
       {showBulkModal && (
-        <>
-          <div className="modal-overlay" onClick={() => setShowBulkModal(false)}></div>
-          <div className="modal modal-lg">
+        <div className="modal-overlay" onClick={() => setShowBulkModal(false)}>
+          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="flex items-center gap-3">
                 <div className="icon-wrapper" style={{ backgroundColor: 'var(--primary-600)', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1415,14 +1425,13 @@ const LeaveAllocationView = () => {
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* Bulk Allocate All Modal */}
       {showBulkAllModal && (
-        <>
-          <div className="modal-overlay" onClick={() => setShowBulkAllModal(false)}></div>
-          <div className="modal modal-md">
+        <div className="modal-overlay" onClick={() => setShowBulkAllModal(false)}>
+          <div className="modal modal-md" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="flex items-center gap-3">
                 <div className="icon-wrapper" style={{ backgroundColor: 'var(--primary-600)', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1535,13 +1544,13 @@ const LeaveAllocationView = () => {
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* Edit Allocation Modal */}
       {showEditModal && selectedAllocation && (
         <div className="modal-overlay" onClick={() => { setShowEditModal(false); setSelectedAllocation(null); resetEditForm(); }}>
-          <div className="modal modal-md">
+          <div className="modal modal-md" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="flex items-center gap-3">
                 <div className="icon-wrapper" style={{ backgroundColor: '#059669', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1644,7 +1653,7 @@ const LeaveAllocationView = () => {
       {/* Details Modal */}
       {showDetailsModal && selectedAllocation && (
         <div className="modal-overlay" onClick={() => { setShowDetailsModal(false); setSelectedAllocation(null); }}>
-          <div className="modal modal-md">
+          <div className="modal modal-md" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="flex items-center gap-3">
                 <div className="icon-wrapper" style={{ backgroundColor: 'var(--primary-600)', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1807,7 +1816,7 @@ const LeaveAllocationView = () => {
       {/* Delete Confirmation Modal */}
       {showDeleteModal && selectedAllocation && (
         <div className="modal-overlay" onClick={() => { setShowDeleteModal(false); setSelectedAllocation(null); }}>
-          <div className="modal modal-sm">
+          <div className="modal modal-sm" onClick={(e) => e.stopPropagation()}>
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 rounded-full bg-error-100 flex items-center justify-center">

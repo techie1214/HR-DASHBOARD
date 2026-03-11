@@ -7,7 +7,9 @@ import {
   ShiftTemplate,
   EmployeeShiftAssignment,
   CreateShiftTemplateRequest,
-  AssignShiftToEmployeeRequest
+  AssignShiftToEmployeeRequest,
+  ShiftException,
+  CreateShiftExceptionRequest
 } from '../services/shiftSchedulingService';
 import { getAllStaff } from '../services/staffManagementService';
 import { getAllBranches, Branch } from '../services/branchManagementService';
@@ -39,8 +41,12 @@ const ShiftSchedulingView = () => {
   // Data state
   const [templates, setTemplates] = useState<TemplateWithStats[]>([]);
   const [assignments, setAssignments] = useState<EmployeeShiftAssignment[]>([]);
+  const [exceptions, setExceptions] = useState<ShiftException[]>([]);
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
+
+  // Filter state for exceptions
+  const [exceptionFilter, setExceptionFilter] = useState<'all' | 'active' | 'pending'>('all');
 
   // Template form state
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -70,13 +76,16 @@ const ShiftSchedulingView = () => {
 
   // Exception form state
   const [showExceptionModal, setShowExceptionModal] = useState(false);
-  const [exceptionForm, setExceptionForm] = useState({
+  const [editingException, setEditingException] = useState<ShiftException | null>(null);
+  const [exceptionForm, setExceptionForm] = useState<CreateShiftExceptionRequest>({
     user_id: 0,
     exception_date: new Date().toISOString().split('T')[0],
-    exception_type: 'special_day' as 'special_day' | 'makeup_day' | 'half_day' | 'overtime',
+    exception_type: 'special_schedule',
     new_start_time: '09:00:00',
     new_end_time: '17:00:00',
+    new_break_duration_minutes: 60,
     reason: '',
+    status: 'active',
   });
 
   // Day selector helpers
@@ -139,6 +148,12 @@ const ShiftSchedulingView = () => {
         const assignmentsRes = await shiftSchedulingService.getEmployeeShiftAssignments();
         if (assignmentsRes.success && assignmentsRes.data) {
           setAssignments(assignmentsRes.data.employeeShiftAssignments || []);
+        }
+      } else if (activeTab === 'exceptions') {
+        // Load exceptions for all users (we'll use user_id 0 as a placeholder to get all)
+        const exceptionsRes = await shiftSchedulingService.getShiftExceptions(0);
+        if (exceptionsRes.success && exceptionsRes.data) {
+          setExceptions(exceptionsRes.data.exceptions || []);
         }
       }
     } catch (err: any) {
@@ -358,6 +373,86 @@ const ShiftSchedulingView = () => {
     setEditingAssignment(null);
   };
 
+  // Exception handlers
+  const handleCreateException = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const response = await shiftSchedulingService.createShiftException(exceptionForm);
+      if (response.success) {
+        setSuccessMessage('Exception created successfully');
+        setShowExceptionModal(false);
+        resetExceptionForm();
+        loadData();
+      } else {
+        setError(response.message || 'Failed to create exception');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to create exception');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateException = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingException) return;
+    setLoading(true);
+
+    try {
+      const response = await shiftSchedulingService.updateShiftException(editingException.id, exceptionForm);
+      if (response.success) {
+        setSuccessMessage('Exception updated successfully');
+        setShowExceptionModal(false);
+        resetExceptionForm();
+        loadData();
+      } else {
+        setError(response.message || 'Failed to update exception');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to update exception');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteException = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this exception?')) return;
+    setLoading(true);
+
+    try {
+      const response = await shiftSchedulingService.deleteShiftException(id);
+      if (response.success) {
+        setSuccessMessage('Exception deleted successfully');
+        loadData();
+      } else {
+        setError(response.message || 'Failed to delete exception');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete exception');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetExceptionForm = () => {
+    setExceptionForm({
+      user_id: 0,
+      exception_date: new Date().toISOString().split('T')[0],
+      exception_type: 'special_schedule',
+      new_start_time: '09:00:00',
+      new_end_time: '17:00:00',
+      new_break_duration_minutes: 60,
+      reason: '',
+      status: 'active',
+    });
+    setEditingException(null);
+  };
+
   // Calculate smart stats
   const stats = useMemo(() => {
     const totalTemplates = templates.length;
@@ -519,11 +614,21 @@ const ShiftSchedulingView = () => {
                       <td className="table-cell">
                         {template.recurrence_days ? (
                           <div className="flex gap-1 flex-wrap">
-                            {JSON.parse(template.recurrence_days).map((day: string) => (
-                              <span key={day} className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-md capitalize font-medium">
-                                {day.substring(0, 3)}
-                              </span>
-                            ))}
+                            {(() => {
+                              try {
+                                const days = JSON.parse(template.recurrence_days);
+                                if (Array.isArray(days)) {
+                                  return days.map((day: string) => (
+                                    <span key={day} className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-md capitalize font-medium">
+                                      {day.substring(0, 3)}
+                                    </span>
+                                  ));
+                                }
+                                return <span className="text-gray-400 text-sm">-</span>;
+                              } catch (e) {
+                                return <span className="text-gray-400 text-sm">-</span>;
+                              }
+                            })()}
                           </div>
                         ) : (
                           <span className="text-gray-400 text-sm">-</span>
@@ -765,64 +870,264 @@ const ShiftSchedulingView = () => {
     </div>
   );
 
-  const renderExceptionsTab = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">Shift Exceptions</h2>
-          <p className="text-sm text-gray-500 mt-0.5">One-time schedule overrides</p>
-        </div>
-        <button
-          className="btn btn-primary"
-          onClick={() => setShowExceptionModal(true)}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Exception
-        </button>
-      </div>
+  const renderExceptionsTab = () => {
+    // Filter exceptions
+    const filteredExceptions = exceptionFilter === 'all' 
+      ? exceptions 
+      : exceptions.filter(ex => ex.status === exceptionFilter);
 
-      {/* Info Card */}
-      <div className="card p-6 bg-blue-50 border border-blue-200">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
-            <AlertCircle className="w-6 h-6 text-blue-600" />
+    // Calculate exception stats
+    const exceptionStats = {
+      total: exceptions.length,
+      active: exceptions.filter(ex => ex.status === 'active').length,
+      pending: exceptions.filter(ex => ex.status === 'pending').length,
+    };
+
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Shift Exceptions</h2>
+            <p className="text-sm text-gray-500 mt-0.5">One-time schedule overrides for specific dates</p>
           </div>
-          <div className="flex-1">
-            <h3 className="font-semibold text-blue-900 mb-2">About Exceptions</h3>
-            <p className="text-blue-800 text-sm leading-relaxed">
-              Exceptions are one-time overrides for specific dates. They take priority over all other shift assignments.
-              Use them for special occasions, makeup days, half days, or overtime periods.
-            </p>
-            <div className="flex gap-2 mt-4">
-              <span className="px-3 py-1.5 bg-blue-100 rounded-lg text-blue-700 text-xs font-medium">Special Days</span>
-              <span className="px-3 py-1.5 bg-blue-100 rounded-lg text-blue-700 text-xs font-medium">Makeup Days</span>
-              <span className="px-3 py-1.5 bg-blue-100 rounded-lg text-blue-700 text-xs font-medium">Half Days</span>
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              resetExceptionForm();
+              setShowExceptionModal(true);
+            }}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Exception
+          </button>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="card p-4 transition-all hover-lift">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <Calendar className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Total</p>
+                <p className="text-xl font-bold text-gray-900">{exceptionStats.total}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="card p-4 transition-all hover-lift">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Active</p>
+                <p className="text-xl font-bold text-gray-900">{exceptionStats.active}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="card p-4 transition-all hover-lift">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <AlertCircle className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Pending</p>
+                <p className="text-xl font-bold text-gray-900">{exceptionStats.pending}</p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Coming Soon State */}
-      <div className="card overflow-hidden">
-        <div className="p-16 text-center">
-          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center mx-auto mb-6">
-            <Calendar className="w-12 h-12 text-purple-600" />
-          </div>
-          <h3 className="text-xl font-bold text-gray-900 mb-2">Exception Management</h3>
-          <p className="text-gray-500 max-w-md mx-auto mb-6">
-            Full exception calendar and management features coming soon. You'll be able to view, create, and manage all shift exceptions in one place.
-          </p>
+        {/* Filter Tabs */}
+        <div className="flex gap-2">
           <button
-            className="btn btn-outline"
-            onClick={() => setShowExceptionModal(true)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              exceptionFilter === 'all'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+            onClick={() => setExceptionFilter('all')}
           >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Your First Exception
+            All Exceptions
+          </button>
+          <button
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              exceptionFilter === 'active'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+            onClick={() => setExceptionFilter('active')}
+          >
+            Active
+          </button>
+          <button
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              exceptionFilter === 'pending'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+            onClick={() => setExceptionFilter('pending')}
+          >
+            Pending
           </button>
         </div>
+
+        {/* Exceptions Table */}
+        <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead className="table-header" style={{ backgroundColor: '#f9fafb' }}>
+                <tr>
+                  <th className="table-header-cell">Employee</th>
+                  <th className="table-header-cell">Date</th>
+                  <th className="table-header-cell">Type</th>
+                  <th className="table-header-cell">New Hours</th>
+                  <th className="table-header-cell">Reason</th>
+                  <th className="table-header-cell">Status</th>
+                  <th className="table-header-cell right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center">
+                      <div className="flex justify-center items-center gap-2">
+                        <RotateCcw className="w-5 h-5 animate-spin text-blue-600" />
+                        <span className="text-gray-600">Loading exceptions...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredExceptions.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center">
+                      <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center mx-auto mb-4">
+                        <Calendar className="w-10 h-10 text-purple-600" />
+                      </div>
+                      <p className="text-gray-700 font-medium mb-1">No exceptions found</p>
+                      <p className="text-gray-500 text-sm">
+                        {exceptionFilter === 'all' 
+                          ? 'Create your first exception to get started' 
+                          : `No ${exceptionFilter} exceptions`}
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredExceptions.map((exception) => {
+                    const staff = staffMembers.find(s => s.id === exception.user_id);
+                    const exceptionTypeColors = {
+                      early_release: 'bg-amber-100 text-amber-700',
+                      late_start: 'bg-blue-100 text-blue-700',
+                      day_off: 'bg-red-100 text-red-700',
+                      special_schedule: 'bg-purple-100 text-purple-700',
+                      holiday_work: 'bg-green-100 text-green-700',
+                    };
+
+                    return (
+                      <tr key={exception.id} className="table-row hover:bg-gray-50 transition-colors">
+                        <td className="table-cell">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold text-sm">
+                              {staff?.name?.charAt(0) || 'U'}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-gray-900">{staff?.name || `User ${exception.user_id}`}</p>
+                              <p className="text-xs text-gray-500">{staff?.department}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="table-cell">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-gray-400" />
+                            <span className="font-medium text-gray-900">
+                              {new Date(exception.exception_date).toLocaleDateString('en-KE', { 
+                                weekday: 'short', 
+                                year: 'numeric', 
+                                month: 'short', 
+                                day: 'numeric' 
+                              })}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="table-cell">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                            exceptionTypeColors[exception.exception_type]
+                          }`}>
+                            {exception.exception_type.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="table-cell">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-sm font-medium text-gray-900">
+                              {exception.new_start_time?.substring(0, 5)} - {exception.new_end_time?.substring(0, 5)}
+                            </span>
+                            {exception.new_break_duration_minutes && (
+                              <span className="text-xs text-gray-500">
+                                {exception.new_break_duration_minutes}min break
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="table-cell max-w-xs">
+                          <p className="text-sm text-gray-600 truncate">{exception.reason}</p>
+                        </td>
+                        <td className="table-cell">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                            exception.status === 'active' ? 'bg-green-100 text-green-700' :
+                            exception.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${
+                              exception.status === 'active' ? 'bg-green-500' :
+                              exception.status === 'pending' ? 'bg-amber-500' :
+                              'bg-gray-400'
+                            }`}></div>
+                            {exception.status}
+                          </span>
+                        </td>
+                        <td className="table-cell right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              className="btn btn-sm btn-ghost"
+                              onClick={() => {
+                                setEditingException(exception);
+                                setExceptionForm({
+                                  user_id: exception.user_id,
+                                  exception_date: exception.exception_date,
+                                  exception_type: exception.exception_type,
+                                  new_start_time: exception.new_start_time,
+                                  new_end_time: exception.new_end_time,
+                                  new_break_duration_minutes: exception.new_break_duration_minutes || 60,
+                                  reason: exception.reason,
+                                  status: exception.status,
+                                });
+                                setShowExceptionModal(true);
+                              }}
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button
+                              className="btn btn-sm btn-ghost text-red-600 hover:bg-red-50"
+                              onClick={() => handleDeleteException(exception.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -1153,21 +1458,169 @@ const ShiftSchedulingView = () => {
       {/* Exception Modal */}
       {showExceptionModal && (
         <>
-          <div className="modal-overlay" onClick={() => setShowExceptionModal(false)}></div>
-          <div className="modal" style={{ maxWidth: '32rem' }}>
-            <div className="modal-header">
-              <h3>Create Shift Exception</h3>
-              <button className="btn btn-ghost btn-icon" onClick={() => setShowExceptionModal(false)}>×</button>
-            </div>
-            <div className="modal-content">
-              <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200">
-                <p className="text-sm text-purple-900 font-medium">Coming Soon</p>
-                <p className="text-xs text-purple-700 mt-1">Full exception management is under development</p>
+          <div className="modal-overlay" onClick={() => { setShowExceptionModal(false); resetExceptionForm(); }} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(15, 23, 42, 0.5)' }}></div>
+          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100000, maxWidth: '32rem', width: 'calc(100% - 2rem)', margin: 0, backgroundColor: 'white', borderRadius: '1rem', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+            <div className="modal-header" style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e5e7eb' }}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-purple-600 flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {editingException ? 'Edit' : 'Create'} Shift Exception
+                  </h3>
+                  <p className="text-sm text-gray-500">One-time schedule override for a specific date</p>
+                </div>
               </div>
+              <button className="btn btn-ghost btn-icon" onClick={() => { setShowExceptionModal(false); resetExceptionForm(); }}>
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <div className="modal-footer">
-              <button className="btn btn-outline" onClick={() => setShowExceptionModal(false)}>Close</button>
-            </div>
+            <form onSubmit={editingException ? handleUpdateException : handleCreateException}>
+              <div className="modal-content space-y-5" style={{ padding: '1.5rem' }}>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Employee *</label>
+                  <select
+                    className="input w-full"
+                    value={exceptionForm.user_id || ''}
+                    onChange={(e) => setExceptionForm({ ...exceptionForm, user_id: Number(e.target.value) })}
+                    required
+                    style={{ padding: '0.625rem 0.875rem' }}
+                  >
+                    <option value="">Select Employee</option>
+                    {staffMembers.map(staff => (
+                      <option key={staff.id} value={staff.id}>
+                        {staff.name} ({staff.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Exception Date *</label>
+                  <input
+                    type="date"
+                    className="input w-full"
+                    value={exceptionForm.exception_date}
+                    onChange={(e) => setExceptionForm({ ...exceptionForm, exception_date: e.target.value })}
+                    required
+                    style={{ padding: '0.625rem 0.875rem' }}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Exception Type *</label>
+                  <select
+                    className="input w-full"
+                    value={exceptionForm.exception_type}
+                    onChange={(e) => setExceptionForm({ ...exceptionForm, exception_type: e.target.value as any })}
+                    required
+                    style={{ padding: '0.625rem 0.875rem' }}
+                  >
+                    <option value="special_schedule">Special Schedule</option>
+                    <option value="late_start">Late Start</option>
+                    <option value="early_release">Early Release</option>
+                    <option value="day_off">Day Off</option>
+                    <option value="holiday_work">Holiday Work</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {exceptionForm.exception_type === 'late_start' && 'Employee will start later than their scheduled time'}
+                    {exceptionForm.exception_type === 'early_release' && 'Employee will leave earlier than their scheduled time'}
+                    {exceptionForm.exception_type === 'day_off' && 'Employee is not required to work on this date'}
+                    {exceptionForm.exception_type === 'special_schedule' && 'Custom schedule for this specific date'}
+                    {exceptionForm.exception_type === 'holiday_work' && 'Employee is scheduled to work on a holiday'}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">New Start Time *</label>
+                    <input
+                      type="time"
+                      className="input w-full"
+                      value={exceptionForm.new_start_time}
+                      onChange={(e) => setExceptionForm({ ...exceptionForm, new_start_time: e.target.value })}
+                      required
+                      style={{ padding: '0.625rem 0.875rem' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">New End Time *</label>
+                    <input
+                      type="time"
+                      className="input w-full"
+                      value={exceptionForm.new_end_time}
+                      onChange={(e) => setExceptionForm({ ...exceptionForm, new_end_time: e.target.value })}
+                      required
+                      style={{ padding: '0.625rem 0.875rem' }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Break Duration (minutes)
+                  </label>
+                  <input
+                    type="number"
+                    className="input w-full"
+                    value={exceptionForm.new_break_duration_minutes}
+                    onChange={(e) => setExceptionForm({ ...exceptionForm, new_break_duration_minutes: Number(e.target.value) })}
+                    min="0"
+                    max="180"
+                    style={{ padding: '0.625rem 0.875rem' }}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Reason *</label>
+                  <textarea
+                    className="input w-full"
+                    value={exceptionForm.reason}
+                    onChange={(e) => setExceptionForm({ ...exceptionForm, reason: e.target.value })}
+                    placeholder="Explain why this exception is needed..."
+                    rows={3}
+                    required
+                    style={{ padding: '0.625rem 0.875rem', resize: 'vertical' }}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                  <select
+                    className="input w-full"
+                    value={exceptionForm.status}
+                    onChange={(e) => setExceptionForm({ ...exceptionForm, status: e.target.value as any })}
+                    style={{ padding: '0.625rem 0.875rem' }}
+                  >
+                    <option value="active">Active</option>
+                    <option value="pending">Pending Approval</option>
+                  </select>
+                </div>
+              </div>
+              <div className="modal-footer" style={{ padding: '1rem 1.5rem', backgroundColor: '#f9fafb', borderTop: '1px solid #e5e7eb' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => { setShowExceptionModal(false); resetExceptionForm(); }}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={loading} style={{ padding: '0.625rem 1.5rem' }}>
+                  {loading ? (
+                    <span className="flex items-center gap-2">
+                      <RotateCcw className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <Save className="w-4 h-4" />
+                      {editingException ? 'Update Exception' : 'Create Exception'}
+                    </span>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </>
       )}
