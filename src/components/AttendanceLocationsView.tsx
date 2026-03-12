@@ -128,10 +128,28 @@ const AttendanceLocationsView: React.FC = () => {
   // Handle create
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate coordinates format
+    if (!createForm.location_coordinates || !createForm.location_coordinates.trim()) {
+      setError('Coordinates are required');
+      return;
+    }
+    
+    // Validate coordinates format - should be "lng,lat" or "POINT(lng lat)"
+    const coordPattern = /^-?\d+\.?\d*\s*[,]\s*-?\d+\.?\d*$|^POINT\s*\(\s*-?\d+\.?\d*\s+-?\d+\.?\d*\s*\)$/i;
+    if (!coordPattern.test(createForm.location_coordinates)) {
+      setError('Invalid coordinates format. Use: longitude,latitude (e.g., 36.8172,-1.2864)');
+      return;
+    }
+    
     setLoading(true);
+    setError(null);
 
     try {
+      console.log('📤 Creating location with:', createForm);
       const response = await createAttendanceLocation(createForm);
+      console.log('📥 Response:', response);
+      
       if (response.success) {
         setSuccessMessage('Location created successfully');
         setShowCreateModal(false);
@@ -142,7 +160,8 @@ const AttendanceLocationsView: React.FC = () => {
         setError(response.message || 'Failed to create location');
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to create location');
+      console.error('❌ Create location error:', err);
+      setError(err.response?.data?.message || err.message || 'Failed to create location');
     } finally {
       setLoading(false);
     }
@@ -223,15 +242,25 @@ const AttendanceLocationsView: React.FC = () => {
   };
 
   // Parse coordinates for display
-  const parseCoordinates = (coords: string) => {
-    // Expected format: "POINT(lng lat)" or similar
-    const match = coords.match(/POINT\(([-\d.]+)\s+([-\d.]+)\)/);
-    if (match) {
-      return {
-        lng: parseFloat(match[1]),
-        lat: parseFloat(match[2])
-      };
+  const parseCoordinates = (coords: any) => {
+    if (!coords) return null;
+    
+    // If it's already an object with x,y (from MySQL geometry)
+    if (typeof coords === 'object' && coords.x && coords.y) {
+      return { lng: coords.x, lat: coords.y };
     }
+    
+    // If it's a string in POINT format
+    if (typeof coords === 'string') {
+      const match = coords.match(/POINT\(([-\d.]+)\s+([-\d.]+)\)/);
+      if (match) {
+        return {
+          lng: parseFloat(match[1]),
+          lat: parseFloat(match[2])
+        };
+      }
+    }
+    
     return null;
   };
 

@@ -28,6 +28,7 @@ import HolidayManagementView from "./components/HolidayManagementView";
 import HolidayDutyRosterView from "./components/HolidayDutyRosterView";
 import ShiftSchedulingView from "./components/ShiftSchedulingView";
 import SettingsView from "./components/SettingsView";
+import StaffLocationAssignmentView from "./components/StaffLocationAssignmentView";
 // import  StaffManagementView  from "./components/StaffManagementView";
 import { mockNotifications, mockStaffData } from "./data/staffData";
 import {
@@ -280,6 +281,15 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
               >
                 <Shield className="w-4 h-4" />
                 <span>Role Management</span>
+              </button>
+            </li>
+            <li className="sidebar-menu-item">
+              <button
+                onClick={() => onNavigate("staff-location-assignments")}
+                className={`sidebar-menu-button ${activeView === "staff-location-assignments" ? "active" : ""}`}
+              >
+                <MapPin className="w-4 h-4" />
+                <span>Location Assignments</span>
               </button>
             </li>
             <li className="sidebar-menu-item">
@@ -758,6 +768,8 @@ export default function App() {
         return <RoleManagementView />;
       case "settings":
         return <SettingsView />;
+      case "staff-location-assignments":
+        return <StaffLocationAssignmentView />;
 
       default:
         return null;
@@ -880,6 +892,11 @@ export default function App() {
         return {
           title: "Settings",
           subtitle: "Configure your HR dashboard preferences"
+        };
+      case "staff-location-assignments":
+        return {
+          title: "Staff Location Assignments",
+          subtitle: "Assign specific attendance locations to staff members"
         };
       default:
         return {

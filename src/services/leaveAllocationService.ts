@@ -427,14 +427,15 @@ export const updateAllocation = async (allocationId: number, data: UpdateAllocat
       },
     });
 
-    if (response.data?.success && response.data?.data?.allocation) {
+    if (response.data?.success && (response.data?.data?.allocation || response.data?.data?.leaveAllocation)) {
       return {
         success: true,
-        allocation: response.data.data.allocation,
+        allocation: response.data.data.allocation || response.data.data.leaveAllocation,
         message: 'Allocation updated successfully',
       };
     }
 
+    console.log('Response format:', response.data);
     return {
       success: false,
       message: 'Unexpected response format',

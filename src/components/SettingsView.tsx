@@ -40,6 +40,7 @@ const SettingsView = () => {
     enable_face_recognition: false,
     enable_biometric_verification: false,
     enable_holiday_attendance: false,
+    strict_location_mode: false, // NEW: Strict vs Legacy mode
     attendance_mode: 'branch_based' as 'branch_based' | 'multiple_locations' | 'flexible',
   });
 
@@ -103,6 +104,7 @@ const SettingsView = () => {
           enable_face_recognition: response.settings.enable_face_recognition ?? false,
           enable_biometric_verification: response.settings.enable_biometric_verification ?? false,
           enable_holiday_attendance: response.settings.enable_holiday_attendance ?? false,
+          strict_location_mode: response.settings.strict_location_mode ?? false,
           attendance_mode: response.settings.attendance_mode ?? 'branch_based',
         });
       }
@@ -394,6 +396,32 @@ const SettingsView = () => {
                 <option value="multiple_locations">Multiple Locations (Approved Hotspots)</option>
                 <option value="flexible">Flexible (Anywhere)</option>
               </select>
+            </div>
+            
+            {/* Strict vs Legacy Mode Toggle */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  id="strict-mode-toggle"
+                  checked={branchForm.strict_location_mode ?? false}
+                  onChange={(e) => setBranchForm({ ...branchForm, strict_location_mode: e.target.checked })}
+                  className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <div className="flex-1">
+                  <label htmlFor="strict-mode-toggle" className="font-medium text-gray-900 cursor-pointer">
+                    Strict Location Mode
+                  </label>
+                  <p className="text-xs text-gray-600 mt-1">
+                    <strong>ON (Strict):</strong> Staff can ONLY check in at their assigned locations. 
+                    If no location is assigned, they cannot check in.
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    <strong>OFF (Legacy):</strong> Staff can check in at branch location or any approved 
+                    location based on attendance mode above.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

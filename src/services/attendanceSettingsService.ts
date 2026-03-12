@@ -20,6 +20,7 @@ export interface BranchAttendanceSettings {
   enable_face_recognition?: boolean;
   enable_biometric_verification?: boolean;
   enable_holiday_attendance?: boolean;
+  strict_location_mode?: boolean; // NEW: Strict vs Legacy mode
   location_coordinates?: string | null;
   location_radius_meters?: number;
   created_at?: string;
@@ -54,6 +55,7 @@ export interface UpdateBranchSettingsRequest {
     enable_face_recognition?: boolean;
     enable_biometric_verification?: boolean;
     enable_holiday_attendance?: boolean;
+    strict_location_mode?: boolean; // NEW
     attendance_mode?: 'branch_based' | 'multiple_locations' | 'flexible';
     location_coordinates?: string | null;
     location_radius_meters?: number;
