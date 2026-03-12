@@ -101,6 +101,15 @@ const AttendanceView = () => {
   const [selectedRecord, setSelectedRecord] = useState<AttendanceWithStaff | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  // Export modal state
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportDateRange, setExportDateRange] = useState({
+    start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+    end: new Date().toISOString().split('T')[0]
+  });
+  const [exportFormat, setExportFormat] = useState<'csv' | 'excel' | 'pdf'>('csv');
+  const [exportLoading, setExportLoading] = useState(false);
+
   // Manual attendance form
   const [manualForm, setManualForm] = useState({
     user_id: 0,
@@ -310,35 +319,112 @@ const AttendanceView = () => {
   };
 
   // Export to CSV
-  const exportToCSV = (selectedOnly = false) => {
-    const dataToExport = selectedOnly 
-      ? filteredRecords.filter(r => selectedRecords.includes(r.id))
-      : filteredRecords;
+  const exportToCSV = async (exportAll = false, customDateRange?: { start: string; end: string }) => {
+    setLoading(true);
+    try {
+      // If exporting all or custom range, fetch all data first
+      let dataToExport: AttendanceWithStaff[] = [];
+      
+      if (exportAll || customDateRange) {
+        // Fetch all records for the date range
+        const startDate = customDateRange?.start || dateRange.start;
+        const endDate = customDateRange?.end || dateRange.end;
+        
+        console.log('📥 Fetching all records for export:', { startDate, endDate });
+        
+        // Fetch in batches to avoid memory issues
+        const batchSize = 100;
+        let page = 1;
+        let hasMore = true;
+        
+        while (hasMore) {
+          const response = await getAllAttendanceRecords(page, batchSize, undefined, startDate, endDate);
+          if (response.success && response.records) {
+            // Enrich with staff info
+            const enriched = response.records.map((record: AttendanceRecord) => {
+              const staff = staffMembers.find((s: any) => s.id === record.user_id);
+              const branch = branches.find((b: Branch) => b.id === staff?.branch_id);
+              return {
+                ...record,
+                staff_name: staff?.full_name || 'Unknown',
+                staff_email: staff?.email || staff?.work_email,
+                employee_id: staff?.employee_id,
+                department: staff?.department,
+                branch_name: branch?.name
+              };
+            });
+            dataToExport.push(...enriched);
+            
+            if (page >= response.pagination?.total_pages || 0) {
+              hasMore = false;
+            } else {
+              page++;
+            }
+          } else {
+            hasMore = false;
+          }
+        }
+        
+        console.log(`📊 Exporting ${dataToExport.length} records`);
+      } else {
+        // Export current filtered records
+        dataToExport = filteredRecords;
+      }
 
-    const headers = ['Employee', 'Email', 'Date', 'Check-in', 'Check-out', 'Hours Worked', 'Status', 'Branch'];
-    const rows = dataToExport.map(r => [
-      r.staff_name || `User ${r.user_id}`,
-      r.staff_email || '',
-      new Date(r.date).toLocaleDateString(),
-      r.check_in_time || '-',
-      r.check_out_time || '-',
-      r.actual_working_hours ? r.actual_working_hours.toFixed(2) : '-',
-      r.status,
-      r.branch_name || '-'
-    ]);
+      // Apply filters
+      if (selectedBranch) {
+        dataToExport = dataToExport.filter(r => r.branch_id === selectedBranch);
+      }
+      if (selectedStatus !== 'all') {
+        dataToExport = dataToExport.filter(r => r.status === selectedStatus);
+      }
+      if (selectedDepartment) {
+        dataToExport = dataToExport.filter(r => r.department === selectedDepartment);
+      }
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(r => r.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
+      const headers = ['Employee', 'Email', 'Employee ID', 'Date', 'Check-in', 'Check-out', 'Hours Worked', 'Status', 'Branch', 'Department'];
+      const rows = dataToExport.map(r => [
+        r.staff_name || `User ${r.user_id}`,
+        r.staff_email || '',
+        r.employee_id || '-',
+        new Date(r.date).toLocaleDateString(),
+        r.check_in_time || '-',
+        r.check_out_time || '-',
+        r.actual_working_hours ? r.actual_working_hours.toFixed(2) : '-',
+        r.status,
+        r.branch_name || '-',
+        r.department || '-'
+      ]);
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `attendance_export_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(r => r.map(cell => `"${cell}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const dateStr = customDateRange 
+        ? `${customDateRange.start}_to_${customDateRange.end}`
+        : `${dateRange.start}_to_${dateRange.end}`;
+      a.download = `attendance_report_${dateStr}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      
+      setSuccessMessage(`Exported ${dataToExport.length} records successfully!`);
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      console.error('Export error:', err);
+      setError('Failed to export data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Export with custom date range
+  const handleExportWithRange = () => {
+    setShowExportModal(true);
   };
 
   // View record details
@@ -517,10 +603,11 @@ const AttendanceView = () => {
             </button>
             <button
               className="btn btn-sm btn-primary"
-              onClick={() => exportToCSV(false)}
+              onClick={handleExportWithRange}
+              disabled={loading}
             >
               <Download className="w-4 h-4" />
-              Export to CSV
+              Export Report
             </button>
           </div>
         </div>
@@ -1073,6 +1160,150 @@ const AttendanceView = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </>
+      )}
+
+      {/* Export Report Modal */}
+      {showExportModal && (
+        <>
+          <div className="modal-overlay" onClick={() => setShowExportModal(false)}></div>
+          <div className="modal" style={{ maxWidth: '32rem' }}>
+            <div className="modal-header">
+              <h3>Export Attendance Report</h3>
+              <button className="btn btn-ghost btn-icon" onClick={() => setShowExportModal(false)}>×</button>
+            </div>
+            <div className="modal-content space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Export Format</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${exportFormat === 'csv' ? 'btn-primary' : 'btn-outline'}`}
+                    onClick={() => setExportFormat('csv')}
+                  >
+                    CSV
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${exportFormat === 'excel' ? 'btn-primary' : 'btn-outline'}`}
+                    onClick={() => setExportFormat('excel')}
+                    disabled
+                    title="Coming soon"
+                  >
+                    Excel
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${exportFormat === 'pdf' ? 'btn-primary' : 'btn-outline'}`}
+                    onClick={() => setExportFormat('pdf')}
+                    disabled
+                    title="Coming soon"
+                  >
+                    PDF
+                  </button>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Date Range *</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted">From:</label>
+                    <input
+                      type="date"
+                      className="input w-full"
+                      value={exportDateRange.start}
+                      onChange={(e) => setExportDateRange({ ...exportDateRange, start: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted">To:</label>
+                    <input
+                      type="date"
+                      className="input w-full"
+                      value={exportDateRange.end}
+                      onChange={(e) => setExportDateRange({ ...exportDateRange, end: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-outline"
+                    onClick={() => {
+                      const today = new Date();
+                      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+                      const todayStr = today.toISOString().split('T')[0];
+                      setExportDateRange({ start: monthStart, end: todayStr });
+                    }}
+                  >
+                    This Month
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-outline"
+                    onClick={() => {
+                      const today = new Date();
+                      const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1).toISOString().split('T')[0];
+                      const monthEnd = new Date(today.getFullYear(), today.getMonth(), 0).toISOString().split('T')[0];
+                      setExportDateRange({ start: lastMonth, end: monthEnd });
+                    }}
+                  >
+                    Last Month
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-outline"
+                    onClick={() => {
+                      const today = new Date();
+                      const yearStart = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+                      const todayStr = today.toISOString().split('T')[0];
+                      setExportDateRange({ start: yearStart, end: todayStr });
+                    }}
+                  >
+                    This Year
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-sm text-blue-900">
+                  <strong>Tip:</strong> The export will include all attendance records in the selected date range, 
+                  including employee details, check-in/out times, hours worked, and status.
+                </p>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button 
+                type="button" 
+                className="btn btn-outline" 
+                onClick={() => setShowExportModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                onClick={() => {
+                  exportToCSV(true, exportDateRange);
+                  setShowExportModal(false);
+                }}
+                disabled={exportLoading}
+              >
+                {exportLoading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Generating Report...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 mr-2" />
+                    Export {exportFormat.toUpperCase()}
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </>
       )}

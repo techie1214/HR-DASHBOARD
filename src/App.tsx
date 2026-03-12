@@ -180,15 +180,6 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
             </li>
             <li className="sidebar-menu-item">
               <button
-                onClick={() => onNavigate("attendance-reports")}
-                className={`sidebar-menu-button ${activeView === "attendance-reports" ? "active" : ""}`}
-              >
-                <FileText className="w-4 h-4" />
-                <span>Reports</span>
-              </button>
-            </li>
-            <li className="sidebar-menu-item">
-              <button
                 onClick={() => onNavigate("branches")}
                 className={`sidebar-menu-button ${activeView === "branches" ? "active" : ""}`}
               >
