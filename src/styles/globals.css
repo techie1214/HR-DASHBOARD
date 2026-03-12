@@ -603,11 +603,11 @@ textarea {
   font-weight: 400;
   font-size: 0.875rem;
   text-decoration: none;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar-menu-button:hover {
-  background-color: #e5e7eb;
+  background-color: rgba(229, 231, 235, 0.6);
   color: #0f172a;
 }
 
@@ -615,17 +615,46 @@ textarea {
   background-color: #ffffff;
   color: #0f172a;
   font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Menu button with expanded submenu */
+.sidebar-menu-button[aria-expanded="true"],
+.sidebar-menu-button:has(+ .sidebar-submenu:visible) {
+  background-color: rgba(241, 245, 249, 0.5);
+}
+
+/* Chevron rotation animation */
+.sidebar-menu-button svg.chevron {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-menu-button svg.chevron.rotated {
+  transform: rotate(90deg);
 }
 
 /* Submenu styles */
 .sidebar-submenu {
   list-style: none;
-  margin: 0.25rem 0;
-  padding-left: 1rem;
+  margin: 0;
+  padding: 0.25rem 0 0.25rem 0.5rem;
+  position: relative;
 }
 
 .sidebar-submenu-item {
+  position: relative;
   margin: 0.125rem 0;
+}
+
+/* Vertical connecting line */
+.sidebar-submenu::after {
+  content: '';
+  position: absolute;
+  left: 1.125rem;
+  top: 0.75rem;
+  bottom: 0.75rem;
+  width: 1px;
+  background: linear-gradient(to bottom, #e2e8f0 0%, #e2e8f0 100%);
 }
 
 .sidebar-submenu-button {
@@ -633,29 +662,141 @@ textarea {
   align-items: center;
   gap: 0.5rem;
   width: 100%;
-  padding: 0.5rem 0.75rem;
+  padding: 0.5rem 0.75rem 0.5rem 1.75rem;
   border-radius: 0.375rem;
-  color: #4b5563;
+  color: #64748b;
   font-weight: 400;
   font-size: 0.8125rem;
   text-decoration: none;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   border: none;
   background: transparent;
   cursor: pointer;
+  position: relative;
+  z-index: 1;
+}
+
+/* Small dot indicator on the left */
+.sidebar-submenu-button::before {
+  content: '';
+  position: absolute;
+  left: 0.875rem;
+  top: 50%;
+  transform: translateY(-50%) scale(0.6);
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  background-color: #cbd5e1;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  z-index: 2;
 }
 
 .sidebar-submenu-button:hover {
-  background-color: #f3f4f6;
-  color: #0f172a;
+  background-color: rgba(241, 245, 249, 0.8);
+  color: #334155;
+  padding-left: 2rem;
+}
+
+.sidebar-submenu-button:hover::before {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+  background-color: #94a3b8;
 }
 
 .sidebar-submenu-button.active {
-  background-color: #eff6ff;
-  color: #2563eb;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(147, 197, 253, 0.08) 100%);
+  color: #1d4ed8;
   font-weight: 500;
+  padding-left: 2rem;
+  box-shadow: 
+    0 1px 2px rgba(59, 130, 246, 0.08),
+    inset 2px 0 0 0 #3b82f6;
 }
 
+.sidebar-submenu-button.active::before {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+  background-color: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+}
+
+/* Icon styling in submenu */
+.sidebar-submenu-button svg {
+  flex-shrink: 0;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-submenu-button:hover svg {
+  transform: translateX(2px);
+}
+
+.sidebar-submenu-button.active svg {
+  transform: translateX(2px);
+  color: #2563eb;
+}
+
+/* Submenu text span */
+.sidebar-submenu-button span {
+  transition: letter-spacing 0.2s ease;
+}
+
+.sidebar-submenu-button:hover span,
+.sidebar-submenu-button.active span {
+  letter-spacing: 0.01em;
+}
+
+/* Submenu animation - slide down and fade in */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-0.375rem);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 12rem;
+  }
+}
+
+.sidebar-submenu {
+  animation: slideDown 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Individual submenu items fade in with stagger */
+@keyframes fadeInItem {
+  from {
+    opacity: 0;
+    transform: translateX(-0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.sidebar-submenu-item {
+  animation: fadeInItem 0.2s ease-out backwards;
+}
+
+.sidebar-submenu-item:nth-child(1) {
+  animation-delay: 0.05s;
+}
+
+.sidebar-submenu-item:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.sidebar-submenu-item:nth-child(3) {
+  animation-delay: 0.15s;
+}
+
+.sidebar-submenu-item:nth-child(4) {
+  animation-delay: 0.2s;
+}
+
+/* Sidebar trigger button */
 .sidebar-trigger {
   display: inline-flex;
   align-items: center;
@@ -666,11 +807,12 @@ textarea {
   border: 1px solid #e2e8f0;
   background-color: transparent;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar-trigger:hover {
-  background-color: #f8fafc;
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
 }
 
 /* Header */

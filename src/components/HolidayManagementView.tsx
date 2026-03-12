@@ -25,10 +25,36 @@ const HolidayManagementView = () => {
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [loadingHolidays, setLoadingHolidays] = useState(false);
+
   // Fetch branches on mount
   useEffect(() => {
     fetchBranches();
+    fetchHolidays();
+
+    // Listen for refresh events
+    const handleRefresh = () => fetchHolidays();
+    window.addEventListener('holiday-refresh', handleRefresh);
+    
+    return () => {
+      window.removeEventListener('holiday-refresh', handleRefresh);
+    };
   }, []);
+
+  const fetchHolidays = async () => {
+    try {
+      setLoadingHolidays(true);
+      const response = await holidayService.getHolidays();
+      if (response.success && response.data) {
+        setHolidays(response.data.holidays || []);
+      }
+    } catch (error) {
+      console.error('Error fetching holidays for stats:', error);
+    } finally {
+      setLoadingHolidays(false);
+    }
+  };
 
   const fetchBranches = async () => {
     try {
@@ -170,7 +196,13 @@ const HolidayManagementView = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-muted text-sm">Total Holidays</p>
-              <h3 className="text-2xl font-bold text-primary mt-1">--</h3>
+              <h3 className="text-2xl font-bold text-primary mt-1">
+                {loadingHolidays ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  holidays.length
+                )}
+              </h3>
             </div>
             <div className="p-3 rounded-full bg-blue-100">
               <Calendar className="w-6 h-6 text-blue-600" />
@@ -182,7 +214,13 @@ const HolidayManagementView = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-muted text-sm">Company-Wide</p>
-              <h3 className="text-2xl font-bold text-primary mt-1">--</h3>
+              <h3 className="text-2xl font-bold text-primary mt-1">
+                {loadingHolidays ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  holidays.filter(h => !h.branch_id).length
+                )}
+              </h3>
             </div>
             <div className="p-3 rounded-full bg-purple-100">
               <Calendar className="w-6 h-6 text-purple-600" />
@@ -194,7 +232,13 @@ const HolidayManagementView = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-muted text-sm">Branch-Specific</p>
-              <h3 className="text-2xl font-bold text-primary mt-1">--</h3>
+              <h3 className="text-2xl font-bold text-primary mt-1">
+                {loadingHolidays ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  holidays.filter(h => h.branch_id).length
+                )}
+              </h3>
             </div>
             <div className="p-3 rounded-full bg-green-100">
               <Calendar className="w-6 h-6 text-green-600" />
@@ -206,7 +250,13 @@ const HolidayManagementView = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-muted text-sm">Upcoming</p>
-              <h3 className="text-2xl font-bold text-primary mt-1">--</h3>
+              <h3 className="text-2xl font-bold text-primary mt-1">
+                {loadingHolidays ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  holidays.filter(h => new Date(h.date) >= new Date()).length
+                )}
+              </h3>
             </div>
             <div className="p-3 rounded-full bg-orange-100">
               <Calendar className="w-6 h-6 text-orange-600" />

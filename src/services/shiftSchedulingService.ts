@@ -19,6 +19,24 @@ import {
   ApiResponse
 } from './apiInterfaces';
 
+export type {
+  ShiftTemplate,
+  CreateShiftTemplateRequest,
+  UpdateShiftTemplateRequest,
+  EmployeeShiftAssignment,
+  AssignShiftToEmployeeRequest,
+  UpdateEmployeeShiftAssignmentRequest,
+  ScheduleRequest,
+  CreateScheduleRequestRequest,
+  UpdateScheduleRequestRequest,
+  TimeOffBank,
+  CreateTimeOffBankRequest,
+  ShiftException,
+  CreateShiftExceptionRequest,
+  UpdateShiftExceptionRequest,
+  ApiResponse
+};
+
 class ShiftSchedulingService {
   // Shift Template methods
   async getShiftTemplates() {
@@ -280,6 +298,16 @@ class ShiftSchedulingService {
     }
   }
 
+  async getAllShiftExceptions(params?: { startDate?: string; endDate?: string; }) {
+    try {
+      const response = await apiServices.getAllShiftExceptions(params);
+      return response;
+    } catch (error) {
+      console.error('Error fetching all shift exceptions:', error);
+      throw error;
+    }
+  }
+
   async getShiftExceptions(userId: number, params?: { startDate?: string; endDate?: string; }) {
     try {
       const response = await apiServices.getShiftExceptions(userId, params);
@@ -356,7 +384,7 @@ class ShiftSchedulingService {
       const allAssignments = await this.getEmployeeShiftAssignments();
       if (allAssignments.success && allAssignments.data) {
         const filteredAssignments = allAssignments.data.employeeShiftAssignments.filter(
-          assignment => assignment.user_id === userId
+          (assignment: EmployeeShiftAssignment) => assignment.user_id === userId
         );
         return {
           success: true,
@@ -376,7 +404,7 @@ class ShiftSchedulingService {
       const userAssignments = await this.getShiftAssignmentsForUser(userId);
       if (userAssignments.success && userAssignments.data) {
         const activeAssignment = userAssignments.data.employeeShiftAssignments.find(
-          assignment => assignment.status === 'active'
+          (assignment: EmployeeShiftAssignment) => assignment.status === 'active'
         );
         return {
           success: true,

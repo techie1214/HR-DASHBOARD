@@ -205,7 +205,7 @@ const HolidayDutyRosterView = () => {
     if (staffMember) {
       return `${staffMember.firstName} ${staffMember.lastName}`;
     }
-    return roster => roster.user_name || `User ${userId}`;
+    return `User ${userId}`;
   };
 
   const getHolidayName = (holidayId: number) => {

@@ -16,6 +16,12 @@ export interface BranchAttendanceSettings {
   allow_manual_attendance_entry: boolean;
   enable_weekend_attendance: boolean;
   notify_absent_employees: boolean;
+  notify_supervisors_daily_summary?: boolean;
+  enable_face_recognition?: boolean;
+  enable_biometric_verification?: boolean;
+  enable_holiday_attendance?: boolean;
+  location_coordinates?: string | null;
+  location_radius_meters?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -44,6 +50,13 @@ export interface UpdateBranchSettingsRequest {
     allow_manual_attendance_entry?: boolean;
     enable_weekend_attendance?: boolean;
     notify_absent_employees?: boolean;
+    notify_supervisors_daily_summary?: boolean;
+    enable_face_recognition?: boolean;
+    enable_biometric_verification?: boolean;
+    enable_holiday_attendance?: boolean;
+    attendance_mode?: 'branch_based' | 'multiple_locations' | 'flexible';
+    location_coordinates?: string | null;
+    location_radius_meters?: number;
   };
 }
 

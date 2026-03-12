@@ -1159,6 +1159,36 @@ export const apiServices = {
   },
 
   // Shift Exception methods
+  async getAllShiftExceptions(params?: { startDate?: string; endDate?: string; }) {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await axios.get(`${API_ENDPOINT}/shift-scheduling/exceptions`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        params
+      });
+
+      return {
+        success: true,
+        message: "Shift exceptions retrieved successfully",
+        data: { exceptions: response.data.data?.exceptions || [] }
+      };
+    } catch (error: any) {
+      console.error('Error fetching all shift exceptions:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to fetch shift exceptions',
+        data: { exceptions: [] }
+      };
+    }
+  },
+
   async getShiftExceptions(userId: number, params?: { startDate?: string; endDate?: string; }) {
     try {
       const token = localStorage.getItem('authToken');
@@ -1188,6 +1218,7 @@ export const apiServices = {
       };
     }
   },
+
 
   async getShiftExceptionById(id: number) {
     try {

@@ -166,45 +166,26 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 className={`sidebar-menu-button ${activeView === "attendance" ? "active" : ""}`}
               >
                 <Clock className="w-4 h-4" />
-                <span className="flex-1">Attendance</span>
-                <ChevronRight
-                  className={`w-3 h-3 transition-transform ${
-                    expandedMenus.attendance ? 'rotate-90' : ''
-                  }`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleMenu('attendance');
-                  }}
-                  style={{ cursor: 'pointer' }}
-                />
+                <span>Attendance</span>
               </button>
-              {/* Submenu */}
-              {expandedMenus.attendance && (
-                <ul className="sidebar-submenu">
-                  <li className="sidebar-submenu-item">
-                    <button
-                      onClick={() => onNavigate("attendance-locations")}
-                      className={`sidebar-submenu-button ${
-                        activeView === "attendance-locations" ? "active" : ""
-                      }`}
-                    >
-                      <MapPin className="w-3 h-3" />
-                      <span>Locations</span>
-                    </button>
-                  </li>
-                  <li className="sidebar-submenu-item">
-                    <button
-                      onClick={() => onNavigate("attendance-reports")}
-                      className={`sidebar-submenu-button ${
-                        activeView === "attendance-reports" ? "active" : ""
-                      }`}
-                    >
-                      <FileText className="w-3 h-3" />
-                      <span>Reports</span>
-                    </button>
-                  </li>
-                </ul>
-              )}
+            </li>
+            <li className="sidebar-menu-item">
+              <button
+                onClick={() => onNavigate("attendance-locations")}
+                className={`sidebar-menu-button ${activeView === "attendance-locations" ? "active" : ""}`}
+              >
+                <MapPin className="w-4 h-4" />
+                <span>Locations</span>
+              </button>
+            </li>
+            <li className="sidebar-menu-item">
+              <button
+                onClick={() => onNavigate("attendance-reports")}
+                className={`sidebar-menu-button ${activeView === "attendance-reports" ? "active" : ""}`}
+              >
+                <FileText className="w-4 h-4" />
+                <span>Reports</span>
+              </button>
             </li>
             <li className="sidebar-menu-item">
               <button
@@ -231,6 +212,24 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
               >
                 <Clock className="w-4 h-4" />
                 <span>Time Management</span>
+              </button>
+            </li>
+            <li className="sidebar-menu-item">
+              <button
+                onClick={() => onNavigate("holidays")}
+                className={`sidebar-menu-button ${activeView === "holidays" ? "active" : ""}`}
+              >
+                <CalendarDays className="w-4 h-4" />
+                <span>Holidays</span>
+              </button>
+            </li>
+            <li className="sidebar-menu-item">
+              <button
+                onClick={() => onNavigate("holiday-duty-roster")}
+                className={`sidebar-menu-button ${activeView === "holiday-duty-roster" ? "active" : ""}`}
+              >
+                <UserCheck className="w-4 h-4" />
+                <span>Duty Roster</span>
               </button>
             </li>
             {/* <li className="sidebar-menu-item">
@@ -260,24 +259,6 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 <span>KPI</span>
               </button>
             </li> */}
-            <li className="sidebar-menu-item">
-              <button
-                onClick={() => onNavigate("holidays")}
-                className={`sidebar-menu-button ${activeView === "holidays" ? "active" : ""}`}
-              >
-                <CalendarDays className="w-4 h-4" />
-                <span>Holidays</span>
-              </button>
-            </li>
-            <li className="sidebar-menu-item">
-              <button
-                onClick={() => onNavigate("holiday-duty-roster")}
-                className={`sidebar-menu-button ${activeView === "holiday-duty-roster" ? "active" : ""}`}
-              >
-                <UserCheck className="w-4 h-4" />
-                <span>Duty Roster</span>
-              </button>
-            </li>
             <li className="sidebar-menu-item">
               <button
                 onClick={() => onNavigate("shiftscheduling")}

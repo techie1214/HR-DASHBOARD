@@ -9,6 +9,14 @@ import {
   ApiResponse
 } from './apiInterfaces';
 
+export type {
+  HolidayDutyRoster,
+  CreateHolidayDutyRosterRequest,
+  UpdateHolidayDutyRosterRequest,
+  BulkCreateHolidayDutyRosterRequest,
+  ApiResponse
+};
+
 class HolidayDutyRosterService {
   // Get all holiday duty rosters
   async getHolidayDutyRosters(params?: {

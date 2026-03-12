@@ -19,7 +19,7 @@ const SettingsView = () => {
 
   // Branch settings state
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [selectedBranchId, setSelectedBranchId] = useState<number | ''>('');
+  const [selectedBranchId, setSelectedBranchId] = useState<string | ''>('');
   const [branchSettingsLoading, setBranchSettingsLoading] = useState(false);
 
   // Global settings state
@@ -36,6 +36,11 @@ const SettingsView = () => {
     allow_manual_attendance_entry: true,
     enable_weekend_attendance: false,
     notify_absent_employees: true,
+    notify_supervisors_daily_summary: true,
+    enable_face_recognition: false,
+    enable_biometric_verification: false,
+    enable_holiday_attendance: false,
+    attendance_mode: 'branch_based' as 'branch_based' | 'multiple_locations' | 'flexible',
   });
 
   // Global settings form state
@@ -94,6 +99,11 @@ const SettingsView = () => {
           allow_manual_attendance_entry: response.settings.allow_manual_attendance_entry ?? true,
           enable_weekend_attendance: response.settings.enable_weekend_attendance ?? false,
           notify_absent_employees: response.settings.notify_absent_employees ?? true,
+          notify_supervisors_daily_summary: response.settings.notify_supervisors_daily_summary ?? true,
+          enable_face_recognition: response.settings.enable_face_recognition ?? false,
+          enable_biometric_verification: response.settings.enable_biometric_verification ?? false,
+          enable_holiday_attendance: response.settings.enable_holiday_attendance ?? false,
+          attendance_mode: response.settings.attendance_mode ?? 'branch_based',
         });
       }
     } catch (err) {
@@ -204,7 +214,7 @@ const SettingsView = () => {
           </div>
           <select
             value={selectedBranchId}
-            onChange={(e) => setSelectedBranchId(e.target.value ? Number(e.target.value) : '')}
+            onChange={(e) => setSelectedBranchId(e.target.value || '')}
             className="px-4 py-2.5 rounded-lg border-0 bg-white/95 text-gray-900 font-medium shadow-lg focus:ring-2 focus:ring-white/50"
             style={{ minWidth: '250px' }}
           >
@@ -326,11 +336,65 @@ const SettingsView = () => {
               description="Verify GPS location on check-in"
             />
             <Toggle
-              checked={branchForm.allow_manual_attendance_entry}
+              checked={branchForm.allow_manual_attendance_entry ?? false}
               onChange={(v) => setBranchForm({ ...branchForm, allow_manual_attendance_entry: v })}
               label="Manual Entry"
               description="Allow admin manual attendance"
             />
+          </div>
+        </div>
+
+        {/* Verification Methods */}
+        <div className="card p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+              <Shield className="w-5 h-5 text-indigo-600" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900">Advanced Verification</h4>
+              <p className="text-xs text-gray-500">Biometrics & AI</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <Toggle
+              checked={branchForm.enable_face_recognition ?? false}
+              onChange={(v) => setBranchForm({ ...branchForm, enable_face_recognition: v })}
+              label="Face Recognition"
+              description="Verify identity via camera"
+            />
+            <Toggle
+              checked={branchForm.enable_biometric_verification ?? false}
+              onChange={(v) => setBranchForm({ ...branchForm, enable_biometric_verification: v })}
+              label="Biometric Verification"
+              description="Fingerprint or FaceID"
+            />
+          </div>
+        </div>
+
+        {/* Attendance Mode */}
+        <div className="card p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
+              <Building className="w-5 h-5 text-slate-600" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900">Attendance Mode</h4>
+              <p className="text-xs text-gray-500">Operation style</p>
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
+              <select
+                value={branchForm.attendance_mode}
+                onChange={(e) => setBranchForm({ ...branchForm, attendance_mode: e.target.value as any })}
+                className="input"
+              >
+                <option value="branch_based">Branch Based (Geofencing)</option>
+                <option value="multiple_locations">Multiple Locations (Approved Hotspots)</option>
+                <option value="flexible">Flexible (Anywhere)</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -342,42 +406,54 @@ const SettingsView = () => {
             <Bell className="w-5 h-5 text-pink-600" />
           </div>
           <div>
-            <h4 className="font-semibold text-gray-900">Notifications & Weekend</h4>
+            <h4 className="font-semibold text-gray-900">Notifications & Policy</h4>
             <p className="text-xs text-gray-500">Additional options</p>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           <Toggle
-            checked={branchForm.enable_weekend_attendance}
+            checked={branchForm.enable_weekend_attendance ?? false}
             onChange={(v) => setBranchForm({ ...branchForm, enable_weekend_attendance: v })}
             label="Weekend Tracking"
-            description="Track weekend attendance"
+            description="Track on Sat/Sun"
           />
           <Toggle
-            checked={branchForm.notify_absent_employees}
-            onChange={(v) => setBranchForm({ ...branchForm, notify_absent_employees: v })}
-            label="Absent Notifications"
-            description="Notify absent employees"
+            checked={branchForm.enable_holiday_attendance ?? false}
+            onChange={(v) => setBranchForm({ ...branchForm, enable_holiday_attendance: v })}
+            label="Holiday Attendance"
+            description="Allow check-in on holidays"
           />
-          <div className="flex items-center justify-end">
-            <button
-              className="btn btn-primary px-6"
-              onClick={handleSaveBranchSettings}
-              disabled={loading || branchSettingsLoading}
-            >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <RotateCcw className="w-4 h-4 animate-spin" />
-                  Saving...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <Save className="w-4 h-4" />
-                  Save Branch Settings
-                </span>
-              )}
-            </button>
-          </div>
+          <Toggle
+            checked={branchForm.notify_absent_employees ?? false}
+            onChange={(v) => setBranchForm({ ...branchForm, notify_absent_employees: v })}
+            label="Absent Alerts"
+            description="Notify employees"
+          />
+          <Toggle
+            checked={branchForm.notify_supervisors_daily_summary ?? true}
+            onChange={(v) => setBranchForm({ ...branchForm, notify_supervisors_daily_summary: v })}
+            label="Supervisor Summary"
+            description="Notify daily summary"
+          />
+        </div>
+        <div className="flex items-center justify-end">
+          <button
+            className="btn btn-primary px-6"
+            onClick={handleSaveBranchSettings}
+            disabled={loading || branchSettingsLoading}
+          >
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <RotateCcw className="w-4 h-4 animate-spin" />
+                Saving...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <Save className="w-4 h-4" />
+                Save Branch Settings
+              </span>
+            )}
+          </button>
         </div>
       </div>
 

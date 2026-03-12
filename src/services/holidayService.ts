@@ -8,6 +8,13 @@ import {
   ApiResponse
 } from './apiInterfaces';
 
+export type {
+  Holiday,
+  CreateHolidayRequest,
+  UpdateHolidayRequest,
+  ApiResponse
+};
+
 class HolidayService {
   async getHolidays(params?: {
     branchId?: number;

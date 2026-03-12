@@ -69,7 +69,8 @@ export interface EmployeeShiftAssignment {
   shift_template_id: number;
   effective_from: string; // ISO date string
   effective_to: string | null; // ISO date string or null
-  status: 'active' | 'inactive';
+  assignment_type: 'permanent' | 'temporary' | 'rotating';
+  status: 'active' | 'inactive' | 'expired';
   created_by: number | null;
   created_at: string; // ISO datetime string
   updated_at: string; // ISO datetime string
@@ -80,13 +81,15 @@ export interface AssignShiftToEmployeeRequest {
   shift_template_id: number;
   effective_from: string; // ISO date string
   effective_to?: string | null; // ISO date string or null
+  assignment_type?: 'permanent' | 'temporary' | 'rotating';
 }
 
 export interface UpdateEmployeeShiftAssignmentRequest {
   shift_template_id?: number;
   effective_from?: string; // ISO date string
   effective_to?: string | null; // ISO date string or null
-  status?: 'active' | 'inactive';
+  assignment_type?: 'permanent' | 'temporary' | 'rotating';
+  status?: 'active' | 'inactive' | 'expired';
 }
 
 // Schedule Request interfaces
@@ -213,20 +216,6 @@ export interface ShiftSchedule {
   updated_at: string; // ISO datetime string
 }
 
-// Shift Schedule interface
-export interface ShiftSchedule {
-  id: number;
-  employee_id: number;
-  shift_type: string;
-  date: string; // ISO date string
-  start_time: string; // HH:MM format
-  end_time: string; // HH:MM format
-  department: string;
-  status: 'confirmed' | 'pending' | 'cancelled';
-  created_at: string; // ISO datetime string
-  updated_at: string; // ISO datetime string
-}
-
 // Shift Exception interfaces
 export interface ShiftException {
   id: number;
@@ -257,7 +246,7 @@ export interface CreateShiftExceptionRequest {
   new_end_time: string; // HH:MM:SS format
   new_break_duration_minutes?: number;
   reason: string;
-  status?: 'active' | 'pending';
+  status?: 'pending' | 'approved' | 'active' | 'rejected' | 'cancelled';
 }
 
 export interface UpdateShiftExceptionRequest {

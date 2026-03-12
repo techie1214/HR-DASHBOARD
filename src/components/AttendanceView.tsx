@@ -1,5 +1,5 @@
 // src/components/AttendanceView.tsx
-// Admin-focused Attendance Management with Calendar, List View, and Check-in Tracking
+// Admin-focused Attendance Management with List View and Check-in Tracking
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -16,6 +16,8 @@ import { getAllStaff } from '../services/staffManagementService';
 import { getAllBranches, Branch } from '../services/branchManagementService';
 import ProcessAttendanceModal from './ProcessAttendanceModal';
 import { holidayService } from '../services/holidayService';
+// Calendar view temporarily disabled - focusing on list view functionality
+// import AttendanceCalendarWrapper from './AttendanceCalendarWrapper';
 import {
   Calendar, Clock, CheckCircle, XCircle, AlertCircle, Search, Filter, Download,
   Plus, Edit3, Trash2, Users, Building, TrendingUp, TrendingDown, RefreshCw,
@@ -38,7 +40,9 @@ interface AttendanceWithStaff extends AttendanceRecord {
 }
 
 const AttendanceView = () => {
-  const [activeView, setActiveView] = useState<'list' | 'calendar'>('list');
+  // Calendar view temporarily disabled
+  const [activeView, setActiveView] = useState<'list'>('list');
+  // const [activeView, setActiveView] = useState<'list' | 'calendar'>('list');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -150,10 +154,12 @@ const AttendanceView = () => {
       if (staffRes.success && staffRes.staff) {
         const mappedStaff = staffRes.staff.map((s: any) => ({
           id: s.id,
-          name: [s.first_name, s.middle_name, s.last_name].filter(Boolean).join(' ') || s.email,
+          name: s.full_name || s.name || 'Unknown',
           email: s.work_email || s.email,
           department: s.department,
-          branch_id: s.branch_id
+          branch_id: s.branch_id,
+          full_name: s.full_name,
+          employee_id: s.employee_id
         }));
         setStaffMembers(mappedStaff);
       }
@@ -167,12 +173,37 @@ const AttendanceView = () => {
       }
 
       if (attendanceRes.success && attendanceRes.records) {
-        // Update pagination info
+        // Update pagination info - handle both snake_case and camelCase
         if (attendanceRes.pagination) {
-          setPagination(attendanceRes.pagination);
-          setTotalRecords(attendanceRes.pagination.totalItems);
-          setTotalPages(attendanceRes.pagination.totalPages);
+          const paginationData = {
+            currentPage: attendanceRes.pagination.current_page || attendanceRes.pagination.currentPage || 1,
+            pageSize: attendanceRes.pagination.per_page || attendanceRes.pagination.pageSize || 20,
+            totalItems: attendanceRes.pagination.total_records || attendanceRes.pagination.totalItems || 0,
+            totalPages: attendanceRes.pagination.total_pages || attendanceRes.pagination.totalPages || 0
+          };
+          
+          setPagination(paginationData);
+          setTotalRecords(paginationData.totalItems);
+          setTotalPages(paginationData.totalPages);
         }
+
+        // DEBUG: Log pagination data to console
+        console.log('📊 ATTENDANCE PAGINATION DATA:', {
+          currentPage,
+          pageSize,
+          totalRecords: attendanceRes.pagination?.total_records || attendanceRes.pagination?.totalItems || 0,
+          totalPages: attendanceRes.pagination?.total_pages || attendanceRes.pagination?.totalPages || 0,
+          recordsOnPage: attendanceRes.records.length,
+          pagination: attendanceRes.pagination,
+          records: attendanceRes.records.map((r: any) => ({
+            id: r.id,
+            user_id: r.user_id,
+            date: r.date,
+            status: r.status,
+            check_in: r.check_in_time,
+            check_out: r.check_out_time
+          }))
+        });
 
         // Enrich attendance records with staff info
         const enriched = attendanceRes.records.map((record: AttendanceRecord) => {
@@ -180,8 +211,9 @@ const AttendanceView = () => {
           const branch = branchesRes.branches?.find((b: Branch) => b.id === staff?.branch_id);
           return {
             ...record,
-            staff_name: staff ? [staff.first_name, staff.middle_name, staff.last_name].filter(Boolean).join(' ') : `User ${record.user_id}`,
-            staff_email: staff?.email,
+            staff_name: staff?.full_name || 'Unknown',
+            staff_email: staff?.email || staff?.work_email,
+            employee_id: staff?.employee_id,
             department: staff?.department,
             branch_name: branch?.name
           };
@@ -393,12 +425,12 @@ const AttendanceView = () => {
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <button
-            className={`btn ${activeView === 'list' ? 'btn-primary' : 'btn-outline'}`}
-            onClick={() => setActiveView('list')}
+            className={`btn btn-primary`}
           >
             <Filter className="w-4 h-4 mr-2" />
-            List
+            List View
           </button>
+          {/* Calendar view temporarily disabled
           <button
             className={`btn ${activeView === 'calendar' ? 'btn-primary' : 'btn-outline'}`}
             onClick={() => setActiveView('calendar')}
@@ -406,6 +438,7 @@ const AttendanceView = () => {
             <Calendar className="w-4 h-4 mr-2" />
             Calendar
           </button>
+          */}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -415,7 +448,8 @@ const AttendanceView = () => {
             <Filter className="w-4 h-4 mr-2" />
             {showAdvancedFilters ? 'Hide' : 'Show'} Filters
           </button>
-          <button
+          {/* Commented out - Admin only functions */}
+          {/* <button
             className="btn btn-primary"
             onClick={() => setShowProcessModal(true)}
           >
@@ -428,7 +462,7 @@ const AttendanceView = () => {
           >
             <Plus className="w-4 h-4 mr-2" />
             Manual Entry
-          </button>
+          </button> */}
           <button
             className="btn btn-outline"
             onClick={loadData}
@@ -439,48 +473,58 @@ const AttendanceView = () => {
         </div>
       </div>
 
-      {/* Bulk Actions Toolbar */}
-      {selectedRecords.length > 0 && (
-        <div className="card p-4 bg-blue-50 border border-blue-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                className="checkbox"
-                checked={selectedRecords.length === filteredRecords.length}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setSelectedRecords(filteredRecords.map(r => r.id));
-                  } else {
-                    setSelectedRecords([]);
-                  }
-                }}
-              />
-              <span className="text-sm font-medium text-blue-900">
-                {selectedRecords.length} record(s) selected
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                className="btn btn-sm btn-outline"
-                onClick={() => {
-                  // Export selected
-                  exportToCSV(true);
-                }}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Export Selected
-              </button>
-              <button
-                className="btn btn-sm btn-outline"
-                onClick={() => setSelectedRecords([])}
-              >
-                Deselect All
-              </button>
+      {/* Export Toolbar */}
+      <div className="card p-4 bg-blue-50 border border-blue-200">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Users className="w-5 h-5 text-blue-600" />
+            <div>
+              <p className="text-sm font-medium text-blue-900">
+                {filteredRecords.length} attendance record(s) available
+              </p>
+              <p className="text-xs text-blue-700 mt-0.5">
+                {dateRange.start} to {dateRange.end}
+              </p>
             </div>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-gray-600 font-medium">From:</label>
+              <input
+                type="date"
+                className="input input-sm w-32"
+                value={dateRange.start}
+                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-gray-600 font-medium">To:</label>
+              <input
+                type="date"
+                className="input input-sm w-32"
+                value={dateRange.end}
+                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+              />
+            </div>
+            <button
+              className="btn btn-sm btn-outline"
+              onClick={() => {
+                setCurrentPage(1);
+                loadData();
+              }}
+            >
+              Apply
+            </button>
+            <button
+              className="btn btn-sm btn-primary"
+              onClick={() => exportToCSV(false)}
+            >
+              <Download className="w-4 h-4" />
+              Export to CSV
+            </button>
+          </div>
         </div>
-      )}
+      </div>
 
       {/* Advanced Filters */}
       {showAdvancedFilters && (
@@ -651,7 +695,8 @@ const AttendanceView = () => {
           <table className="table min-w-full">
             <thead className="table-header">
               <tr>
-                <th className="table-header-cell" style={{ width: '40px' }}>
+                {/* Commented out checkbox column (Admin only) */}
+                {/* <th className="table-header-cell" style={{ width: '40px' }}>
                   <input
                     type="checkbox"
                     className="checkbox"
@@ -664,7 +709,7 @@ const AttendanceView = () => {
                       }
                     }}
                   />
-                </th>
+                </th> */}
                 <th className="table-header-cell whitespace-nowrap">Employee</th>
                 <th className="table-header-cell whitespace-nowrap">Date</th>
                 <th className="table-header-cell whitespace-nowrap">Check-in</th>
@@ -672,13 +717,14 @@ const AttendanceView = () => {
                 <th className="table-header-cell whitespace-nowrap">Hours Worked</th>
                 <th className="table-header-cell whitespace-nowrap">Status</th>
                 <th className="table-header-cell whitespace-nowrap">Branch</th>
-                <th className="table-header-cell right whitespace-nowrap">Actions</th>
+                {/* Commented out Actions column (Admin only) */}
+                {/* <th className="table-header-cell right whitespace-nowrap">Actions</th> */}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center">
+                  <td colSpan={7} className="px-6 py-12 text-center">
                     <div className="flex justify-center items-center gap-2">
                       <RefreshCw className="w-5 h-5 animate-spin text-blue-600" />
                       <span className="text-gray-600">Loading attendance records...</span>
@@ -687,18 +733,19 @@ const AttendanceView = () => {
                 </tr>
               ) : filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center">
+                  <td colSpan={7} className="px-6 py-12 text-center">
                     <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
                       <Calendar className="w-8 h-8 text-blue-500" />
                     </div>
                     <p className="text-gray-500 font-medium mb-1">No attendance records found</p>
-                    <p className="text-gray-400 text-sm">Adjust filters or add manual attendance</p>
+                    <p className="text-gray-400 text-sm">Adjust filters to see records</p>
                   </td>
                 </tr>
               ) : (
                 filteredRecords.map((record) => (
                   <tr key={record.id} className="table-row">
-                    <td className="table-cell">
+                    {/* Commented out checkbox (Admin only) */}
+                    {/* <td className="table-cell">
                       <input
                         type="checkbox"
                         className="checkbox"
@@ -711,7 +758,7 @@ const AttendanceView = () => {
                           }
                         }}
                       />
-                    </td>
+                    </td> */}
                     <td className="table-cell">
                       <div>
                         <p style={{ fontWeight: 500 }}>{record.staff_name || `User ${record.user_id}`}</p>
@@ -755,7 +802,8 @@ const AttendanceView = () => {
                     <td className="table-cell">
                       <span className="text-sm">{record.branch_name || '-'}</span>
                     </td>
-                    <td className="table-cell right">
+                    {/* Commented out action buttons (Admin only) */}
+                    {/* <td className="table-cell right">
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => openDetailsModal(record)}
@@ -779,7 +827,7 @@ const AttendanceView = () => {
                           <Trash2 className="w-3 h-3" />
                         </button>
                       </div>
-                    </td>
+                    </td> */}
                   </tr>
                 ))
               )}
@@ -862,131 +910,7 @@ const AttendanceView = () => {
   );
 
   const renderCalendarView = () => {
-    const { daysInMonth, startingDay, year, month } = getDaysInMonth(calendarDate);
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
-    return (
-      <div className="space-y-6">
-        {/* Calendar Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              className="btn btn-outline"
-              onClick={() => setCalendarDate(new Date(year, month - 1, 1))}
-            >
-              ← Previous
-            </button>
-            <h2 className="text-xl font-bold">
-              {monthNames[month]} {year}
-            </h2>
-            <button
-              className="btn btn-outline"
-              onClick={() => setCalendarDate(new Date(year, month + 1, 1))}
-            >
-              Next →
-            </button>
-          </div>
-          <button
-            className="btn btn-primary"
-            onClick={() => setShowManualAttendanceModal(true)}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Manual Entry
-          </button>
-        </div>
-
-        {/* Calendar Grid */}
-        <div className="card overflow-hidden">
-          <div className="grid grid-cols-7 border-b">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day} className="p-3 text-center font-medium text-sm bg-gray-50 border-r last:border-r-0">
-                {day}
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7">
-            {/* Empty cells for days before the first day of the month */}
-            {Array.from({ length: startingDay }).map((_, i) => (
-              <div key={`empty-${i}`} className="p-2 min-h-[100px] bg-gray-50 border-r border-b last:border-r-0" />
-            ))}
-            {/* Days of the month */}
-            {Array.from({ length: daysInMonth }).map((_, i) => {
-              const day = i + 1;
-              const dayAttendance = getAttendanceForDate(day);
-              const holiday = isHoliday(day);
-              const presentCount = dayAttendance.filter(a => a.status === 'present').length;
-              const lateCount = dayAttendance.filter(a => a.status === 'late').length;
-              const absentCount = dayAttendance.filter(a => a.status === 'absent').length;
-              const isWeekend = [0, 6].includes(new Date(year, month, day).getDay());
-
-              return (
-                <div
-                  key={day}
-                  className={`p-2 min-h-[100px] border-r border-b last:border-r-0 relative ${
-                    holiday ? 'bg-red-50' : isWeekend ? 'bg-gray-50' : ''
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-medium">{day}</div>
-                    {holiday && (
-                      <span className="text-xs text-red-600 font-medium" title={holiday.name}>
-                        🎉 {holiday.name}
-                      </span>
-                    )}
-                  </div>
-                  {dayAttendance.length > 0 && (
-                    <div className="space-y-1 mt-1">
-                      {presentCount > 0 && (
-                        <div className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded">
-                          ✓ {presentCount} present
-                        </div>
-                      )}
-                      {lateCount > 0 && (
-                        <div className="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded">
-                          ⚠ {lateCount} late
-                        </div>
-                      )}
-                      {absentCount > 0 && (
-                        <div className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded">
-                          ✗ {absentCount} absent
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Legend */}
-        <div className="card p-4">
-          <h4 className="font-medium mb-3">Legend</h4>
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-green-100 rounded"></div>
-              <span className="text-sm">Present</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-yellow-100 rounded"></div>
-              <span className="text-sm">Late</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-red-100 rounded"></div>
-              <span className="text-sm">Absent</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-red-50 border border-red-200 rounded"></div>
-              <span className="text-sm">Holiday</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-gray-50 rounded"></div>
-              <span className="text-sm">Weekend</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <AttendanceCalendarWrapper onBackToList={() => setActiveView('list')} />;
   };
 
   return (
@@ -1018,37 +942,46 @@ const AttendanceView = () => {
         </div>
       )}
 
-      {/* View Toggle and Filters */}
-      <div className="card p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <button
-              className={`btn ${activeView === 'list' ? 'btn-primary' : 'btn-outline'}`}
-              onClick={() => setActiveView('list')}
-            >
-              <Filter className="w-4 h-4 mr-2" />
-              List View
-            </button>
-            <button
-              className={`btn ${activeView === 'calendar' ? 'btn-primary' : 'btn-outline'}`}
-              onClick={() => setActiveView('calendar')}
-            >
-              <Calendar className="w-4 h-4 mr-2" />
-              Calendar View
-            </button>
-          </div>
-          <button
-            className={`btn ${showFilters ? 'btn-primary' : 'btn-outline'}`}
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            <Filter className="w-4 h-4 mr-2" />
-            {showFilters ? 'Hide' : 'Show'} Filters
-          </button>
-        </div>
-      </div>
-
       {/* Content */}
       {activeView === 'list' ? renderListView() : renderCalendarView()}
+
+      {/* Pagination - Only show in list view */}
+      {activeView === 'list' && pagination && pagination.totalPages > 1 && (
+        <div className="card p-4">
+          {/* DEBUG: Pagination state */}
+          {console.log('📄 PAGINATION CONTROLS RENDERING:', {
+            currentPage,
+            pageSize,
+            totalPages: pagination.totalPages,
+            totalItems: pagination.totalItems,
+            hasNext: currentPage < pagination.totalPages,
+            hasPrev: currentPage > 1,
+            showingFrom: (currentPage - 1) * pageSize + 1,
+            showingTo: Math.min(currentPage * pageSize, pagination.totalItems)
+          })}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted">
+              Showing page {pagination.currentPage} of {pagination.totalPages} ({pagination.totalItems} total records)
+            </p>
+            <div className="flex gap-2">
+              <button
+                className="btn btn-sm btn-outline"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </button>
+              <button
+                className="btn btn-sm btn-outline"
+                onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
+                disabled={currentPage === pagination.totalPages}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Manual Attendance Modal */}
       {showManualAttendanceModal && (

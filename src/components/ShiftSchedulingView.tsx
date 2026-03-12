@@ -150,8 +150,8 @@ const ShiftSchedulingView = () => {
           setAssignments(assignmentsRes.data.employeeShiftAssignments || []);
         }
       } else if (activeTab === 'exceptions') {
-        // Load exceptions for all users (we'll use user_id 0 as a placeholder to get all)
-        const exceptionsRes = await shiftSchedulingService.getShiftExceptions(0);
+        // Load all exceptions using the admin endpoint (no userId needed)
+        const exceptionsRes = await shiftSchedulingService.getAllShiftExceptions();
         if (exceptionsRes.success && exceptionsRes.data) {
           setExceptions(exceptionsRes.data.exceptions || []);
         }
@@ -198,10 +198,35 @@ const ShiftSchedulingView = () => {
       const assignEnd = a.effective_to ? new Date(a.effective_to) : null;
       
       // Check for date overlap
+      let hasDateOverlap = false;
       if (end && assignEnd) {
-        return start <= assignEnd && end >= assignStart;
+        hasDateOverlap = start <= assignEnd && end >= assignStart;
+      } else {
+        hasDateOverlap = start >= assignStart && (!assignEnd || start <= assignEnd);
       }
-      return start >= assignStart && (!assignEnd || start <= assignEnd);
+
+      if (!hasDateOverlap) return false;
+
+      // If dates overlap, check if recurrence days also overlap
+      // Note: This logic assumes we have access to the template data for 'a' 
+      // which is stored in 'templates' state.
+      const existingTemplate = templates.find(t => t.id === a.shift_template_id);
+      const newTemplate = templates.find(t => t.id === assignmentForm.shift_template_id);
+
+      if (existingTemplate && newTemplate && existingTemplate.recurrence_days && newTemplate.recurrence_days) {
+        try {
+          const existingDays = JSON.parse(existingTemplate.recurrence_days);
+          const newDays = JSON.parse(newTemplate.recurrence_days);
+          const commonDays = existingDays.filter((day: string) => newDays.includes(day));
+          
+          // If they don't share any days, it's NOT a conflict even if dates overlap
+          if (commonDays.length === 0) return false;
+        } catch (e) {
+          // If JSON parsing fails, fall back to strict overlap
+        }
+      }
+
+      return true;
     });
   };
 

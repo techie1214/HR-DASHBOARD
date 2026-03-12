@@ -130,7 +130,7 @@ export const getAllAttendanceRecords = async (
     }
 
     const data = responseData.data;
-    const recordsArray: AttendanceRecord[] = data.attendanceRecords || data.records || data.data || [];
+    const recordsArray: AttendanceRecord[] = data.attendance || data.attendanceRecords || data.records || data.data || [];
     const pagination = data.pagination;
 
     return {
@@ -831,6 +831,153 @@ export const getMonthlyStats = async (): Promise<{ success: boolean; stats?: Mon
     return {
       success: false,
       message: error.response?.data?.message || error.message || 'Failed to fetch monthly attendance statistics',
+    };
+  }
+};
+
+// Get attendance data for calendar view (aggregated by date)
+export interface CalendarDayAttendance {
+  date: string;
+  totalStaff: number;
+  scheduledStaff: number;  // Staff scheduled to work that day
+  present: number;
+  late: number;
+  absent: number;
+  onLeave: number;
+  attendanceRate: number;
+}
+
+export const getAttendanceForMonth = async (
+  year: number,
+  month: number
+): Promise<{ success: boolean; data?: CalendarDayAttendance[]; message?: string }> => {
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      return {
+        success: false,
+        message: 'Authentication token not found. Please log in again.'
+      };
+    }
+
+    const startDate = new Date(year, month, 1).toISOString().split('T')[0];
+    const endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
+
+    console.log('[AttendanceService] Fetching attendance for:', { year, month, startDate, endDate });
+
+    // Fetch attendance records and staff count in parallel
+    const [attendanceResponse, staffResponse] = await Promise.all([
+      axios.get(`${API_ENDPOINT}/attendance/records`, {
+        params: {
+          startDate,
+          endDate,
+          limit: 5000,
+          page: 1
+        },
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }),
+      axios.get(`${API_ENDPOINT}/staff`, {
+        params: {
+          page: 1,
+          limit: 1000
+        },
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+    ]);
+
+    console.log('[AttendanceService] API Response:', {
+      attendanceCount: attendanceResponse.data.data?.attendance?.length || 0,
+      staffCount: staffResponse.data.data?.staff?.length || 0
+    });
+
+    const attendanceRecords: AttendanceRecord[] = attendanceResponse.data.data?.attendance || [];
+    const allStaff = staffResponse.data.data?.staff || staffResponse.data.staff || [];
+    
+    // Count active staff
+    const totalActiveStaff = allStaff.filter((s: any) => 
+      s.status === 'active' && !s.termination_date
+    ).length;
+
+    console.log('[AttendanceService] Total active staff:', totalActiveStaff);
+    console.log('[AttendanceService] Attendance records:', attendanceRecords.length);
+
+    // Aggregate attendance by date
+    const aggregatedByDate = new Map<string, CalendarDayAttendance>();
+    const staffWithRecordsByDate = new Map<string, Set<number>>();
+
+    attendanceRecords.forEach(record => {
+      // Track which staff have records for each date
+      if (!staffWithRecordsByDate.has(record.date)) {
+        staffWithRecordsByDate.set(record.date, new Set());
+      }
+      staffWithRecordsByDate.get(record.date)!.add(record.user_id);
+
+      if (!aggregatedByDate.has(record.date)) {
+        aggregatedByDate.set(record.date, {
+          date: record.date,
+          totalStaff: totalActiveStaff,
+          scheduledStaff: 0,
+          present: 0,
+          late: 0,
+          absent: 0,
+          onLeave: 0,
+          attendanceRate: 0
+        });
+      }
+
+      const dayData = aggregatedByDate.get(record.date)!;
+      
+      // Count based on status
+      if (record.status === 'present') dayData.present++;
+      else if (record.status === 'late') dayData.late++;
+      else if (record.status === 'absent') dayData.absent++;
+      else if (record.status === 'leave' || record.status === 'half_day') dayData.onLeave++;
+    });
+
+    console.log('[AttendanceService] Aggregated days:', aggregatedByDate.size);
+    console.log('[AttendanceService] Sample day data:', Array.from(aggregatedByDate.entries())[0]);
+
+    // Calculate scheduled staff and attendance rates
+    aggregatedByDate.forEach((dayData, date) => {
+      // Staff scheduled = those who have any attendance record for that day
+      const staffCount = staffWithRecordsByDate.get(date)?.size || 0;
+      dayData.scheduledStaff = staffCount;
+      dayData.totalStaff = totalActiveStaff;
+      
+      // Attendance rate = present / scheduled staff (not total staff)
+      // This is more accurate for companies with rotating shifts
+      if (dayData.scheduledStaff > 0) {
+        dayData.attendanceRate = Math.round((dayData.present / dayData.scheduledStaff) * 100);
+      }
+    });
+
+    return {
+      success: true,
+      data: Array.from(aggregatedByDate.values()),
+    };
+  } catch (error: any) {
+    console.error('[AttendanceService] Error fetching attendance:', error);
+    console.error('[AttendanceService] Error details:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    });
+    
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      return {
+        success: false,
+        message: 'Access denied. Please check your permissions or log in again.'
+      };
+    }
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Failed to fetch monthly attendance data',
     };
   }
 };
