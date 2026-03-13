@@ -21,7 +21,6 @@ import LeaveManagementView from "./components/LeaveManagementView";
 import LeaveAllocationView from "./components/LeaveAllocationView";
 import AttendanceLocationsView from "./components/AttendanceLocationsView";
 import AttendanceReportView from "./components/AttendanceReportView";
-import PerformanceMetrics from "./components/PerformanceMetrics";
 import { EmployeeTable } from "./components/EmployeeTable";
 import KPIView from "./components/KPIView";
 import HolidayManagementView from "./components/HolidayManagementView";
@@ -29,8 +28,9 @@ import HolidayDutyRosterView from "./components/HolidayDutyRosterView";
 import ShiftSchedulingView from "./components/ShiftSchedulingView";
 import SettingsView from "./components/SettingsView";
 import StaffLocationAssignmentView from "./components/StaffLocationAssignmentView";
+import { getDashboardStats } from "./services/dashboardService";
 // import  StaffManagementView  from "./components/StaffManagementView";
-import { mockNotifications, mockStaffData } from "./data/staffData";
+import { mockNotifications } from "./data/staffData";
 import {
   LayoutDashboard,
   Users,
@@ -336,6 +336,30 @@ export default function App() {
   const [selectedStaffFromSearch, setSelectedStaffFromSearch] = useState<any>(null);
   const [selectedResultIndex, setSelectedResultIndex] = useState(-1);
   const [searchInputRef, setSearchInputRef] = useState<HTMLInputElement | null>(null);
+  
+  // Dashboard stats state
+  const [dashboardStats, setDashboardStats] = useState<any>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  
+  // Cached staff data for search
+  const [cachedStaffData, setCachedStaffData] = useState<any[]>([]);
+  
+  // Fetch staff data for search on mount
+  useEffect(() => {
+    const fetchStaffForSearch = async () => {
+      try {
+        const response = await getAllStaff(1, 1000);
+        if (response.success && response.staff) {
+          setCachedStaffData(response.staff);
+        }
+      } catch (error) {
+        console.error('Error fetching staff for search:', error);
+      }
+    };
+    
+    fetchStaffForSearch();
+  }, []);
+  
   const [currentTime, setCurrentTime] = useState(() => {
     const now = new Date();
     const day = now.getDate();
@@ -372,6 +396,25 @@ export default function App() {
   useEffect(() => {
     console.log('Checking system initialization...');
     checkSystemInitialization();
+  }, []);
+
+  // Fetch dashboard stats on mount
+  useEffect(() => {
+    const fetchDashboardStats = async () => {
+      try {
+        setStatsLoading(true);
+        const result = await getDashboardStats();
+        if (result.success && result.stats) {
+          setDashboardStats(result.stats);
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard stats:', error);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    fetchDashboardStats();
   }, []);
 
   // Check login status and load user details only after system initialization is confirmed
@@ -438,7 +481,7 @@ export default function App() {
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     setSelectedResultIndex(-1);
-    
+
     if (query.trim() === "") {
       setSearchResults([]);
       setShowSearchResults(false);
@@ -448,64 +491,52 @@ export default function App() {
     const queryLower = query.toLowerCase();
     const allResults: any[] = [];
 
-    // Staff search
-    const staffMatches = mockStaffData.filter(staff =>
-      `${staff.firstName} ${staff.middleName} ${staff.lastName}`.toLowerCase().includes(queryLower) ||
-      staff.email.toLowerCase().includes(queryLower) ||
-      staff.id.toLowerCase().includes(queryLower) ||
-      staff.department.toLowerCase().includes(queryLower) ||
-      staff.departmentRole.toLowerCase().includes(queryLower) ||
-      staff.phoneNumber.includes(query) ||
-      staff.stateOfOrigin.toLowerCase().includes(queryLower)
+    // Staff search - using REAL data from cachedStaffData
+    const staffMatches = cachedStaffData.filter(staff =>
+      `${staff.full_name || ''} ${staff.firstName || ''} ${staff.lastName || ''}`.toLowerCase().includes(queryLower) ||
+      (staff.email || '').toLowerCase().includes(queryLower) ||
+      (staff.work_email || '').toLowerCase().includes(queryLower) ||
+      (staff.employee_id || '').toLowerCase().includes(queryLower) ||
+      (staff.department || '').toLowerCase().includes(queryLower) ||
+      (staff.departmentRole || '').toLowerCase().includes(queryLower) ||
+      (staff.phoneNumber || '').includes(query)
     ).slice(0, 5).map((staff, index) => ({
       type: 'staff',
       category: 'Staff Members',
       categoryIcon: '👤',
-      id: staff.id,
-      title: `${staff.firstName} ${staff.middleName} ${staff.lastName}`,
-      subtitle: `${staff.departmentRole} • ${staff.department}`,
-      meta: staff.status === 'Active' ? '✓ Active' : '⊘ Inactive',
-      metaColor: staff.status === 'Active' ? '#16a34a' : '#6b7280',
+      id: staff.user_id || staff.id,
+      title: staff.full_name || `${staff.firstName || ''} ${staff.lastName || ''}`.trim() || `User ${staff.user_id}`,
+      subtitle: `${staff.departmentRole || staff.designation || 'Staff'} • ${staff.department || 'Unassigned'}`,
+      meta: staff.status === 'active' ? '✓ Active' : '⊘ Inactive',
+      metaColor: staff.status === 'active' ? '#16a34a' : '#6b7280',
       data: staff,
       resultIndex: index
     }));
 
-    // Department search
-    const departments = ['Sales', 'Technical', 'Solar', 'Logistics', 'Audit', 'HR', 'RMS', 'Digital Media Team'];
-    const departmentMatches = departments
-      .filter(dept => dept.toLowerCase().includes(queryLower))
-      .map((dept, index) => ({
+    // Department search - using REAL data from cachedStaffData
+    const departmentMap = new Map<string, number>();
+    cachedStaffData.forEach(staff => {
+      const dept = staff.department || 'Unassigned';
+      departmentMap.set(dept, (departmentMap.get(dept) || 0) + 1);
+    });
+    
+    const departmentMatches = Array.from(departmentMap.entries())
+      .filter(([dept]) => dept.toLowerCase().includes(queryLower))
+      .map(([dept, count], index) => ({
         type: 'department',
         category: 'Departments',
         categoryIcon: '🏢',
         id: `dept-${dept}`,
         title: dept,
         subtitle: `View staff in ${dept}`,
-        meta: `${mockStaffData.filter(s => s.department === dept).length} staff`,
+        meta: `${count} staff`,
         metaColor: '#2563eb',
-        data: { name: dept },
+        data: { name: dept, count },
         resultIndex: index
       }));
 
-    // Leave type search
-    const leaveTypes = ['Annual', 'Sick', 'Maternity', 'Paternity', 'Bereaved', 'Emergency', 'Unpaid'];
-    const leaveMatches = leaveTypes
-      .filter(type => type.toLowerCase().includes(queryLower))
-      .map((type, index) => ({
-        type: 'leave',
-        category: 'Leave Types',
-        categoryIcon: '🏖️',
-        id: `leave-${type}`,
-        title: `${type} Leave`,
-        subtitle: 'View leave requests',
-        meta: 'Manage',
-        metaColor: '#7c3aed',
-        data: { name: type },
-        resultIndex: index
-      }));
+    allResults.push(...staffMatches, ...departmentMatches);
 
-    allResults.push(...staffMatches, ...departmentMatches, ...leaveMatches);
-    
     setSearchResults(allResults);
     setShowSearchResults(allResults.length > 0);
   };
@@ -598,38 +629,30 @@ export default function App() {
         return (
           <div className="space-y-6">
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md-grid-cols-2 lg-grid-cols-4 gap-6">
-              <StatsCard 
+            <div className="grid grid-cols-1 md-grid-cols-2 lg-grid-cols-3 gap-6">
+              <StatsCard
                 title="Total Employees"
-                value="248"
-                change="+12 this month"
+                value={statsLoading ? '...' : dashboardStats?.totalEmployees || 0}
+                change={statsLoading ? '' : `${dashboardStats?.activeEmployees || 0} active`}
                 changeType="positive"
                 icon={Users}
                 iconColor="bg-blue"
               />
-              <StatsCard 
+              <StatsCard
                 title="Attendance Rate"
-                value="96.5%"
-                change="+2.1% from last week"
+                value={statsLoading ? '...' : `${dashboardStats?.attendanceRate || 0}%`}
+                change={statsLoading ? '' : 'Today'}
                 changeType="positive"
                 icon={Clock}
                 iconColor="bg-green"
               />
-              <StatsCard 
+              <StatsCard
                 title="Pending Leaves"
-                value="18"
-                change="4 urgent"
+                value={statsLoading ? '...' : dashboardStats?.pendingLeaves || 0}
+                change={statsLoading ? '' : 'Needs attention'}
                 changeType="neutral"
                 icon={Calendar}
                 iconColor="bg-orange"
-              />
-              <StatsCard 
-                title="New Hires"
-                value="12"
-                change="This month"
-                changeType="positive"
-                icon={UserPlus}
-                iconColor="bg-purple"
               />
             </div>
 
@@ -639,14 +662,10 @@ export default function App() {
               <DepartmentChart />
             </div>
 
-            {/* Leave Requests and Recent Hires */}
-            <div className="grid grid-cols-1 lg-grid-cols-2 gap-6">
+            {/* Leave Requests */}
+            <div className="grid grid-cols-1 gap-6">
               <LeaveRequestCard />
-              <RecentHires />
             </div>
-
-            {/* Performance Metrics */}
-            <PerformanceMetrics />
           </div>
         );
       
@@ -661,8 +680,6 @@ export default function App() {
               <AttendanceChart />
               <DepartmentChart />
             </div>
-            {/* Performance Metrics */}
-            <PerformanceMetrics />
           </div>
         );
       

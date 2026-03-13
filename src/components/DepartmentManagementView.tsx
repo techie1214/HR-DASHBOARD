@@ -200,52 +200,16 @@ const DepartmentManagementView = () => {
         </div>
       )}
 
-      {/* Stats Cards - Compact design to fit all 4 on one line */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card p-3 cursor-pointer transition-all hover-lift">
-          <div className="flex items-center gap-2">
-            <div className="icon-wrapper" style={{ backgroundColor: '#dbeafe', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
-              <Building className="w-3 h-3" style={{ color: '#2563eb' }} />
+      {/* Stats Cards - Only Total Departments */}
+      <div className="grid grid-cols-1 gap-4">
+        <div className="card p-6 cursor-pointer transition-all hover-lift">
+          <div className="flex items-center gap-3">
+            <div className="icon-wrapper" style={{ backgroundColor: '#dbeafe', width: '3rem', height: '3rem', borderRadius: '0.5rem' }}>
+              <Building className="w-5 h-5" style={{ color: '#2563eb' }} />
             </div>
             <div>
-              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Total Departments</p>
-              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{totalDepartments}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-3 cursor-pointer transition-all hover-lift">
-          <div className="flex items-center gap-2">
-            <div className="icon-wrapper" style={{ backgroundColor: '#dcfce7', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
-              <Briefcase className="w-3 h-3" style={{ color: '#16a34a' }} />
-            </div>
-            <div>
-              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>IT/Tech</p>
-              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{itDepartments}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-3 cursor-pointer transition-all hover-lift">
-          <div className="flex items-center gap-2">
-            <div className="icon-wrapper" style={{ backgroundColor: '#fef9c3', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
-              <Users className="w-3 h-3" style={{ color: '#ca8a04' }} />
-            </div>
-            <div>
-              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>HR/People</p>
-              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{hrDepartments}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-3 cursor-pointer transition-all hover-lift">
-          <div className="flex items-center gap-2">
-            <div className="icon-wrapper" style={{ backgroundColor: '#f3e8ff', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
-              <Building className="w-3 h-3" style={{ color: '#9333ea' }} />
-            </div>
-            <div>
-              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Other</p>
-              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{otherDepartments}</p>
+              <p className="text-muted" style={{ fontSize: '0.875rem', lineHeight: '1' }}>Total Departments</p>
+              <p style={{ fontSize: '2rem', fontWeight: 600, lineHeight: '1' }}>{totalDepartments}</p>
             </div>
           </div>
         </div>
@@ -426,7 +390,6 @@ const DepartmentManagementView = () => {
                       </div>
                       <div>
                         <p style={{ fontWeight: 500, fontSize: '0.875rem' }}>{department.name}</p>
-                        <p className="text-xs text-muted">ID: {typeof department.id === 'string' ? department.id.slice(0, 8) : department.id}</p>
                       </div>
                     </div>
                   </td>

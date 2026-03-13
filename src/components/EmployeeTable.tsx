@@ -1,69 +1,108 @@
 // This component renders a table displaying employee information
 // It shows employee details including name, department, position, status, and actions
 
-// Import Lucide React icon for actions menu
+import React, { useState, useEffect } from "react";
 import { MoreHorizontal } from "lucide-react";
-// Import data function to get employee table data
-import { getEmployeeTableData } from "../data/staffData";
+import { getAllStaff } from "../services/staffManagementService";
 
-// Main component function for employee table
+interface Employee {
+  id: number;
+  name: string;
+  email: string;
+  department: string;
+  position: string;
+  status: 'Active' | 'Inactive';
+  avatar: string;
+}
+
 export function EmployeeTable() {
-  // Get employee data from staff data module
-  const employees = getEmployeeTableData();
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Main render return with table structure
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        setLoading(true);
+        const response = await getAllStaff(1, 100);
+        
+        if (response.success && response.staff) {
+          const staffList = response.staff.map((s: any) => ({
+            id: s.user_id || s.id,
+            name: s.full_name || `${s.firstName || ''} ${s.lastName || ''}`.trim() || `User ${s.user_id}`,
+            email: s.email || s.work_email || '', 
+            department: s.department || 'Unassigned',
+            position: s.designation || s.departmentRole || 'Staff',
+            status: s.status === 'active' ? 'Active' : 'Inactive',
+            avatar: (s.full_name || s.firstName || 'U').substring(0, 2).toUpperCase()
+          }));
+          
+          setEmployees(staffList);
+        }
+      } catch (error) {
+        console.error('Error fetching employees:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEmployees();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="rounded-lg border p-8 text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+        <p className="text-muted mt-2">Loading employees...</p>
+      </div>
+    );
+  }
+
   return (
-    // Table container with border styling
     <div className="rounded-lg border">
-      {/* HTML table element */}
       <table className="table">
-        {/* Table header */}
         <thead className="table-header">
           <tr>
-            {/* Header cells for each column */}
             <th className="table-header-cell">Employee</th>
             <th className="table-header-cell">Department</th>
             <th className="table-header-cell">Position</th>
             <th className="table-header-cell">Status</th>
-            <th className="table-header-cell right">Actions</th>
+            {/* <th className="table-header-cell right">  Actions</th> */}
           </tr>
         </thead>
-        {/* Table body */}
         <tbody>
-          {/* Map over employees array to create table rows */}
-          {employees.map((employee) => (
-            // Table row for each employee
-            <tr key={employee.id} className="table-row">
-              {/* Employee information cell with avatar and details */}
-              <td className="table-cell">
-                <div className="employee-info">
-                  {/* Employee avatar */}
-                  <div className="avatar">{employee.avatar}</div>
-                  {/* Employee name and email details */}
-                  <div className="employee-details">
-                    <div className="employee-name">{employee.name}</div>
-                    <div className="employee-email">{employee.email}</div>
+          {employees.length > 0 ? (
+            employees.map((employee) => (
+              <tr key={employee.id} className="table-row">
+                <td className="table-cell">
+                  <div className="employee-info">
+                    <div className="avatar">{employee.avatar}</div>
+                    <div className="employee-details">
+                      <div className="employee-name">{employee.name}</div>
+                      <div className="employee-email">{employee.email}</div>
+                    </div>
                   </div>
-                </div>
-              </td>
-              {/* Department cell */}
-              <td className="table-cell">{employee.department}</td>
-              {/* Position cell */}
-              <td className="table-cell">{employee.position}</td>
-              {/* Status cell with conditional badge styling */}
-              <td className="table-cell">
-                <span className={employee.status === "Active" ? "badge badge-default" : "badge badge-secondary"}>
-                  {employee.status}
-                </span>
-              </td>
-              {/* Actions cell with menu button */}
-              <td className="table-cell right">
-                <button className="btn btn-ghost btn-sm">
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
+                </td>
+                <td className="table-cell">{employee.department}</td>
+                <td className="table-cell">{employee.position}</td>
+                <td className="table-cell">
+                  <span className={employee.status === "Active" ? "badge badge-default" : "badge badge-secondary"}>
+                    {employee.status}
+                  </span>
+                </td>
+                <td className="table-cell right">
+                  <button className="btn btn-ghost btn-sm">
+                    {/* <MoreHorizontal className="w-4 h-4" /> */}
+                  </button>
+                </td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan={5} className="text-center p-8 text-muted">
+                No employees found
               </td>
             </tr>
-          ))}
+          )}
         </tbody>
       </table>
     </div>
