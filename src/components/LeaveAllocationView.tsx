@@ -1092,7 +1092,7 @@ const LeaveAllocationView = () => {
                     <option value="" disabled>Select Staff</option>
                     {staffMembers.map(staff => (
                       <option key={staff.id} value={staff.id}>
-                        {staff.name} {staff.staff_id ? `(${staff.staff_id})` : ''} {staff.email ? `- ${staff.email}` : ''}
+                        {staff.name} {staff.staff_id ? `(${staff.staff_id})` : ''}
                       </option>
                     ))}
                   </select>

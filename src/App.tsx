@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { NotificationPanel } from "./components/NotificationPanel";
 import { AllStaffView } from "./components/AllStaffView";
 import { BranchManagementView } from "./components/BranchManagementView";
-import { TimeManagementView } from "./components/TimeManagementView";
 import { OffDaysView } from "./components/OffDaysView";
 import { StatsCard } from "./components/StatsCard";
 import { AttendanceChart } from "./components/AttendanceChart";
@@ -195,15 +194,6 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
               >
                 <Building className="w-4 h-4" />
                 <span>Department Management</span>
-              </button>
-            </li>
-            <li className="sidebar-menu-item">
-              <button
-                onClick={() => onNavigate("timemanagement")}
-                className={`sidebar-menu-button ${activeView === "timemanagement" ? "active" : ""}`}
-              >
-                <Clock className="w-4 h-4" />
-                <span>Time Management</span>
               </button>
             </li>
             <li className="sidebar-menu-item">
@@ -746,9 +736,6 @@ export default function App() {
       case "departments":
         return <DepartmentManagementView />;
 
-      case "timemanagement":
-        return <TimeManagementView />;
-
       case "employees":
         return <EmployeesView />;
 
@@ -839,11 +826,6 @@ export default function App() {
         return {
           title: "Department Management",
           subtitle: "Manage organizational departments and structures"
-        };
-      case "timemanagement":
-        return {
-          title: "Time Management",
-          subtitle: "Set resumption times for branches and individual staff"
         };
       case "employees":
         return {

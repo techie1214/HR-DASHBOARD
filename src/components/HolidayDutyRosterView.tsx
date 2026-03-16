@@ -555,7 +555,7 @@ const HolidayDutyRosterView = () => {
                         <option value="">Select staff member</option>
                         {staff.map(member => (
                           <option key={member.id} value={member.id}>
-                            {member.firstName} {member.lastName} ({member.email})
+                            {member.firstName} {member.lastName}
                           </option>
                         ))}
                       </select>

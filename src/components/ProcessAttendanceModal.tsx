@@ -319,7 +319,7 @@ const ProcessAttendanceModal: React.FC<ProcessAttendanceModalProps> = ({
                 <option value="">Choose a user...</option>
                 {staffMembers.map(staff => (
                   <option key={staff.id} value={staff.id}>
-                    {staff.name} ({staff.email})
+                    {staff.name}
                   </option>
                 ))}
               </select>

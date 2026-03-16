@@ -101,10 +101,16 @@ export const apiServices = {
         params
       });
 
+      // Handle different response formats
+      const holidays = response.data.data?.holidays || 
+                       response.data.holidays || 
+                       response.data || 
+                       [];
+
       return {
-        success: true,
-        message: "Holidays retrieved successfully",
-        data: { holidays: response.data.data?.holidays || response.data.holidays || [] }
+        success: response.data.success !== false,
+        message: response.data.message || "Holidays retrieved successfully",
+        data: { holidays: Array.isArray(holidays) ? holidays : [] }
       };
     } catch (error: any) {
       console.error('Error fetching holidays:', error);
