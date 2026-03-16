@@ -19,7 +19,7 @@ interface LoginResponse {
 }
 
 // Secure storage helper functions
-const secureSetItem = (key: string, value: string): void => {
+export const secureSetItem = (key: string, value: string): void => {
   try {
     // In a production environment, you might want to encrypt the data
     // For now, we're just storing it in localStorage
@@ -29,7 +29,7 @@ const secureSetItem = (key: string, value: string): void => {
   }
 };
 
-const secureGetItem = (key: string): string | null => {
+export const secureGetItem = (key: string): string | null => {
   try {
     return localStorage.getItem(key);
   } catch (error) {
@@ -38,7 +38,7 @@ const secureGetItem = (key: string): string | null => {
   }
 };
 
-const secureRemoveItem = (key: string): void => {
+export const secureRemoveItem = (key: string): void => {
   try {
     localStorage.removeItem(key);
   } catch (error) {
