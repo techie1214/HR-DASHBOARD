@@ -933,11 +933,11 @@ export function StaffProfileView({ staff, onBack, onUpdate }: StaffProfileViewPr
       {/* Back Button and Header */}
       <div>
         {/* Back navigation button */}
-        <button className="btn btn-ghost" onClick={onBack} style={{ marginBottom: '1rem' }}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Staff Directory
+        <button className="btn btn-ghost" onClick={onBack} style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <ArrowLeft className="w-5 h-5" />
+          <span>Back to Staff Directory</span>
         </button>
-        
+
         {/* Staff Header Card */}
         <div className="card p-6">
           <div className="flex items-start justify-between gap-4">
@@ -962,14 +962,16 @@ export function StaffProfileView({ staff, onBack, onUpdate }: StaffProfileViewPr
                     <Phone className="w-4 h-4 text-muted" />
                     <span style={{ fontSize: '0.875rem' }}>{staff.phoneNumber}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-muted" />
-                    <span style={{ fontSize: '0.875rem' }}>ID: {staff.id}</span>
-                  </div>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {error && (
+                <div className="text-sm text-red-600 flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>{error}</span>
+                </div>
+              )}
               {!isEditing ? (
                 <button className="btn btn-sm btn-primary" onClick={() => { setIsEditing(true); setEditedStaff({ ...staff }); }}>
                   Edit Profile
@@ -1001,7 +1003,7 @@ export function StaffProfileView({ staff, onBack, onUpdate }: StaffProfileViewPr
                         status: editedStaff.status.toLowerCase(),
                         reports_to: editedStaff.reportsTo
                       };
-                      
+
                       const response = await updateStaffApi(staff.id, apiData);
                       if (response.success && response.staff) {
                         onUpdate(editedStaff);

@@ -1118,18 +1118,6 @@ export default function App() {
               <h1 className="text-3xl font-bold text-primary tracking-tight">{pageInfo.title}</h1>
               <p className="text-secondary mt-2 text-lg font-medium opacity-80">{pageInfo.subtitle}</p>
             </div>
-            {activeView === "dashboard" && (
-              <div className="flex items-center gap-3">
-                <button className="btn btn-outline bg-white shadow-sm hover:shadow-md transition-all">
-                  <FileText className="w-4 h-4" />
-                  <span>Export Report</span>
-                </button>
-                <button className="btn btn-primary shadow-lg shadow-primary-600/20 hover:shadow-primary-600/30 transition-all">
-                  <UserPlus className="w-4 h-4" />
-                  <span>Add Staff</span>
-                </button>
-              </div>
-            )}
           </div>
 
           {renderContent()}
