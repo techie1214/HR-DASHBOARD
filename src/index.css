@@ -1708,7 +1708,10 @@ select:focus {
   border-radius: .75rem; /* Rounded corners */
   width: 90%; /* Width responsive */
   max-width: 32rem; /* Maximum width */
-  position: relative; /* Relative to overlay flex container */
+  position: fixed; /* Fix: Use fixed positioning instead of relative */
+  top: 50%; /* Fix: Position from top */
+  left: 50%; /* Fix: Position from left */
+  transform: translate(-50%, -50%); /* Fix: Center exactly */
   max-height: 90vh; /* Maximum height */
   overflow-y: auto; /* Scroll if content is too long */
   box-shadow: 0 20px 25px -5px #0000001a, 0 10px 10px -5px #0000000a; /* Shadow for depth */

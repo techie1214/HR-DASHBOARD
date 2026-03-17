@@ -89,25 +89,16 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
     return 'AU'; // Anonymous User
   };
 
-  // Submenu state
-  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
-    attendance: false,
-  });
-
-  const toggleMenu = (menu: string) => {
-    setExpandedMenus(prev => ({ ...prev, [menu]: !prev[menu] }));
-  };
-
   return (
-    <div className="sidebar">
+    <div className="sidebar shadow-lg">
       <div className="sidebar-header">
         <div className="flex items-center gap-3">
-          <div className="logo-box">
+          <div className="logo-box bg-primary-600 shadow-md">
             <PieChart className="w-5 h-5 text-white" />
           </div>
           <div>
-            <p style={{ fontWeight: 600, fontSize: "0.9375rem", color: "#0f172a" }}>HR Dashboard</p>
-            <p className="text-xs" style={{ color: "#6b7280" }}>Management Portal</p>
+            <p className="font-bold text-base text-primary leading-none">HR Dashboard</p>
+            <p className="text-xs text-secondary mt-1">Management Portal</p>
           </div>
         </div>
       </div>
@@ -133,15 +124,6 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 <span>All Staff</span>
               </button>
             </li>
-            {/* <li className="sidebar-menu-item">
-              <button
-                onClick={() => onNavigate("offdays")}
-                className={`sidebar-menu-button ${activeView === "offdays" ? "active" : ""}`}
-              >
-                <Sun className="w-4 h-4" />
-                <span>Off Days</span>
-              </button>
-            </li> */}
             <li className="sidebar-menu-item">
               <button
                 onClick={() => onNavigate("leave")}
@@ -214,33 +196,6 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
                 <span>Duty Roster</span>
               </button>
             </li>
-            {/* <li className="sidebar-menu-item">
-              <button
-                onClick={() => onNavigate("payroll")}
-                className={`sidebar-menu-button ${activeView === "payroll" ? "active" : ""}`}
-              >
-                <DollarSign className="w-4 h-4" />
-                <span>Payroll</span>
-              </button>
-            </li> */}
-            {/* <li className="sidebar-menu-item">
-              <button
-                onClick={() => onNavigate("appraisal")}
-                className={`sidebar-menu-button ${activeView === "appraisal" ? "active" : ""}`}
-              >
-                <Award className="w-4 h-4" />
-                <span>Appraisal</span>
-              </button>
-            </li> */}
-            {/* <li className="sidebar-menu-item">
-              <button
-                onClick={() => onNavigate("kpi")}
-                className={`sidebar-menu-button ${activeView === "kpi" ? "active" : ""}`}
-              >
-                <Target className="w-4 h-4" />
-                <span>KPI</span>
-              </button>
-            </li> */}
             <li className="sidebar-menu-item">
               <button
                 onClick={() => onNavigate("shiftscheduling")}
@@ -296,12 +251,14 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
       </div>
       <div className="sidebar-footer">
         <div className="flex items-center gap-3">
-          <div className="avatar">{getAvatarInitials()}</div>
-          <div className="flex-1">
-            <p className="text-sm" style={{ fontWeight: 500, color: "#0f172a" }}>
+          <div className="avatar bg-primary-100 text-primary-700 font-bold shadow-sm">
+            {getAvatarInitials()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-primary truncate">
               {user?.name || 'Guest User'}
             </p>
-            <p className="text-xs" style={{ color: "#6b7280" }}>
+            <p className="text-xs text-secondary truncate">
               {user?.email || 'No email'}
             </p>
           </div>
@@ -684,24 +641,27 @@ export default function App() {
         return (
           <div>
             {/* Tabs */}
-            <div className="tabs-list mb-6">
+            <div className="tabs-list mb-8">
               <button 
                 className={`tabs-trigger ${activeTab === "overview" ? "active" : ""}`}
                 onClick={() => setActiveTab("overview")}
               >
-                Overview
+                <LayoutDashboard className="w-4 h-4" />
+                <span>Overview</span>
               </button>
               <button 
                 className={`tabs-trigger ${activeTab === "employees" ? "active" : ""}`}
                 onClick={() => setActiveTab("employees")}
               >
-                Employees
+                <Users className="w-4 h-4" />
+                <span>Employees</span>
               </button>
               <button 
                 className={`tabs-trigger ${activeTab === "analytics" ? "active" : ""}`}
                 onClick={() => setActiveTab("analytics")}
               >
-                Analytics
+                <BarChart3 className="w-4 h-4" />
+                <span>Analytics</span>
               </button>
             </div>
 
@@ -1168,10 +1128,24 @@ export default function App() {
         </header>
 
         {/* Main Content */}
-        <div className="px-6 py-8">
-          <div className="mb-8">
-            <h1 style={{ fontSize: "1.875rem", fontWeight: 600, marginBottom: "0.5rem" }}>{pageInfo.title}</h1>
-            <p style={{ color: "#6b7280", fontSize: "0.875rem" }}>{pageInfo.subtitle}</p>
+        <div className="px-8 py-10 max-w-7xl mx-auto">
+          <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-primary tracking-tight">{pageInfo.title}</h1>
+              <p className="text-secondary mt-2 text-lg font-medium opacity-80">{pageInfo.subtitle}</p>
+            </div>
+            {activeView === "dashboard" && (
+              <div className="flex items-center gap-3">
+                <button className="btn btn-outline bg-white shadow-sm hover:shadow-md transition-all">
+                  <FileText className="w-4 h-4" />
+                  <span>Export Report</span>
+                </button>
+                <button className="btn btn-primary shadow-lg shadow-primary-600/20 hover:shadow-primary-600/30 transition-all">
+                  <UserPlus className="w-4 h-4" />
+                  <span>Add Staff</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {renderContent()}
