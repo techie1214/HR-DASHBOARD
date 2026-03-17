@@ -4,7 +4,7 @@
 // Import React hooks for state management
 import { useState, useEffect } from 'react';
 // Import Lucide React icons for UI elements
-import { Search, Calendar, Download, Filter, Check, X, Clock, User, Building, FileText, TrendingUp, AlertCircle, CalendarDays, Info } from 'lucide-react';
+import { Search, Calendar, Download, Filter, Check, X, Clock, User, Building, FileText, TrendingUp, AlertCircle, CalendarDays, Info, CheckCircle } from 'lucide-react';
 // Import utility functions
 import { cn } from '@/components/ui/utils';
 // Import leave management service
@@ -101,6 +101,8 @@ const LeaveManagementView = () => {
   const [itemsPerPage] = useState(20);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  // Status counts from API
+  const [pendingTotal, setPendingTotal] = useState(0);
   // State for create leave type form
   const [createLeaveTypeForm, setCreateLeaveTypeForm] = useState({
     name: '',
@@ -157,7 +159,13 @@ const LeaveManagementView = () => {
         // Build filters object
         const filters: { status?: string; leaveType?: string; search?: string } = {};
         if (filterStatus !== 'all') {
-          filters.status = filterStatus;
+          // Map frontend status to backend status values
+          const backendStatus = 
+            filterStatus === 'pending' ? 'submitted' :
+            filterStatus === 'declined' ? 'rejected' :
+            filterStatus === 'active' ? 'approved' :  // Active = approved leave in progress
+            filterStatus;
+          filters.status = backendStatus;
         }
         if (filterLeaveType !== 'all') {
           filters.leaveType = filterLeaveType;
@@ -211,14 +219,27 @@ const LeaveManagementView = () => {
           console.log('Transformed requests:', transformedRequests.length);
           console.log('Pending requests:', transformedRequests.filter(r => r.status === 'Pending').length);
           setLeaveRequests(transformedRequests);
-          
+
           // Update pagination info
           if (requestsResponse.pagination) {
             setTotalItems(requestsResponse.pagination.totalItems);
             setTotalPages(requestsResponse.pagination.totalPages);
+            // Always update pendingTotal when we have pagination data
+            // Fetch pending count separately if not already filtered by pending
+            if (filterStatus !== 'pending') {
+              const pendingResponse = await getAllLeaveRequests(1, 1, { status: 'submitted' });
+              if (pendingResponse.pagination) {
+                setPendingTotal(pendingResponse.pagination.totalItems);
+              }
+            } else {
+              setPendingTotal(requestsResponse.pagination.totalItems);
+            }
           } else {
             setTotalItems(transformedRequests.length);
             setTotalPages(Math.ceil(transformedRequests.length / itemsPerPage));
+            if (filterStatus === 'pending') {
+              setPendingTotal(transformedRequests.length);
+            }
           }
         } else {
           console.warn('Failed to fetch leave requests from API:', requestsResponse.message);
@@ -327,7 +348,8 @@ const LeaveManagementView = () => {
   const approvedCount = leaveRequests.filter(r => r.status === 'Approved').length;
   const declinedCount = leaveRequests.filter(r => r.status === 'Declined').length;
   const activeCount = leaveRequests.filter(r => r.status === 'Active').length;
-  const pendingCount = leaveRequests.filter(r => r.status === 'Pending').length;
+  // Use pendingTotal from API when filtered by pending, otherwise calculate from current page
+  const pendingCount = filterStatus === 'pending' ? pendingTotal : leaveRequests.filter(r => r.status === 'Pending').length;
 
   // Handler for approval/decline actions - opens approval modal
   const handleApprovalAction = (request: LeaveRequest, action: 'approve' | 'decline') => {
@@ -561,102 +583,43 @@ const LeaveManagementView = () => {
   // Function to render the requests tab content
   const renderRequestsTab = () => (
     <>
-      {/* Interactive Stats Cards - clickable cards that filter by status */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* All Requests Card - shows total count and filters to show all */}
-        <div
-          className="card p-3 cursor-pointer transition-all hover-lift"
-          onClick={() => setFilterStatus('all')}
-          style={{
-            border: filterStatus === 'all' ? '2px solid #2563eb' : '1px solid #e5e7eb',
-            backgroundColor: filterStatus === 'all' ? '#eff6ff' : 'white'
-          }}
-        >
-          <div className="flex items-center gap-2">
-            <div className="icon-wrapper" style={{ backgroundColor: '#dbeafe', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
-              <Calendar className="w-3 h-3" style={{ color: '#2563eb' }} />
-            </div>
-            <div>
-              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>All Requests</p>
-              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{totalRequests}</p>
-            </div>
-          </div>
-        </div>
-        {/* Approved Requests Card */}
-        <div
-          className="card p-3 cursor-pointer transition-all hover-lift"
-          onClick={() => setFilterStatus('approved')}
-          style={{
-            border: filterStatus === 'approved' ? '2px solid #16a34a' : '1px solid #e5e7eb',
-            backgroundColor: filterStatus === 'approved' ? '#f0fdf4' : 'white'
-          }}
-        >
-          <div className="flex items-center gap-2">
-            <div className="icon-wrapper" style={{ backgroundColor: '#dcfce7', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
-              <Check className="w-3 h-3" style={{ color: '#16a34a' }} />
-            </div>
-            <div>
-              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Approved</p>
-              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{approvedCount}</p>
+      {/* Pending Requests Card with Show All Toggle */}
+      <div className="mb-6">
+        <div className="flex items-center gap-4">
+          <div
+            className="card p-4 cursor-pointer transition-all hover-lift flex-1"
+            onClick={() => setFilterStatus('pending')}
+            style={{
+              border: filterStatus === 'pending' ? '2px solid #f59e0b' : '1px solid #e5e7eb',
+              backgroundColor: filterStatus === 'pending' ? '#fffbeb' : 'white'
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="icon-wrapper" style={{ backgroundColor: '#fef9c3', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem' }}>
+                  <Clock className="w-4 h-4" style={{ color: '#ca8a04' }} />
+                </div>
+                <div>
+                  <p className="text-muted" style={{ fontSize: '0.75rem', lineHeight: '1' }}>Pending Requests</p>
+                  <p style={{ fontSize: '1.5rem', fontWeight: 600, lineHeight: '1.25' }}>{pendingCount}</p>
+                </div>
+              </div>
+              {filterStatus === 'pending' && (
+                <CheckCircle className="w-5 h-5 text-amber-600" />
+              )}
             </div>
           </div>
-        </div>
-        {/* Declined Requests Card */}
-        <div
-          className="card p-3 cursor-pointer transition-all hover-lift"
-          onClick={() => setFilterStatus('declined')}
-          style={{
-            border: filterStatus === 'declined' ? '2px solid #dc2626' : '1px solid #e5e7eb',
-            backgroundColor: filterStatus === 'declined' ? '#fef2f2' : 'white'
-          }}
-        >
-          <div className="flex items-center gap-2">
-            <div className="icon-wrapper" style={{ backgroundColor: '#fee2e2', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
-              <X className="w-3 h-3" style={{ color: '#dc2626' }} />
-            </div>
-            <div>
-              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Declined</p>
-              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{declinedCount}</p>
-            </div>
-          </div>
-        </div>
-        {/* Active Leave Card */}
-        <div
-          className="card p-3 cursor-pointer transition-all hover-lift"
-          onClick={() => setFilterStatus('active')}
-          style={{
-            border: filterStatus === 'active' ? '2px solid #10b981' : '1px solid #e5e7eb',
-            backgroundColor: filterStatus === 'active' ? '#ecfdf5' : 'white'
-          }}
-        >
-          <div className="flex items-center gap-2">
-            <div className="icon-wrapper" style={{ backgroundColor: '#d1fae5', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
-              <CalendarDays className="w-3 h-3" style={{ color: '#10b981' }} />
-            </div>
-            <div>
-              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Active Now</p>
-              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{activeCount}</p>
-            </div>
-          </div>
-        </div>
-        {/* Pending Requests Card */}
-        <div
-          className="card p-3 cursor-pointer transition-all hover-lift"
-          onClick={() => setFilterStatus('pending')}
-          style={{
-            border: filterStatus === 'pending' ? '2px solid #f59e0b' : '1px solid #e5e7eb',
-            backgroundColor: filterStatus === 'pending' ? '#fffbeb' : 'white'
-          }}
-        >
-          <div className="flex items-center gap-2">
-            <div className="icon-wrapper" style={{ backgroundColor: '#fef9c3', width: '2rem', height: '2rem', borderRadius: '0.375rem' }}>
-              <Clock className="w-3 h-3" style={{ color: '#ca8a04' }} />
-            </div>
-            <div>
-              <p className="text-muted" style={{ fontSize: '0.65rem', lineHeight: '1' }}>Pending</p>
-              <p style={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: '1.25' }}>{pendingCount}</p>
-            </div>
-          </div>
+          
+          {filterStatus === 'pending' && (
+            <button
+              className="btn btn-outline"
+              onClick={() => setFilterStatus('all')}
+              style={{ padding: '0.625rem 1.25rem', height: 'fit-content' }}
+            >
+              <Calendar className="w-4 h-4 mr-2" />
+              Show All
+            </button>
+          )}
         </div>
       </div>
 
@@ -870,16 +833,8 @@ const LeaveManagementView = () => {
                   <tr key={request.id} className="table-row">
                     {/* Employee information cell */}
                     <td className="table-cell">
-                      <div className="flex items-center gap-3">
-                        {/* Employee avatar with initials */}
-                        <div className="avatar" style={{ width: '2.5rem', height: '2.5rem', fontSize: '0.75rem' }}>
-                          {request.staffName.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                        </div>
-                        {/* Employee name and ID */}
-                        <div>
-                          <p style={{ fontWeight: 500, fontSize: '0.875rem' }}>{request.staffName}</p>
-                          <p className="text-xs text-muted">{request.staffId}</p>
-                        </div>
+                      <div>
+                        <p style={{ fontWeight: 500, fontSize: '0.875rem' }}>{request.staffName}</p>
                       </div>
                     </td>
                     <td className="table-cell">

@@ -1564,8 +1564,8 @@ const ShiftSchedulingView = () => {
       {/* Template Modal */}
       {showTemplateModal && (
         <>
-          <div className="modal-overlay" onClick={() => { setShowTemplateModal(false); resetTemplateForm(); }} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(15, 23, 42, 0.5)' }}></div>
-          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100000, maxWidth: '36rem', width: 'calc(100% - 2rem)', margin: 0, backgroundColor: 'white', borderRadius: '1rem', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+          <div className="modal-overlay" onClick={() => { setShowTemplateModal(false); resetTemplateForm(); }}></div>
+          <div className="modal" style={{ maxWidth: '36rem' }}>
             <div className="modal-header" style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e5e7eb' }}>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center">
@@ -1704,8 +1704,8 @@ const ShiftSchedulingView = () => {
       {/* Assignment Modal */}
       {showAssignmentModal && (
         <>
-          <div className="modal-overlay" onClick={() => { setShowAssignmentModal(false); resetAssignmentForm(); }} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(15, 23, 42, 0.5)' }}></div>
-          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100000, maxWidth: '36rem', width: 'calc(100% - 2rem)', margin: 0, backgroundColor: 'white', borderRadius: '1rem', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+          <div className="modal-overlay" onClick={() => { setShowAssignmentModal(false); resetAssignmentForm(); }}></div>
+          <div className="modal" style={{ maxWidth: '36rem' }}>
             <div className="modal-header" style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e5e7eb' }}>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center">
@@ -1817,8 +1817,8 @@ const ShiftSchedulingView = () => {
       {/* Exception Modal */}
       {showExceptionModal && (
         <>
-          <div className="modal-overlay" onClick={() => { setShowExceptionModal(false); resetExceptionForm(); }} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(15, 23, 42, 0.5)' }}></div>
-          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100000, maxWidth: '36rem', width: 'calc(100% - 2rem)', margin: 0, backgroundColor: 'white', borderRadius: '1rem', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+          <div className="modal-overlay" onClick={() => { setShowExceptionModal(false); resetExceptionForm(); }}></div>
+          <div className="modal" style={{ maxWidth: '36rem' }}>
             <div className="modal-header" style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e5e7eb' }}>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-purple-600 flex items-center justify-center">
@@ -2151,8 +2151,8 @@ const ShiftSchedulingView = () => {
       {/* Exception Type Modal */}
       {showExceptionTypeModal && (
         <>
-          <div className="modal-overlay" onClick={() => { setShowExceptionTypeModal(false); resetExceptionTypeForm(); }} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(15, 23, 42, 0.5)' }}></div>
-          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100000, maxWidth: '32rem', width: 'calc(100% - 2rem)', margin: 0, backgroundColor: 'white', borderRadius: '1rem', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+          <div className="modal-overlay" onClick={() => { setShowExceptionTypeModal(false); resetExceptionTypeForm(); }}></div>
+          <div className="modal">
             <div className="modal-header" style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e5e7eb' }}>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-purple-600 flex items-center justify-center">

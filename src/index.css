@@ -1697,6 +1697,9 @@ select:focus {
   background-color: #00000080; /* Semi-transparent black background */
   position: fixed; /* Fixed positioning */
   inset: 0; /* Full screen coverage */
+  display: flex; /* Flexbox for centering */
+  align-items: center; /* Center vertically */
+  justify-content: center; /* Center horizontally */
 }
 
 .modal {
@@ -1705,10 +1708,9 @@ select:focus {
   border-radius: .75rem; /* Rounded corners */
   width: 90%; /* Width responsive */
   max-width: 32rem; /* Maximum width */
-  position: fixed; /* Fixed positioning */
-  top: 50%; /* Center vertically */
-  left: 50%; /* Center horizontally */
-  transform: translate(-50%, -50%); /* Center the modal */
+  position: relative; /* Relative to overlay flex container */
+  max-height: 90vh; /* Maximum height */
+  overflow-y: auto; /* Scroll if content is too long */
   box-shadow: 0 20px 25px -5px #0000001a, 0 10px 10px -5px #0000000a; /* Shadow for depth */
 }
 
