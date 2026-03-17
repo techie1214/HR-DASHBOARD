@@ -97,9 +97,9 @@ export const getAllUsers = async (page?: number, limit?: number): Promise<{ succ
     // Map API response to User interface (handle snake_case to camelCase)
     const users = usersData.map((u: any) => ({
       id: u.id,
-      firstName: u.first_name || u.firstName || 'N/A',
-      lastName: u.last_name || u.lastName || 'N/A',
-      email: u.email || 'N/A',
+      firstName: u.first_name || u.firstName || '',
+      lastName: u.last_name || u.lastName || '',
+      email: u.email || '',
       roleId: u.role_id || u.roleId || 0,
       branchId: u.branch_id || u.branchId || 0,
       departmentId: u.department_id || u.departmentId || 0,

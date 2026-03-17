@@ -79,12 +79,27 @@ const HolidayDutyRosterView = () => {
   const fetchStaff = async () => {
     try {
       setLoadingStaff(true);
-      const response = await getAllStaff(1, 100);
+      const response = await getAllStaff(1, 500);
       if (response.success && response.staff) {
-        setStaff(response.staff);
+        // Map API response to StaffMember interface
+        const mappedStaff: StaffMember[] = response.staff.map((s: any) => ({
+          id: s.user_id || s.id,
+          firstName: s.first_name || s.firstName || '',
+          lastName: s.last_name || s.lastName || '',
+          middleName: s.middle_name || s.middleName,
+          email: s.email || '',
+          department: s.department || '',
+          role: s.role || s.departmentRole || ''
+        }));
+        setStaff(mappedStaff);
+        console.log('Loaded staff members:', mappedStaff.length);
+      } else {
+        console.error('Failed to fetch staff:', response.message);
+        setStaff([]);
       }
     } catch (error) {
       console.error('Error fetching staff:', error);
+      setStaff([]);
     } finally {
       setLoadingStaff(false);
     }

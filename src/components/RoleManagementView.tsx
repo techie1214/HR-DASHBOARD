@@ -374,8 +374,7 @@ const RoleManagementView = () => {
                               className="mt-1 mr-2 w-4 h-4"
                             />
                             <label htmlFor={`perm-${permission.key}`} className="flex-1 cursor-pointer">
-                              <div className="font-medium text-sm">{permission.key}</div>
-                              <div className="text-xs text-gray-500">{permission.description}</div>
+                              <div className="text-sm text-gray-700">{permission.description}</div>
                             </label>
                           </div>
                         ))}
@@ -450,8 +449,7 @@ const RoleManagementView = () => {
                               className="mt-1 mr-2 w-4 h-4"
                             />
                             <label htmlFor={`edit-perm-${permission.key}`} className="flex-1 cursor-pointer">
-                              <div className="font-medium text-sm">{permission.key}</div>
-                              <div className="text-xs text-gray-500">{permission.description}</div>
+                              <div className="text-sm text-gray-700">{permission.description}</div>
                             </label>
                           </div>
                         ))}
@@ -512,8 +510,7 @@ const RoleManagementView = () => {
                               className="mt-1 mr-2 w-4 h-4"
                             />
                             <label htmlFor={`manage-perm-${permission.key}`} className="flex-1 cursor-pointer">
-                              <div className="font-medium text-sm">{permission.key}</div>
-                              <div className="text-xs text-gray-500">{permission.description}</div>
+                              <div className="text-sm text-gray-700">{permission.description}</div>
                             </label>
                           </div>
                         ))}

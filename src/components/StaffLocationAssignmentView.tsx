@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { getAllStaff } from '../services/staffManagementService';
 import { getAllAttendanceLocations, AttendanceLocation } from '../services/attendanceService';
+import axios from 'axios';
+import { API_ENDPOINT } from '../config/config';
 
 interface StaffMember {
   user_id: number;
@@ -145,22 +147,17 @@ const StaffLocationAssignmentView: React.FC = () => {
     setError(null);
 
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`/api/staff-location-assignments/${userId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(editForm)
-      });
+      const response = await axios.put(
+        `${API_ENDPOINT}/staff-location-assignments/${userId}`,
+        editForm,
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update');
-      }
-
-      const result = await response.json();
+      const result = response.data;
 
       if (result.success) {
         setSuccessMessage('Location assignment updated successfully');
@@ -172,7 +169,8 @@ const StaffLocationAssignmentView: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Update error:', err);
-      setError(err.message || 'Failed to update assignment');
+      const errorMsg = err.response?.data?.message || err.message || 'Failed to update assignment';
+      setError(errorMsg);
     } finally {
       setSaving(false);
     }
@@ -189,27 +187,22 @@ const StaffLocationAssignmentView: React.FC = () => {
     setError(null);
 
     try {
-      const token = localStorage.getItem('authToken');
       const assignments = selectedStaff.map(userId => ({
         user_id: userId,
         assigned_location_id: Number(bulkLocationId)
       }));
 
-      const response = await fetch('/api/staff-location-assignments/bulk-update', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ assignments })
-      });
+      const response = await axios.post(
+        `${API_ENDPOINT}/staff-location-assignments/bulk-update`,
+        { assignments },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update');
-      }
-
-      const result = await response.json();
+      const result = response.data;
 
       if (result.success) {
         setSuccessMessage(`Updated ${selectedStaff.length} staff member(s)`);
@@ -222,7 +215,8 @@ const StaffLocationAssignmentView: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Bulk update error:', err);
-      setError(err.message || 'Failed to update assignments');
+      const errorMsg = err.response?.data?.message || err.message || 'Failed to update assignments';
+      setError(errorMsg);
     } finally {
       setSaving(false);
     }

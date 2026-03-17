@@ -62,6 +62,7 @@ import UserManagementView from "./components/UserManagementView";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { checkSystemReadiness } from "./services/apiServices";
 import { isAuthenticated, logout, getUserInfo, setupAxiosInterceptors } from "./services/authService";
+import { useAuth } from "./AuthContext";
 
 interface SidebarProps {
   activeView: string;
@@ -270,9 +271,13 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
 
 export default function App() {
   console.log('App component is rendering');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // Use AuthContext for authentication state
+  const auth = useAuth();
+  const isLoggedIn = auth.isAuthenticated;
+  const user = auth.user;
+  const refreshUserData = auth.refreshUserData;
+  
   const [isSystemInitialized, setIsSystemInitialized] = useState<boolean|null>(null); // null = checking, true/false = result
-  const [user, setUser] = useState<{ name?: string; email?: string; avatarInitials?: string } | null>(null);
   const prevIsLoggedIn = useRef<boolean | null>(null);
   const [activeView, setActiveView] = useState("dashboard");
   const [activeTab, setActiveTab] = useState("overview");
@@ -283,11 +288,11 @@ export default function App() {
   const [selectedStaffFromSearch, setSelectedStaffFromSearch] = useState<any>(null);
   const [selectedResultIndex, setSelectedResultIndex] = useState(-1);
   const [searchInputRef, setSearchInputRef] = useState<HTMLInputElement | null>(null);
-  
+
   // Dashboard stats state
   const [dashboardStats, setDashboardStats] = useState<any>(null);
   const [statsLoading, setStatsLoading] = useState(true);
-  
+
   // Cached staff data for search
   const [cachedStaffData, setCachedStaffData] = useState<any[]>([]);
   
@@ -345,22 +350,23 @@ export default function App() {
     checkSystemInitialization();
   }, []);
 
+  // Fetch dashboard stats function (defined outside useEffect to be reusable)
+  const fetchDashboardStats = async () => {
+    try {
+      setStatsLoading(true);
+      const result = await getDashboardStats();
+      if (result.success && result.stats) {
+        setDashboardStats(result.stats);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
   // Fetch dashboard stats on mount
   useEffect(() => {
-    const fetchDashboardStats = async () => {
-      try {
-        setStatsLoading(true);
-        const result = await getDashboardStats();
-        if (result.success && result.stats) {
-          setDashboardStats(result.stats);
-        }
-      } catch (error) {
-        console.error('Error fetching dashboard stats:', error);
-      } finally {
-        setStatsLoading(false);
-      }
-    };
-
     fetchDashboardStats();
   }, []);
 
@@ -370,58 +376,36 @@ export default function App() {
       const authenticated = isAuthenticated();
 
       // Only update state if it has actually changed
-      prevIsLoggedIn.current = prevIsLoggedIn.current ?? !authenticated; // Initialize if undefined
+      prevIsLoggedIn.current = prevIsLoggedIn.current ?? !authenticated;
 
       if (prevIsLoggedIn.current !== authenticated) {
-        setIsLoggedIn(authenticated);
         prevIsLoggedIn.current = authenticated;
-
-        // Load user details if authenticated
+        
+        // AuthContext handles user data loading automatically
+        // Just trigger a refresh of dashboard stats on login
         if (authenticated) {
-          const userInfo = getUserInfo();
-          if (userInfo) {
-            setUser({
-              name: userInfo.fullName || userInfo.name || userInfo.fullname || userInfo.username || userInfo.displayName || `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim(),
-              email: userInfo.email || userInfo.Email,
-            });
-          }
-        } else {
-          // Clear user data when logging out
-          setUser(null);
+          fetchDashboardStats();
         }
       }
-      // If isLoggedIn is already correct, don't update it to prevent re-renders
     }
   }, [isSystemInitialized]);
 
   const handleLogin = () => {
     const authenticated = isAuthenticated();
-
-    // Only update state if the authentication status has actually changed
     if (prevIsLoggedIn.current !== authenticated) {
-      setIsLoggedIn(authenticated);
       prevIsLoggedIn.current = authenticated;
-
-      // Load user details after login
-      const userInfo = getUserInfo();
-      if (userInfo) {
-        setUser({
-          name: userInfo.fullName || userInfo.name || userInfo.fullname || userInfo.username || userInfo.displayName || `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim(),
-          email: userInfo.email || userInfo.Email,
-        });
+      // AuthContext handles user data, just refresh dashboard
+      if (authenticated) {
+        fetchDashboardStats();
       }
     }
   };
 
   const handleLogout = () => {
-    logout();
-
-    // Only update state if the authentication status has actually changed
-    if (prevIsLoggedIn.current !== false) {
-      setIsLoggedIn(false);
-      prevIsLoggedIn.current = false;
-      setUser(null); // Clear user state on logout
-    }
+    auth.logout();
+    prevIsLoggedIn.current = false;
+    // Clear dashboard stats on logout
+    setDashboardStats(null);
   };
 
   // Handle global search with multiple categories

@@ -9,6 +9,8 @@ import { ArrowLeft, User, Phone, Mail, MapPin, Calendar, GraduationCap, Briefcas
 import { StaffMember, Education, Leave, OffDay, Document, updateStaffStatus, updateStaff, Department, getLeaveBalance, LeaveBalance, mockStaffData } from '../data/staffData';
 // Import branch data function
 import { getBranches } from '../data/branchData';
+// Import real API service
+import { updateStaff as updateStaffApi, getStaffById } from '../services/staffManagementService';
 
 // Interface defining props for StaffProfileView component
 interface StaffProfileViewProps {
@@ -37,6 +39,10 @@ export function StaffProfileView({ staff, onBack, onUpdate }: StaffProfileViewPr
   const [isEditing, setIsEditing] = useState(false);
   // State for edited staff data
   const [editedStaff, setEditedStaff] = useState<StaffMember>(staff);
+  // State for saving
+  const [saving, setSaving] = useState(false);
+  // State for error
+  const [error, setError] = useState<string | null>(null);
 
   // Form states for modals
   const [educationForm, setEducationForm] = useState({
@@ -970,14 +976,46 @@ export function StaffProfileView({ staff, onBack, onUpdate }: StaffProfileViewPr
                 </button>
               ) : (
                 <>
-                  <button className="btn btn-sm btn-primary" onClick={() => { 
-                    const success = updateStaff(staff.id, editedStaff);
-                    if (success) {
-                      onUpdate(editedStaff); 
-                      setIsEditing(false); 
+                  <button className="btn btn-sm btn-primary" onClick={async () => {
+                    setSaving(true);
+                    setError(null);
+                    try {
+                      // Convert staff data to API format
+                      const apiData: any = {
+                        first_name: editedStaff.firstName,
+                        last_name: editedStaff.lastName,
+                        middle_name: editedStaff.middleName,
+                        email: editedStaff.email,
+                        work_email: editedStaff.workEmail,
+                        phone_number: editedStaff.phoneNumber,
+                        alternate_phone: editedStaff.alternatePhone,
+                        physical_address: editedStaff.physicalAddress,
+                        postal_address: editedStaff.postalAddress,
+                        town: editedStaff.town,
+                        zip_code: editedStaff.zipCode,
+                        department_id: editedStaff.departmentId,
+                        branch_id: editedStaff.branchId,
+                        designation: editedStaff.designation,
+                        date_joined: editedStaff.dateJoined,
+                        contract_type: editedStaff.contractType,
+                        status: editedStaff.status.toLowerCase(),
+                        reports_to: editedStaff.reportsTo
+                      };
+                      
+                      const response = await updateStaffApi(staff.id, apiData);
+                      if (response.success && response.staff) {
+                        onUpdate(editedStaff);
+                        setIsEditing(false);
+                      } else {
+                        setError(response.message || 'Failed to update staff profile');
+                      }
+                    } catch (err: any) {
+                      setError(err.message || 'An error occurred while updating');
+                    } finally {
+                      setSaving(false);
                     }
-                  }}>
-                    Save Changes
+                  }} disabled={saving}>
+                    {saving ? 'Saving...' : 'Save Changes'}
                   </button>
                   <button className="btn btn-sm btn-outline" onClick={() => setIsEditing(false)}>
                     Cancel

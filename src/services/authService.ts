@@ -18,11 +18,24 @@ interface LoginResponse {
   };
 }
 
+// Token refresh state
+let isRefreshing = false;
+let refreshSubscribers: ((token: string) => void)[] = [];
+
+// Subscribe to token refresh
+const subscribeTokenRefresh = (cb: (token: string) => void) => {
+  refreshSubscribers.push(cb);
+};
+
+// Call all subscribers after token refresh
+const onTokenRefreshed = (token: string) => {
+  refreshSubscribers.forEach(cb => cb(token));
+  refreshSubscribers = [];
+};
+
 // Secure storage helper functions
 export const secureSetItem = (key: string, value: string): void => {
   try {
-    // In a production environment, you might want to encrypt the data
-    // For now, we're just storing it in localStorage
     localStorage.setItem(key, value);
   } catch (error) {
     console.error(`Error setting ${key} in localStorage:`, error);
@@ -150,13 +163,13 @@ export const getAuthToken = (): string | null => {
 // Function to refresh token (if needed)
 export const refreshToken = async (): Promise<string | null> => {
   try {
-    const refreshToken = secureGetItem('refreshToken');
-    if (!refreshToken) {
+    const refreshTokenStored = secureGetItem('refreshToken');
+    if (!refreshTokenStored) {
       return null;
     }
 
     const response = await axios.post(`${API_ENDPOINT}/auth/refresh`, {
-      refreshToken,
+      refreshToken: refreshTokenStored,
     });
 
     const { token } = response.data;
@@ -195,6 +208,14 @@ export const isTokenExpired = (token: string): boolean => {
   }
 };
 
+// Callback for authentication failure (401/403)
+let onAuthFailed: (() => void) | null = null;
+
+// Set the auth failed callback
+export const setAuthFailedCallback = (callback: () => void) => {
+  onAuthFailed = callback;
+};
+
 // Function to add authorization header to axios requests
 export const setupAxiosInterceptors = (): void => {
   // Request interceptor to add auth token
@@ -211,15 +232,54 @@ export const setupAxiosInterceptors = (): void => {
     }
   );
 
-  // Response interceptor to handle token expiration
+  // Response interceptor to handle token expiration and refresh
   axios.interceptors.response.use(
     (response) => response,
-    (error) => {
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        // Token might be expired or invalid, log out the user
-        logout();
-        window.location.href = '/'; // Redirect to login page
+    async (error) => {
+      const originalRequest = error.config;
+
+      // If error is 401/403 and we haven't tried to refresh yet
+      if ((error.response?.status === 401 || error.response?.status === 403) && !originalRequest._retry) {
+        // If already refreshing, queue this request
+        if (isRefreshing) {
+          return new Promise((resolve) => {
+            subscribeTokenRefresh((token: string) => {
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+              resolve(axios(originalRequest));
+            });
+          });
+        }
+
+        originalRequest._retry = true;
+        isRefreshing = true;
+
+        try {
+          const newToken = await refreshToken();
+          if (newToken) {
+            isRefreshing = false;
+            onTokenRefreshed(newToken);
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            return axios(originalRequest);
+          }
+        } catch (refreshError) {
+          isRefreshing = false;
+          // Refresh failed, log out user
+          if (onAuthFailed) {
+            onAuthFailed();
+          }
+          return Promise.reject(refreshError);
+        }
+
+        isRefreshing = false;
       }
+
+      // If still 401/403 after refresh attempt or no refresh token
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        if (onAuthFailed) {
+          onAuthFailed();
+        }
+      }
+
       return Promise.reject(error);
     }
   );

@@ -223,15 +223,43 @@ const UserManagementView = () => {
     }
   };
 
-  const startEditing = (user: User) => {
-    setEditingUser(user);
-    setFirstName(user.firstName);
-    setLastName(user.lastName);
-    setEmail(user.email);
-    setRoleId(user.roleId);
-    setBranchId(user.branchId);
-    setPassword('');
-    setShowEditForm(true);
+  const startEditing = async (user: User) => {
+    try {
+      // Fetch fresh user data from API
+      const userResponse = await getUserById(user.id);
+      if (userResponse.success && userResponse.user) {
+        const freshUser = userResponse.user;
+        setEditingUser(freshUser);
+        setFirstName(freshUser.first_name || freshUser.firstName || '');
+        setLastName(freshUser.last_name || freshUser.lastName || '');
+        setEmail(freshUser.email || '');
+        setRoleId(freshUser.role_id || freshUser.roleId || 0);
+        setBranchId(freshUser.branch_id || freshUser.branchId || 0);
+        setPassword('');
+        setShowEditForm(true);
+      } else {
+        // Fallback to the passed user object
+        setEditingUser(user);
+        setFirstName(user.firstName || '');
+        setLastName(user.lastName || '');
+        setEmail(user.email || '');
+        setRoleId(user.roleId || 0);
+        setBranchId(user.branchId || 0);
+        setPassword('');
+        setShowEditForm(true);
+      }
+    } catch (error) {
+      console.error('Error fetching user details for edit:', error);
+      // Fallback to the passed user object
+      setEditingUser(user);
+      setFirstName(user.firstName || '');
+      setLastName(user.lastName || '');
+      setEmail(user.email || '');
+      setRoleId(user.roleId || 0);
+      setBranchId(user.branchId || 0);
+      setPassword('');
+      setShowEditForm(true);
+    }
   };
 
   // Calculate statistics - use totalUsers_count for total, and calculate active/inactive from all users

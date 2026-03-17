@@ -202,22 +202,22 @@ const SettingsView = () => {
 
   const renderAttendanceSettings = () => (
     <div className="space-y-6">
-      {/* Branch Selector Card */}
-      <div className="card p-5" style={{ backgroundColor: '#4f46e5' }}>
-        <div className="flex items-center justify-between">
+      {/* Branch Selector Card - Simplified */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-              <Building className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+              <Building className="w-5 h-5 text-gray-600" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">Branch Settings</h3>
-              <p className="text-sm text-white/80">Configure attendance rules per branch</p>
+              <h3 className="text-base font-semibold text-gray-900">Branch Settings</h3>
+              <p className="text-sm text-gray-500">Configure attendance rules per branch</p>
             </div>
           </div>
           <select
             value={selectedBranchId}
             onChange={(e) => setSelectedBranchId(e.target.value || '')}
-            className="px-4 py-2.5 rounded-lg border-0 bg-white/95 text-gray-900 font-medium shadow-lg focus:ring-2 focus:ring-white/50"
+            className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 font-medium focus:ring-2 focus:ring-blue-500"
             style={{ minWidth: '250px' }}
           >
             {branches.map(branch => (
@@ -566,38 +566,26 @@ const SettingsView = () => {
   );
 
   const renderNotificationsSettings = () => (
-    <div className="space-y-6">
-      <div className="card p-12 text-center">
-        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center mx-auto mb-6">
-          <Bell className="w-10 h-10 text-amber-600" />
-        </div>
-        <h3 className="text-xl font-bold text-gray-900 mb-2">Notification Settings</h3>
-        <p className="text-gray-500 max-w-md mx-auto mb-6">
-          Configure email, SMS, and push notifications for attendance, shifts, and system alerts.
-        </p>
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-full text-sm font-medium">
-          <Zap className="w-4 h-4" />
-          Coming Soon
-        </div>
+    <div className="card p-8 text-center">
+      <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+        <Bell className="w-8 h-8 text-gray-400" />
       </div>
+      <h3 className="text-lg font-semibold text-gray-900 mb-2">Notification Settings</h3>
+      <p className="text-gray-500 max-w-md mx-auto">
+        Configure email, SMS, and push notifications for attendance, shifts, and system alerts.
+      </p>
     </div>
   );
 
   const renderGeneralSettings = () => (
-    <div className="space-y-6">
-      <div className="card p-12 text-center">
-        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center mx-auto mb-6">
-          <Settings className="w-10 h-10 text-blue-600" />
-        </div>
-        <h3 className="text-xl font-bold text-gray-900 mb-2">General Settings</h3>
-        <p className="text-gray-500 max-w-md mx-auto mb-6">
-          System-wide configuration including company info, working hours, holidays, and localization.
-        </p>
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-full text-sm font-medium">
-          <Shield className="w-4 h-4" />
-          Coming Soon
-        </div>
+    <div className="card p-8 text-center">
+      <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+        <Settings className="w-8 h-8 text-gray-400" />
       </div>
+      <h3 className="text-lg font-semibold text-gray-900 mb-2">General Settings</h3>
+      <p className="text-gray-500 max-w-md mx-auto">
+        System-wide configuration including company info, working hours, holidays, and localization.
+      </p>
     </div>
   );
 

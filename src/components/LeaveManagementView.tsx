@@ -84,6 +84,8 @@ const LeaveManagementView = () => {
   const [showEditLeaveTypeModal, setShowEditLeaveTypeModal] = useState(false);
   // State for leave types
   const [leaveTypes, setLeaveTypes] = useState<any[]>([]);
+  // Store raw API leave types for editing
+  const [rawLeaveTypes, setRawLeaveTypes] = useState<any[]>([]);
   // State for loading indicator
   const [loading, setLoading] = useState(true);
   // State for details modal loading indicator
@@ -138,8 +140,12 @@ const LeaveManagementView = () => {
         const typesResponse = await getAllLeaveTypes();
         console.log('Leave types response:', typesResponse);
         if (typesResponse.success && typesResponse.leaveTypes) {
+          // Store raw API data for editing
+          setRawLeaveTypes(typesResponse.leaveTypes);
+          
           // Transform API response to match our UI interface
           const transformedTypes = typesResponse.leaveTypes.map((type: any) => ({
+            id: type.id, // Keep the ID
             type: type.name,
             limit: type.days_per_year, // Use the correct field name from API
             color: type.is_paid ? '#3b82f6' : '#6b7280', // Different colors for paid/unpaid
@@ -152,6 +158,7 @@ const LeaveManagementView = () => {
           console.warn('Failed to fetch leave types from API:', typesResponse.message);
           // Set to empty array if API call fails
           setLeaveTypes([]);
+          setRawLeaveTypes([]);
         }
 
         console.log('Fetching leave requests...');
@@ -224,21 +231,21 @@ const LeaveManagementView = () => {
           if (requestsResponse.pagination) {
             setTotalItems(requestsResponse.pagination.totalItems);
             setTotalPages(requestsResponse.pagination.totalPages);
-            // Always update pendingTotal when we have pagination data
-            // Fetch pending count separately if not already filtered by pending
-            if (filterStatus !== 'pending') {
-              const pendingResponse = await getAllLeaveRequests(1, 1, { status: 'submitted' });
-              if (pendingResponse.pagination) {
-                setPendingTotal(pendingResponse.pagination.totalItems);
-              }
-            } else {
-              setPendingTotal(requestsResponse.pagination.totalItems);
+            // Always fetch the total pending count regardless of current filter
+            const pendingResponse = await getAllLeaveRequests(1, 1, { status: 'submitted' });
+            if (pendingResponse.pagination) {
+              setPendingTotal(pendingResponse.pagination.totalItems || 0);
+              console.log('Pending total from API:', pendingResponse.pagination.totalItems);
             }
           } else {
             setTotalItems(transformedRequests.length);
             setTotalPages(Math.ceil(transformedRequests.length / itemsPerPage));
-            if (filterStatus === 'pending') {
-              setPendingTotal(transformedRequests.length);
+            // Fallback: fetch pending count
+            const pendingResponse = await getAllLeaveRequests(1, 1, { status: 'submitted' });
+            if (pendingResponse.pagination) {
+              setPendingTotal(pendingResponse.pagination.totalItems || 0);
+            } else {
+              setPendingTotal(transformedRequests.filter(r => r.status === 'Pending').length);
             }
           }
         } else {
@@ -306,17 +313,25 @@ const LeaveManagementView = () => {
     return Calendar; // Use Lucide Calendar icon for all leave types
   };
   
-  // Handler to open edit leave type modal
-  const openEditLeaveTypeModal = (type: any) => {
+  // Handler to open edit leave type modal - uses raw API data
+  const openEditLeaveTypeModal = (displayType: any) => {
+    // Find the raw API data for this leave type
+    const rawType = rawLeaveTypes.find(t => t.id === displayType.id);
+    
+    if (!rawType) {
+      console.error('Could not find raw leave type data for id:', displayType.id);
+      return;
+    }
+    
     setEditLeaveTypeForm({
-      id: type.id || type.id, // Use the correct field name depending on API response
-      name: type.name,
-      description: type.description || '',
-      daysPerYear: type.days_per_year || type.daysPerYear || null,
-      isPaid: type.is_paid || type.isPaid || false,
-      allowCarryover: type.allow_carryover || type.allowCarryover || false,
-      carryoverLimit: type.carryover_limit || type.carryoverLimit || null,
-      expiryRuleId: type.expiry_rule_id || type.expiryRuleId || null
+      id: rawType.id,
+      name: rawType.name,
+      description: rawType.description || '',
+      daysPerYear: rawType.days_per_year || null,
+      isPaid: rawType.is_paid || false,
+      allowCarryover: rawType.allow_carryover || false,
+      carryoverLimit: rawType.carryover_limit || null,
+      expiryRuleId: rawType.expiry_rule_id || null
     });
     setShowEditLeaveTypeModal(true);
   };
@@ -734,42 +749,42 @@ const LeaveManagementView = () => {
             /* Map through leave types to create interactive cards */
             leaveTypes.map(type => (
               <div
-                key={type.type}
-                className="flex items-center gap-3 p-3 rounded cursor-pointer transition-all hover-lift relative"
+                key={type.id || type.type}
+                className="flex items-center gap-2 p-3 rounded-lg cursor-pointer transition-all hover-lift relative"
                 style={{
-                  backgroundColor: filterLeaveType === type.type ? type.color + '20' : '#f9fafb', // Highlight selected type
-                  border: filterLeaveType === type.type ? `2px solid ${type.color}` : '1px solid #e5e7eb'
+                  backgroundColor: filterLeaveType === type.type ? type.color + '20' : '#f9fafb',
+                  border: filterLeaveType === type.type ? `2px solid ${type.color}` : '1px solid #e5e7eb',
+                  minHeight: '80px'
                 }}
-                onClick={() => setFilterLeaveType(filterLeaveType === type.type ? 'all' : type.type)} // Toggle filter
+                onClick={() => setFilterLeaveType(filterLeaveType === type.type ? 'all' : type.type)}
               >
-                {/* Leave type icon */}
-                <div className="icon-wrapper" style={{ backgroundColor: type.color + '30', width: '2.75rem', height: '2.75rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Calendar className="w-5 h-5" style={{ color: type.color }} />
+                {/* Leave type icon - left side */}
+                <div className="icon-wrapper flex-shrink-0" style={{ backgroundColor: type.color + '30', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Calendar className="w-4 h-4" style={{ color: type.color }} />
                 </div>
-                {/* Leave type details */}
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.125rem' }}>{type.type}</p>
-                  <p className="text-xs text-muted">{type.description}</p>
+                {/* Leave type details - middle */}
+                <div style={{ flex: 1, minWidth: 0 }} onClick={(e) => e.stopPropagation()}>
+                  <p style={{ fontWeight: 600, fontSize: '0.8125rem', marginBottom: '0.125rem', lineHeight: 1.2 }}>{type.type}</p>
+                  <p className="text-xs text-muted" style={{ fontSize: '0.6875rem', lineHeight: 1.3 }}>{type.description}</p>
                 </div>
-                {/* Edit button - more pronounced */}
+                {/* Edit button - right side */}
                 <button
-                  className="absolute top-2 right-2 btn btn-sm btn-outline"
+                  className="flex-shrink-0 btn btn-sm btn-outline"
                   onClick={(e) => {
-                    e.stopPropagation(); // Prevent triggering the parent click
+                    e.stopPropagation();
                     openEditLeaveTypeModal(type);
                   }}
                   title="Edit leave type"
-                  style={{ 
-                    padding: '0.375rem 0.5rem',
+                  style={{
+                    padding: '0.25rem 0.5rem',
+                    height: 'auto',
                     minWidth: 'auto',
-                    width: 'auto',
-                    height: 'auto'
+                    fontSize: '0.6875rem'
                   }}
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
-                  <span style={{ fontSize: '0.625rem', marginLeft: '0.25rem' }}>Edit</span>
                 </button>
               </div>
             ))
@@ -1506,8 +1521,8 @@ const LeaveManagementView = () => {
           {/* Details Modal - BAM Design */}
           {showDetailsModal && selectedRequest && (
             <>
-              <div className="bam-overlay" onClick={() => { setShowDetailsModal(false); setSelectedRequestDetails(null); }}></div>
-              <div className="bam-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px' }}>
+              <div className="bam-overlay" onClick={() => { setShowDetailsModal(false); setSelectedRequestDetails(null); }} style={{ zIndex: 9999 }}></div>
+              <div className="bam-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', zIndex: 10000, position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
                 {/* Header */}
                 <div className="bam-header">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
