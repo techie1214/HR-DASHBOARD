@@ -73,7 +73,7 @@ export interface CreateLeaveRequest {
   startDate: string;
   endDate: string;
   reason: string;
-  attachment?: string;
+  attachment?: File | null;  // Changed to support file upload
 }
 
 export interface UpdateLeaveRequest {
@@ -647,10 +647,23 @@ export const createLeaveRequest = async (leaveRequestData: CreateLeaveRequest): 
       };
     }
 
-    const response = await axios.post(`${API_ENDPOINT}/leave/requests`, leaveRequestData, {
+    // Use FormData for file upload support
+    const formData = new FormData();
+    formData.append('user_id', leaveRequestData.userId.toString());
+    formData.append('leave_type_id', leaveRequestData.leaveTypeId.toString());
+    formData.append('start_date', leaveRequestData.startDate);
+    formData.append('end_date', leaveRequestData.endDate);
+    formData.append('reason', leaveRequestData.reason);
+    
+    // Append file if exists
+    if (leaveRequestData.attachment) {
+      formData.append('attachment', leaveRequestData.attachment);
+    }
+
+    const response = await axios.post(`${API_ENDPOINT}/leave/requests`, formData, {
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'multipart/form-data',
       },
     });
 
@@ -670,6 +683,7 @@ export const createLeaveRequest = async (leaveRequestData: CreateLeaveRequest): 
     return {
       success: true,
       leaveRequest: leaveRequest,
+      message: 'Leave request submitted successfully'
     };
   } catch (error: any) {
     console.error('Error creating leave request:', error);

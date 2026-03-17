@@ -64,6 +64,7 @@ import { checkSystemReadiness } from "./services/apiServices";
 import { isAuthenticated, logout, getUserInfo, setupAxiosInterceptors } from "./services/authService";
 import { useAuth } from "./AuthContext";
 import { getAllStaff } from "./services/staffManagementService";
+import { createLeaveRequest, getAllLeaveTypes } from "./services/leaveManagementService";
 
 interface SidebarProps {
   activeView: string;

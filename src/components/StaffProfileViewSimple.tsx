@@ -3,12 +3,14 @@ import { useState, useEffect } from 'react';
 import {
   ArrowLeft, User, Phone, Mail, MapPin, Calendar, Briefcase, FileText, Edit2, Save, X,
   CreditCard, GraduationCap, Award, Activity, AlertCircle, BookOpen, Building2, Clock,
-  Shield, Stethoscope, Banknote, Target, Users, FileCheck, BadgeCheck, CalendarDays, ChevronDown
+  Shield, Stethoscope, Banknote, Target, Users, FileCheck, BadgeCheck, CalendarDays, ChevronDown,
+  Upload, Download, Trash2, Eye, File, FileType
 } from 'lucide-react';
 import { StaffMember } from '../data/staffData';
 import { getStaffById, updateStaff } from '../services/staffManagementService';
 import { getAllBranches } from '../services/branchManagementService';
 import { getAllDepartments } from '../services/departmentManagementService';
+import { uploadStaffDocument, getStaffDocuments, deleteStaffDocument, getDocumentUrl, downloadStaffDocument, StaffDocument } from '../services/staffDocumentService';
 import statesAndLgas from 'nigeria-state-lga-data';
 
 interface StaffProfileViewProps {
@@ -18,12 +20,19 @@ interface StaffProfileViewProps {
 }
 
 export function StaffProfileView({ staff, onBack, onUpdate }: StaffProfileViewProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'personal' | 'employment' | 'contact' | 'education' | 'emergency' | 'banking' | 'medical' | 'resignation'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'personal' | 'employment' | 'contact' | 'education' | 'emergency' | 'banking' | 'medical' | 'resignation' | 'documents'>('overview');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedStaff, setEditedStaff] = useState<any>(staff);
+  const [documents, setDocuments] = useState<StaffDocument[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [selectedDocumentType, setSelectedDocumentType] = useState('');
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [viewingDocument, setViewingDocument] = useState<StaffDocument | null>(null);
   
   // Dropdown data
   const [branches, setBranches] = useState<any[]>([]);
@@ -64,6 +73,8 @@ export function StaffProfileView({ staff, onBack, onUpdate }: StaffProfileViewPr
     // Load Nigerian states
     const states = statesAndLgas.getStates();
     setNigerianStates(states);
+    // Load staff documents
+    loadDocuments();
   }, [staff]);
 
   // Update LGAs when state changes
@@ -88,6 +99,74 @@ export function StaffProfileView({ staff, onBack, onUpdate }: StaffProfileViewPr
       }
     } catch (err) {
       console.error('Error loading dropdown data:', err);
+    }
+  };
+
+  const loadDocuments = async () => {
+    setDocumentsLoading(true);
+    try {
+      const response = await getStaffDocuments(staff.id);
+      if (response.success) {
+        setDocuments(response.data.documents);
+      }
+    } catch (err) {
+      console.error('Error loading documents:', err);
+    } finally {
+      setDocumentsLoading(false);
+    }
+  };
+
+  const handleUploadDocument = async () => {
+    if (!selectedFile || !selectedDocumentType) {
+      setError('Please select a file and document type');
+      return;
+    }
+
+    setUploadingDocument(true);
+    setError(null);
+    try {
+      const response = await uploadStaffDocument(staff.id, selectedDocumentType, selectedFile);
+      if (response.success) {
+        setSuccessMessage('Document uploaded successfully');
+        setShowUploadModal(false);
+        setSelectedFile(null);
+        setSelectedDocumentType('');
+        loadDocuments();
+        setTimeout(() => setSuccessMessage(null), 3000);
+      } else {
+        setError(response.message || 'Failed to upload document');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to upload document');
+    } finally {
+      setUploadingDocument(false);
+    }
+  };
+
+  const handleDeleteDocument = async (docId: number, docName: string) => {
+    if (!window.confirm(`Are you sure you want to delete "${docName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const response = await deleteStaffDocument(docId);
+      if (response.success) {
+        setSuccessMessage('Document deleted successfully');
+        loadDocuments();
+        setTimeout(() => setSuccessMessage(null), 3000);
+      } else {
+        setError(response.message || 'Failed to delete document');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete document');
+    }
+  };
+
+  const handleDownloadDocument = async (doc: StaffDocument) => {
+    try {
+      await downloadStaffDocument(doc);
+    } catch (err: any) {
+      setError(err.message || 'Failed to download document');
     }
   };
 
@@ -378,7 +457,8 @@ export function StaffProfileView({ staff, onBack, onUpdate }: StaffProfileViewPr
             { id: 'emergency', label: 'Emergency', icon: AlertCircle },
             { id: 'banking', label: 'Banking', icon: CreditCard },
             { id: 'medical', label: 'Medical', icon: Stethoscope },
-            { id: 'resignation', label: 'Resignation', icon: FileCheck }
+            { id: 'resignation', label: 'Resignation', icon: FileCheck },
+            { id: 'documents', label: 'Documents', icon: FileText }
           ].map(tab => (
             <button
               key={tab.id}
@@ -682,7 +762,211 @@ export function StaffProfileView({ staff, onBack, onUpdate }: StaffProfileViewPr
             </div>
           </div>
         )}
+
+        {/* Documents Tab */}
+        {activeTab === 'documents' && (
+          <div className="space-y-6">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-lg font-semibold flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-primary" />
+                  Staff Documents
+                </h4>
+                <button
+                  className="btn btn-primary btn-sm flex items-center gap-2"
+                  onClick={() => setShowUploadModal(true)}
+                  disabled={isEditing}
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload Document
+                </button>
+              </div>
+
+              {documentsLoading ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="text-muted mt-2">Loading documents...</p>
+                </div>
+              ) : documents.length === 0 ? (
+                <div className="text-center py-12" style={{ backgroundColor: '#f8fafc', borderRadius: '0.5rem' }}>
+                  <FileText className="w-12 h-12 text-muted mx-auto mb-3" />
+                  <p className="font-medium text-gray-900 mb-1">No documents uploaded</p>
+                  <p className="text-sm text-muted mb-4">Upload documents like ID, certificates, resumes, etc.</p>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => setShowUploadModal(true)}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Your First Document
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {documents.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="p-4 rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
+                      style={{ backgroundColor: '#fff' }}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#dbeafe' }}>
+                            <FileType className="w-5 h-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm text-gray-900">{doc.document_type}</p>
+                            <p className="text-xs text-muted">{formatDate(doc.uploaded_at)}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-700 mb-3 truncate" title={doc.document_name}>
+                        {doc.document_name}
+                      </p>
+                      <div className="flex items-center justify-between text-xs text-muted mb-3">
+                        <span>{(doc.file_size / 1024).toFixed(1)} KB</span>
+                        <span className="uppercase">{doc.mime_type.split('/')[1]}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="btn btn-sm btn-outline flex-1"
+                          onClick={() => setViewingDocument(doc)}
+                          title="View"
+                        >
+                          <Eye className="w-3 h-3" />
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline flex-1"
+                          onClick={() => handleDownloadDocument(doc)}
+                          title="Download"
+                        >
+                          <Download className="w-3 h-3" />
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline red flex-1"
+                          onClick={() => handleDeleteDocument(doc.id, doc.document_name)}
+                          title="Delete"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
+
+    {/* Upload Document Modal */}
+    {showUploadModal && (
+      <>
+        <div className="modal-overlay" onClick={() => setShowUploadModal(false)}></div>
+        <div className="modal">
+          <div className="modal-header">
+            <h3>Upload Document</h3>
+            <button className="btn btn-ghost btn-icon" onClick={() => setShowUploadModal(false)}>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="modal-content">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Document Type *</label>
+                <select
+                  className="input w-full"
+                  value={selectedDocumentType}
+                  onChange={(e) => setSelectedDocumentType(e.target.value)}
+                >
+                  <option value="">Select document type</option>
+                  <option value="ID Document">ID Document</option>
+                  <option value="Resume/CV">Resume/CV</option>
+                  <option value="Certificate">Certificate</option>
+                  <option value="Reference Letter">Reference Letter</option>
+                  <option value="Medical Report">Medical Report</option>
+                  <option value="Training Certificate">Training Certificate</option>
+                  <option value="Performance Review">Performance Review</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">File *</label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                  <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-600 mb-1">
+                    {selectedFile ? selectedFile.name : 'Drag and drop your file here, or click to browse'}
+                  </p>
+                  <p className="text-xs text-muted mb-3">PDF, JPG, PNG (Max 10MB)</p>
+                  <input
+                    type="file"
+                    id="file-upload"
+                    className="hidden"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={(e) => e.target.files && setSelectedFile(e.target.files[0])}
+                  />
+                  <label htmlFor="file-upload" className="btn btn-sm btn-outline cursor-pointer">
+                    Choose File
+                  </label>
+                </div>
+              </div>
+              {error && (
+                <div className="bg-red-50 border-l-4 border-red-500 p-3">
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button className="btn btn-outline" onClick={() => setShowUploadModal(false)}>Cancel</button>
+            <button
+              className="btn btn-primary"
+              onClick={handleUploadDocument}
+              disabled={uploadingDocument || !selectedFile || !selectedDocumentType}
+            >
+              {uploadingDocument ? 'Uploading...' : 'Upload Document'}
+            </button>
+          </div>
+        </div>
+      </>
+    )}
+
+    {/* View Document Modal */}
+    {viewingDocument && (
+      <>
+        <div className="modal-overlay" onClick={() => setViewingDocument(null)} style={{ zIndex: 9999 }}></div>
+        <div className="modal" style={{ maxWidth: '800px', zIndex: 10000, position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+          <div className="modal-header">
+            <h3>{viewingDocument.document_name}</h3>
+            <button className="btn btn-ghost btn-icon" onClick={() => setViewingDocument(null)}>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="modal-content" style={{ padding: '1rem' }}>
+            <div className="text-center mb-4">
+              <FileType className="w-16 h-16 text-primary mx-auto mb-2" />
+              <p className="font-medium">{viewingDocument.document_type}</p>
+              <p className="text-sm text-muted">{formatDate(viewingDocument.uploaded_at)}</p>
+              <p className="text-xs text-muted mt-1">{(viewingDocument.file_size / 1024).toFixed(1)} KB</p>
+            </div>
+            <div className="flex items-center justify-center gap-3">
+              <button className="btn btn-primary" onClick={() => handleDownloadDocument(viewingDocument)}>
+                <Download className="w-4 h-4 mr-2" />
+                Download
+              </button>
+              <a
+                href={getDocumentUrl(viewingDocument.file_path)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-outline"
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                Open in New Tab
+              </a>
+            </div>
+          </div>
+        </div>
+      </>
+    )}
     </div>
   );
 }
