@@ -63,6 +63,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { checkSystemReadiness } from "./services/apiServices";
 import { isAuthenticated, logout, getUserInfo, setupAxiosInterceptors } from "./services/authService";
 import { useAuth } from "./AuthContext";
+import { getAllStaff } from "./services/staffManagementService";
 
 interface SidebarProps {
   activeView: string;

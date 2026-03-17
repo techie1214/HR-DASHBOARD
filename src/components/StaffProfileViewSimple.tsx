@@ -1,8 +1,15 @@
-// Staff Profile View - Improved version with real API data
+// Staff Profile View - Comprehensive version with ALL staff details from database
 import { useState, useEffect } from 'react';
-import { ArrowLeft, User, Phone, Mail, MapPin, Calendar, Briefcase, FileText, Edit2, Save, X } from 'lucide-react';
+import {
+  ArrowLeft, User, Phone, Mail, MapPin, Calendar, Briefcase, FileText, Edit2, Save, X,
+  CreditCard, GraduationCap, Award, Activity, AlertCircle, BookOpen, Building2, Clock,
+  Shield, Stethoscope, Banknote, Target, Users, FileCheck, BadgeCheck, CalendarDays, ChevronDown
+} from 'lucide-react';
 import { StaffMember } from '../data/staffData';
 import { getStaffById, updateStaff } from '../services/staffManagementService';
+import { getAllBranches } from '../services/branchManagementService';
+import { getAllDepartments } from '../services/departmentManagementService';
+import statesAndLgas from 'nigeria-state-lga-data';
 
 interface StaffProfileViewProps {
   staff: StaffMember;
@@ -11,367 +18,671 @@ interface StaffProfileViewProps {
 }
 
 export function StaffProfileView({ staff, onBack, onUpdate }: StaffProfileViewProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'personal' | 'employment' | 'contact'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'personal' | 'employment' | 'contact' | 'education' | 'emergency' | 'banking' | 'medical' | 'resignation'>('overview');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [editedStaff, setEditedStaff] = useState<StaffMember>(staff);
+  const [editedStaff, setEditedStaff] = useState<any>(staff);
+  
+  // Dropdown data
+  const [branches, setBranches] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [nigerianStates, setNigerianStates] = useState<string[]>([]);
+  const [selectedStateLgas, setSelectedStateLgas] = useState<string[]>([]);
+
+  // Hardcoded dropdown options (must match backend ENUM values)
+  const maritalStatusOptions = ['Single', 'Married', 'Divorced', 'Widowed', 'Separated'];
+  const bloodGroupOptions = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  const genderOptions = ['Male', 'Female', 'Other'];
+  // Backend ENUM: ('full_time', 'part_time', 'contract', 'temporary')
+  const employmentTypeOptions = [
+    { value: 'full_time', label: 'Full Time' },
+    { value: 'part_time', label: 'Part Time' },
+    { value: 'contract', label: 'Contract' },
+    { value: 'temporary', label: 'Temporary' }
+  ];
+  const jobStatusOptions = ['Active', 'Probation', 'Suspended', 'Terminated', 'Resigned'];
+  const gratuityOptions = [
+    { value: '1', label: 'Yes' },
+    { value: '0', label: 'No' }
+  ];
+  const overtimeEligibilityOptions = [
+    { value: '1', label: 'Yes' },
+    { value: '0', label: 'No' }
+  ];
+  const workModeOptions = [
+    { value: 'office', label: 'Office' },
+    { value: 'remote', label: 'Remote' },
+    { value: 'hybrid', label: 'Hybrid' }
+  ];
 
   useEffect(() => {
     setEditedStaff(staff);
+    // Load branches and departments
+    loadDropdownData();
+    // Load Nigerian states
+    const states = statesAndLgas.getStates();
+    setNigerianStates(states);
   }, [staff]);
+
+  // Update LGAs when state changes
+  useEffect(() => {
+    if (editedStaff.stateOfOrigin) {
+      const lgas = statesAndLgas.getLgas(editedStaff.stateOfOrigin);
+      setSelectedStateLgas(lgas || []);
+    }
+  }, [editedStaff.stateOfOrigin]);
+
+  const loadDropdownData = async () => {
+    try {
+      const [branchesRes, deptsRes] = await Promise.all([
+        getAllBranches(),
+        getAllDepartments()
+      ]);
+      if (branchesRes.success && branchesRes.branches) {
+        setBranches(branchesRes.branches);
+      }
+      if (deptsRes.success && deptsRes.departments) {
+        setDepartments(deptsRes.departments);
+      }
+    } catch (err) {
+      console.error('Error loading dropdown data:', err);
+    }
+  };
 
   const handleSave = async () => {
     setLoading(true);
     setError(null);
+    setSuccessMessage(null);
     try {
-      const response = await updateStaff(staff.id, {
-        designation: editedStaff.departmentRole,
+      // Build comprehensive API payload with ALL fields
+      const apiData: any = {
+        first_name: editedStaff.firstName,
+        last_name: editedStaff.lastName,
+        middle_name: editedStaff.middleName,
+        email: editedStaff.email,
+        work_email: editedStaff.workEmail,
+        phone_number: editedStaff.phoneNumber,
+        alternate_phone: editedStaff.alternatePhone,
+        designation: editedStaff.designation || editedStaff.departmentRole,
         department: editedStaff.department,
-        // Add other fields as needed
+        branch_id: editedStaff.branchId,
+        employment_type: editedStaff.employmentType,
+        date_joined: editedStaff.joiningDate || editedStaff.dateEmployed,
+        status: editedStaff.status?.toLowerCase() || 'active',
+        // Personal info
+        gender: editedStaff.gender,
+        date_of_birth: editedStaff.dateOfBirth,
+        blood_group: editedStaff.bloodGroup,
+        state_of_origin: editedStaff.stateOfOrigin,
+        lga: editedStaff.lga,
+        marital_status: editedStaff.maritalStatus,
+        // Address
+        current_address: editedStaff.currentAddress,
+        permanent_address: editedStaff.permanentAddress,
+        town: editedStaff.town,
+        zip_code: editedStaff.zipCode,
+        // Employment
+        job_status: editedStaff.jobStatus,
+        weekly_working_hours: editedStaff.weeklyWorkingHours,
+        probation_end_date: editedStaff.probationEndDate,
+        contract_end_date: editedStaff.contractEndDate,
+        notice_period_days: editedStaff.noticePeriodDays,
+        pay_grade: editedStaff.payGrade,
+        base_salary: editedStaff.baseSalary,
+        // Banking
+        bank_name: editedStaff.bankName,
+        bank_account_number: editedStaff.bankAccountNumber,
+        bank_ifsc_code: editedStaff.bankIfscCode,
+        tax_identification_number: editedStaff.taxIdentificationNumber,
+        provident_fund_id: editedStaff.providentFundId,
+        // Emergency
+        emergency_contact_name: editedStaff.emergencyContactName,
+        emergency_contact_phone: editedStaff.emergencyContactPhone,
+        emergency_contact_relationship: editedStaff.emergencyContactRelationship,
+        // Education
+        highest_qualification: editedStaff.highestQualification,
+        university_school: editedStaff.universitySchool,
+        year_of_graduation: editedStaff.yearOfGraduation,
+        professional_certifications: editedStaff.professionalCertifications,
+        languages_known: editedStaff.languagesKnown,
+        primary_skills: editedStaff.primarySkills,
+        // Medical
+        allergies: editedStaff.allergies,
+        special_medical_notes: editedStaff.specialMedicalNotes,
+        medical_insurance_id: editedStaff.medicalInsuranceId,
+        gratuity_applicable: editedStaff.gratuityApplicable === 'Yes' || editedStaff.gratuityApplicable === '1' || editedStaff.gratuityApplicable === true ? 1 : 0,
+        overtime_eligibility: editedStaff.overtimeEligibility === 'Yes' || editedStaff.overtimeEligibility === '1' || editedStaff.overtimeEligibility === true ? 1 : 0,
+        work_mode: editedStaff.workMode,
+        // Resignation (if applicable)
+        resignation_date: editedStaff.resignationDate,
+        notice_period_start: editedStaff.noticePeriodStart,
+        notice_period_end: editedStaff.noticePeriodEnd,
+        last_working_date: editedStaff.lastWorkingDate,
+        relieving_date: editedStaff.relievingDate,
+        reason_for_leaving: editedStaff.reasonForLeaving,
+        previous_company: editedStaff.previousCompany,
+        experience_years: editedStaff.experienceYears,
+        reference_check_status: editedStaff.referenceCheckStatus,
+        background_verification_status: editedStaff.backgroundVerificationStatus
+      };
+
+      // Remove undefined/null fields
+      Object.keys(apiData).forEach(key => {
+        if (apiData[key] === undefined || apiData[key] === null || apiData[key] === '') {
+          delete apiData[key];
+        }
       });
-      
+
+      console.log('Saving staff data:', apiData);
+      const response = await updateStaff(staff.id, apiData);
+
       if (response.success) {
-        onUpdate(editedStaff);
+        setSuccessMessage('Staff profile updated successfully');
+        // Update the local state with the saved data
+        const updatedStaff = { ...editedStaff };
+        onUpdate(updatedStaff);
+        setTimeout(() => setSuccessMessage(null), 3000);
         setIsEditing(false);
       } else {
         setError(response.message || 'Failed to update staff');
       }
-    } catch (err) {
-      setError('An error occurred while updating staff');
-      console.error(err);
+    } catch (err: any) {
+      console.error('Save error:', err);
+      setError(err.message || 'An error occurred while updating staff');
     } finally {
       setLoading(false);
     }
   };
 
   const formatDate = (dateStr?: string | null) => {
-    if (!dateStr || dateStr === 'N/A') return 'Not specified';
-    return new Date(dateStr).toLocaleDateString('en-KE', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    if (!dateStr || dateStr === 'N/A' || dateStr === '') return 'Not specified';
+    try {
+      return new Date(dateStr).toLocaleDateString('en-KE', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch {
+      return dateStr;
+    }
   };
 
   const computeYearsEmployed = (dateStr?: string | null) => {
-    if (!dateStr || dateStr === 'N/A') return 'N/A';
-    const start = new Date(dateStr);
-    if (isNaN(start.getTime())) return 'N/A';
-    const now = new Date();
-    let years = now.getFullYear() - start.getFullYear();
-    const monthDiff = now.getMonth() - start.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < start.getDate())) years -= 1;
-    return `${years >= 0 ? years : 0} years`;
+    if (!dateStr || dateStr === 'N/A' || dateStr === '') return 'N/A';
+    try {
+      const start = new Date(dateStr);
+      if (isNaN(start.getTime())) return 'N/A';
+      const now = new Date();
+      let years = now.getFullYear() - start.getFullYear();
+      const monthDiff = now.getMonth() - start.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < start.getDate())) years -= 1;
+      return `${years >= 0 ? years : 0} years`;
+    } catch {
+      return 'N/A';
+    }
+  };
+
+  const renderField = (icon: any, label: string, value: any, field?: string, type: string = 'text', options?: any[]) => {
+    const isEditable = isEditing && field;
+    const currentValue = field ? editedStaff[field] : value;
+
+    return (
+      <div className="p-4" style={{ backgroundColor: '#f8fafc', borderRadius: '0.5rem' }}>
+        <div className="flex items-center gap-2 mb-2">
+          {icon}
+          <span className="text-sm text-muted">{label}</span>
+        </div>
+        {isEditable ? (
+          type === 'select' && options ? (
+            <div className="relative">
+              <select
+                className="input w-full pr-10"
+                value={currentValue || ''}
+                onChange={(e) => setEditedStaff({ ...editedStaff, [field]: e.target.value })}
+                style={{ backgroundColor: 'white', appearance: 'none' }}
+              >
+                <option value="">Select {label}</option>
+                {options.map((opt: any) => (
+                  <option key={opt.value || opt} value={opt.value || opt}>
+                    {opt.label || opt}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          ) : type === 'textarea' ? (
+            <textarea
+              className="input w-full"
+              value={currentValue || ''}
+              onChange={(e) => setEditedStaff({ ...editedStaff, [field]: e.target.value })}
+              rows={3}
+              style={{ backgroundColor: 'white' }}
+            />
+          ) : type === 'date' ? (
+            <input
+              type="date"
+              className="input w-full"
+              value={currentValue ? currentValue.split('T')[0] : ''}
+              onChange={(e) => setEditedStaff({ ...editedStaff, [field]: e.target.value })}
+              style={{ backgroundColor: 'white' }}
+            />
+          ) : type === 'number' ? (
+            <input
+              type="number"
+              className="input w-full"
+              value={currentValue || ''}
+              onChange={(e) => setEditedStaff({ ...editedStaff, [field]: e.target.value })}
+              style={{ backgroundColor: 'white' }}
+            />
+          ) : (
+            <input
+              type="text"
+              className="input w-full"
+              value={currentValue || ''}
+              onChange={(e) => setEditedStaff({ ...editedStaff, [field]: e.target.value })}
+              style={{ backgroundColor: 'white' }}
+            />
+          )
+        ) : (
+          <p className="font-medium" style={{ color: '#0f172a' }}>
+            {type === 'date' ? formatDate(currentValue) : currentValue || 'Not specified'}
+          </p>
+        )}
+      </div>
+    );
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="card p-6">
-        <div className="flex items-center gap-4 mb-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <button onClick={onBack} className="btn btn-ghost" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <ArrowLeft className="w-5 h-5" />
+              <span>Back</span>
+            </button>
+            <h2 className="text-xl font-semibold">Staff Profile</h2>
+          </div>
           <button
-            onClick={onBack}
-            className="btn btn-outline"
-            style={{ width: '2.5rem', height: '2.5rem' }}
+            onClick={() => isEditing ? handleSave() : setIsEditing(true)}
+            className="btn"
+            disabled={loading}
+            style={{
+              backgroundColor: '#2563eb',
+              color: 'white',
+              fontWeight: 600,
+              border: 'none',
+              boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
+            }}
           >
-            <ArrowLeft className="w-5 h-5" />
+            {isEditing ? (
+              <><Save className="w-4 h-4 mr-2" /> Save Changes</>
+            ) : (
+              <><Edit2 className="w-4 h-4 mr-2" /> Edit Profile</>
+            )}
           </button>
-          <h2 className="text-xl font-semibold">Staff Profile</h2>
         </div>
+
+        {/* Success Message */}
+        {successMessage && (
+          <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-4">
+            <p className="text-sm text-green-700">{successMessage}</p>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
 
         {/* Staff Info Header */}
         <div className="flex items-start gap-6">
-          <div
-            className="avatar"
-            style={{
-              width: '6rem',
-              height: '6rem',
-              fontSize: '1.5rem',
-              backgroundColor: '#2563eb',
-              color: 'white'
-            }}
-          >
-            {editedStaff.avatar || `${editedStaff.firstName[0]}${editedStaff.lastName[0]}`}
+          <div className="avatar" style={{ width: '6rem', height: '6rem', fontSize: '1.5rem', backgroundColor: '#2563eb', color: 'white' }}>
+            {editedStaff.avatar || `${editedStaff.firstName?.[0] || ''}${editedStaff.lastName?.[0] || ''}`}
           </div>
           <div className="flex-1">
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="text-2xl font-bold" style={{ color: '#0f172a' }}>
-                  {editedStaff.firstName} {editedStaff.middleName} {editedStaff.lastName}
-                </h3>
-                <p className="text-muted" style={{ marginTop: '0.25rem' }}>
-                  {editedStaff.departmentRole} • {editedStaff.department}
-                </p>
-                <div className="flex items-center gap-2" style={{ marginTop: '0.5rem' }}>
-                  <span className={`badge ${editedStaff.status === 'Active' ? 'badge-success' : 'badge-secondary'}`}>
-                    {editedStaff.status}
-                  </span>
-                  <span className="text-muted" style={{ fontSize: '0.75rem' }}>
-                    Employee ID: {editedStaff.id}
-                  </span>
-                </div>
-              </div>
-              <button
-                onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-                className="btn btn-primary"
-                disabled={loading}
-              >
-                {isEditing ? (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Changes
-                  </>
-                ) : (
-                  <>
-                    <Edit2 className="w-4 h-4 mr-2" />
-                    Edit Profile
-                  </>
-                )}
-              </button>
+            <h3 className="text-2xl font-bold" style={{ color: '#0f172a' }}>
+              {editedStaff.firstName} {editedStaff.middleName} {editedStaff.lastName}
+            </h3>
+            <p className="text-muted" style={{ marginTop: '0.25rem' }}>
+              {editedStaff.departmentRole || editedStaff.designation} • {editedStaff.department}
+            </p>
+            <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: '0.5rem' }}>
+              <span className={`badge ${editedStaff.status === 'Active' ? 'badge-success' : 'badge-secondary'}`}>
+                {editedStaff.status}
+              </span>
+              {editedStaff.employeeId && (
+                <span className="text-muted" style={{ fontSize: '0.75rem' }}>
+                  ID: {editedStaff.employeeId}
+                </span>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Error Message */}
-      {error && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <X className="h-5 w-5 text-red-400" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Tabs */}
-      <div className="tabs">
-        <div className="tabs-list">
-          <button
-            className={`tabs-trigger ${activeTab === 'overview' ? 'active' : ''}`}
-            onClick={() => setActiveTab('overview')}
-          >
-            Overview
-          </button>
-          <button
-            className={`tabs-trigger ${activeTab === 'personal' ? 'active' : ''}`}
-            onClick={() => setActiveTab('personal')}
-          >
-            Personal
-          </button>
-          <button
-            className={`tabs-trigger ${activeTab === 'employment' ? 'active' : ''}`}
-            onClick={() => setActiveTab('employment')}
-          >
-            Employment
-          </button>
-          <button
-            className={`tabs-trigger ${activeTab === 'contact' ? 'active' : ''}`}
-            onClick={() => setActiveTab('contact')}
-          >
-            Contact
-          </button>
+      <div className="card p-2" style={{ backgroundColor: '#f1f5f9' }}>
+        <div className="flex flex-wrap gap-1 overflow-x-auto  ">
+          {[
+            { id: 'overview', label: 'Overview', icon: User },
+            { id: 'personal', label: 'Personal', icon: User },
+            { id: 'employment', label: 'Employment', icon: Briefcase },
+            { id: 'contact', label: 'Contact', icon: Mail },
+            { id: 'education', label: 'Education', icon: GraduationCap },
+            { id: 'emergency', label: 'Emergency', icon: AlertCircle },
+            { id: 'banking', label: 'Banking', icon: CreditCard },
+            { id: 'medical', label: 'Medical', icon: Stethoscope },
+            { id: 'resignation', label: 'Resignation', icon: FileCheck }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
+                activeTab === tab.id
+                  ? 'text-white shadow-md'
+                  : 'text-gray-600 hover:bg-white hover:shadow-sm'
+              }`}
+              onClick={() => setActiveTab(tab.id as any)}
+              style={{
+                backgroundColor: activeTab === tab.id ? '#2563eb' : 'transparent',
+                borderColor: activeTab === tab.id ? '#2563eb' : 'transparent'
+              }}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Tab Content */}
       <div className="card p-6">
+        {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
             <div>
-              <h4 className="text-lg font-semibold mb-4">Quick Information</h4>
-              <div className="grid grid-cols-1 md-grid-cols-2 gap-4">
-                <InfoItem
-                  icon={User}
-                  label="Full Name"
-                  value={`${editedStaff.firstName} ${editedStaff.middleName} ${editedStaff.lastName}`}
-                />
-                <InfoItem
-                  icon={Briefcase}
-                  label="Designation"
-                  value={editedStaff.departmentRole}
-                />
-                <InfoItem
-                  icon={FileText}
-                  label="Department"
-                  value={editedStaff.department}
-                />
-                <InfoItem
-                  icon={Calendar}
-                  label="Date Employed"
-                  value={formatDate(editedStaff.dateEmployed)}
-                />
-                <InfoItem
-                  icon={Calendar}
-                  label="Years Employed"
-                  value={computeYearsEmployed(editedStaff.dateEmployed)}
-                />
-                <InfoItem
-                  icon={User}
-                  label="Status"
-                  value={editedStaff.status}
-                />
+              <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <User className="w-5 h-5 text-primary" />
+                Quick Information
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {renderField(<User className="w-4 h-4 text-muted" />, 'Full Name', `${editedStaff.firstName} ${editedStaff.middleName} ${editedStaff.lastName}`)}
+                {renderField(<Briefcase className="w-4 h-4 text-muted" />, 'Designation', editedStaff.departmentRole || editedStaff.designation)}
+                {renderField(<Building2 className="w-4 h-4 text-muted" />, 'Department', editedStaff.department)}
+                {renderField(<Calendar className="w-4 h-4 text-muted" />, 'Date Employed', formatDate(editedStaff.joiningDate || editedStaff.dateEmployed))}
+                {renderField(<Clock className="w-4 h-4 text-muted" />, 'Years Employed', computeYearsEmployed(editedStaff.joiningDate || editedStaff.dateEmployed))}
+                {renderField(<Shield className="w-4 h-4 text-muted" />, 'Status', editedStaff.status)}
+                {renderField(<FileText className="w-4 h-4 text-muted" />, 'Employee ID', editedStaff.employeeId)}
+                {renderField(<Users className="w-4 h-4 text-muted" />, 'Employment Type', editedStaff.employmentType)}
+                {renderField(<MapPin className="w-4 h-4 text-muted" />, 'Branch', editedStaff.branch)}
               </div>
             </div>
           </div>
         )}
 
+        {/* Personal Tab */}
         {activeTab === 'personal' && (
           <div className="space-y-6">
             <div>
-              <h4 className="text-lg font-semibold mb-4">Personal Information</h4>
-              <div className="grid grid-cols-1 md-grid-cols-2 gap-4">
-                <InfoItem
-                  icon={User}
-                  label="First Name"
-                  value={editedStaff.firstName}
-                  editable={isEditing}
-                  onChange={(value) => setEditedStaff({ ...editedStaff, firstName: value })}
-                />
-                <InfoItem
-                  icon={User}
-                  label="Middle Name"
-                  value={editedStaff.middleName}
-                  editable={isEditing}
-                  onChange={(value) => setEditedStaff({ ...editedStaff, middleName: value })}
-                />
-                <InfoItem
-                  icon={User}
-                  label="Last Name"
-                  value={editedStaff.lastName}
-                  editable={isEditing}
-                  onChange={(value) => setEditedStaff({ ...editedStaff, lastName: value })}
-                />
-                <InfoItem
-                  icon={User}
-                  label="Gender"
-                  value={editedStaff.gender}
-                  editable={isEditing}
-                  onChange={(value) => setEditedStaff({ ...editedStaff, gender: value })}
-                />
-                <InfoItem
-                  icon={Calendar}
-                  label="Date of Birth"
-                  value={formatDate(editedStaff.dateOfBirth)}
-                />
-                <InfoItem
-                  icon={MapPin}
-                  label="State of Origin"
-                  value={editedStaff.stateOfOrigin}
-                />
+              <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <User className="w-5 h-5 text-primary" />
+                Personal Information
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {renderField(<User className="w-4 h-4 text-muted" />, 'First Name', editedStaff.firstName, 'firstName')}
+                {renderField(<User className="w-4 h-4 text-muted" />, 'Middle Name', editedStaff.middleName, 'middleName')}
+                {renderField(<User className="w-4 h-4 text-muted" />, 'Last Name', editedStaff.lastName, 'lastName')}
+                {renderField(<Calendar className="w-4 h-4 text-muted" />, 'Date of Birth', editedStaff.dateOfBirth, 'dateOfBirth', 'date')}
+                {renderField(
+                  <User className="w-4 h-4 text-muted" />,
+                  'Gender',
+                  editedStaff.gender,
+                  'gender',
+                  'select',
+                  genderOptions
+                )}
+                {renderField(
+                  <Activity className="w-4 h-4 text-muted" />,
+                  'Blood Group',
+                  editedStaff.bloodGroup,
+                  'bloodGroup',
+                  'select',
+                  bloodGroupOptions
+                )}
+                {renderField(
+                  <MapPin className="w-4 h-4 text-muted" />,
+                  'State of Origin',
+                  editedStaff.stateOfOrigin,
+                  'stateOfOrigin',
+                  'select',
+                  nigerianStates
+                )}
+                {renderField(
+                  <MapPin className="w-4 h-4 text-muted" />,
+                  'LGA',
+                  editedStaff.lga,
+                  'lga',
+                  'select',
+                  selectedStateLgas
+                )}
+                {renderField(
+                  <Users className="w-4 h-4 text-muted" />,
+                  'Marital Status',
+                  editedStaff.maritalStatus,
+                  'maritalStatus',
+                  'select',
+                  maritalStatusOptions
+                )}
               </div>
             </div>
           </div>
         )}
 
+        {/* Employment Tab */}
         {activeTab === 'employment' && (
           <div className="space-y-6">
             <div>
-              <h4 className="text-lg font-semibold mb-4">Employment Details</h4>
-              <div className="grid grid-cols-1 md-grid-cols-2 gap-4">
-                <InfoItem
-                  icon={Briefcase}
-                  label="Designation"
-                  value={editedStaff.departmentRole}
-                  editable={isEditing}
-                  onChange={(value) => setEditedStaff({ ...editedStaff, departmentRole: value })}
-                />
-                <InfoItem
-                  icon={FileText}
-                  label="Department"
-                  value={editedStaff.department}
-                  editable={isEditing}
-                  onChange={(value) => setEditedStaff({ ...editedStaff, department: value })}
-                />
-                <InfoItem
-                  icon={Calendar}
-                  label="Date Employed"
-                  value={formatDate(editedStaff.dateEmployed)}
-                />
-                <InfoItem
-                  icon={User}
-                  label="Job Status"
-                  value={editedStaff.jobStatus}
-                />
-                <InfoItem
-                  icon={Briefcase}
-                  label="Branch Type"
-                  value={editedStaff.branchType}
-                />
-                <InfoItem
-                  icon={Calendar}
-                  label="Years Employed"
-                  value={computeYearsEmployed(editedStaff.dateEmployed)}
-                />
+              <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Briefcase className="w-5 h-5 text-primary" />
+                Employment Details
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {renderField(<Briefcase className="w-4 h-4 text-muted" />, 'Designation', editedStaff.departmentRole || editedStaff.designation, 'designation')}
+                {renderField(
+                  <Building2 className="w-4 h-4 text-muted" />,
+                  'Department',
+                  editedStaff.department,
+                  'department',
+                  'select',
+                  departments.map(d => ({ value: d.name, label: d.name }))
+                )}
+                {renderField(
+                  <MapPin className="w-4 h-4 text-muted" />,
+                  'Branch',
+                  editedStaff.branch,
+                  'branchId',
+                  'select',
+                  branches.map(b => ({ value: b.id, label: b.name }))
+                )}
+                {renderField(<Calendar className="w-4 h-4 text-muted" />, 'Date Joined', formatDate(editedStaff.joiningDate || editedStaff.dateEmployed), 'dateJoined', 'date')}
+                {renderField(
+                  <Users className="w-4 h-4 text-muted" />,
+                  'Employment Type',
+                  editedStaff.employmentType,
+                  'employmentType',
+                  'select',
+                  employmentTypeOptions
+                )}
+                {renderField(
+                  <Target className="w-4 h-4 text-muted" />,
+                  'Job Status',
+                  editedStaff.jobStatus,
+                  'jobStatus',
+                  'select',
+                  jobStatusOptions
+                )}
+                {renderField(<Clock className="w-4 h-4 text-muted" />, 'Weekly Hours', editedStaff.weeklyWorkingHours, 'weeklyWorkingHours', 'number')}
+                {renderField(<CalendarDays className="w-4 h-4 text-muted" />, 'Probation End', formatDate(editedStaff.probationEndDate), 'probationEndDate', 'date')}
+                {renderField(<CalendarDays className="w-4 h-4 text-muted" />, 'Contract End', formatDate(editedStaff.contractEndDate), 'contractEndDate', 'date')}
+                {renderField(<Clock className="w-4 h-4 text-muted" />, 'Notice Period', `${editedStaff.noticePeriodDays || 'N/A'} days`, 'noticePeriodDays', 'number')}
+                {renderField(<Award className="w-4 h-4 text-muted" />, 'Pay Grade', editedStaff.payGrade, 'payGrade')}
+                {renderField(<Banknote className="w-4 h-4 text-muted" />, 'Base Salary', editedStaff.baseSalary, 'baseSalary', 'number')}
+                {renderField(
+                  <Banknote className="w-4 h-4 text-muted" />,
+                  'Gratuity Applicable',
+                  editedStaff.gratuityApplicable === '1' || editedStaff.gratuityApplicable === true || editedStaff.gratuityApplicable === 'Yes' ? 'Yes' : 'No',
+                  'gratuityApplicable',
+                  'select',
+                  gratuityOptions
+                )}
+                {renderField(
+                  <Clock className="w-4 h-4 text-muted" />,
+                  'Overtime Eligible',
+                  editedStaff.overtimeEligibility === '1' || editedStaff.overtimeEligibility === true || editedStaff.overtimeEligibility === 'Yes' ? 'Yes' : 'No',
+                  'overtimeEligibility',
+                  'select',
+                  overtimeEligibilityOptions
+                )}
+                {renderField(
+                  <Briefcase className="w-4 h-4 text-muted" />,
+                  'Work Mode',
+                  editedStaff.workMode,
+                  'workMode',
+                  'select',
+                  workModeOptions
+                )}
               </div>
             </div>
           </div>
         )}
 
+        {/* Contact Tab */}
         {activeTab === 'contact' && (
           <div className="space-y-6">
             <div>
-              <h4 className="text-lg font-semibold mb-4">Contact Information</h4>
-              <div className="grid grid-cols-1 md-grid-cols-2 gap-4">
-                <InfoItem
-                  icon={Mail}
-                  label="Email Address"
-                  value={editedStaff.email}
-                />
-                <InfoItem
-                  icon={Phone}
-                  label="Phone Number"
-                  value={editedStaff.phoneNumber}
-                />
-                <InfoItem
-                  icon={MapPin}
-                  label="Address"
-                  value={editedStaff.address}
-                />
+              <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Mail className="w-5 h-5 text-primary" />
+                Contact Information
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {renderField(<Mail className="w-4 h-4 text-muted" />, 'Work Email', editedStaff.workEmail, 'workEmail')}
+                {renderField(<Mail className="w-4 h-4 text-muted" />, 'Personal Email', editedStaff.email, 'email')}
+                {renderField(<Phone className="w-4 h-4 text-muted" />, 'Phone Number', editedStaff.phoneNumber, 'phoneNumber')}
+                {renderField(<Phone className="w-4 h-4 text-muted" />, 'Alternate Phone', editedStaff.alternatePhone, 'alternatePhone')}
+                {renderField(<MapPin className="w-4 h-4 text-muted" />, 'Current Address', editedStaff.currentAddress, 'currentAddress', 'textarea')}
+                {renderField(<MapPin className="w-4 h-4 text-muted" />, 'Permanent Address', editedStaff.permanentAddress, 'permanentAddress', 'textarea')}
+                {renderField(<MapPin className="w-4 h-4 text-muted" />, 'Town/City', editedStaff.town, 'town')}
+                {renderField(<MapPin className="w-4 h-4 text-muted" />, 'ZIP Code', editedStaff.zipCode, 'zipCode')}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Education Tab */}
+        {activeTab === 'education' && (
+          <div className="space-y-6">
+            <div>
+              <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <GraduationCap className="w-5 h-5 text-primary" />
+                Education & Qualifications
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {renderField(<GraduationCap className="w-4 h-4 text-muted" />, 'Highest Qualification', editedStaff.highestQualification, 'highestQualification')}
+                {renderField(<BookOpen className="w-4 h-4 text-muted" />, 'University/School', editedStaff.universitySchool, 'universitySchool')}
+                {renderField(<Calendar className="w-4 h-4 text-muted" />, 'Year of Graduation', editedStaff.yearOfGraduation, 'yearOfGraduation', 'number')}
+                {renderField(<Award className="w-4 h-4 text-muted" />, 'Professional Certifications', editedStaff.professionalCertifications, 'professionalCertifications', 'textarea')}
+                {renderField(<BookOpen className="w-4 h-4 text-muted" />, 'Languages Known', editedStaff.languagesKnown, 'languagesKnown')}
+                {renderField(<Award className="w-4 h-4 text-muted" />, 'Primary Skills', editedStaff.primarySkills, 'primarySkills', 'textarea')}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Emergency Contact Tab */}
+        {activeTab === 'emergency' && (
+          <div className="space-y-6">
+            <div>
+              <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-primary" />
+                Emergency Contact Information
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {renderField(<User className="w-4 h-4 text-muted" />, 'Contact Name', editedStaff.emergencyContactName, 'emergencyContactName')}
+                {renderField(<Phone className="w-4 h-4 text-muted" />, 'Contact Phone', editedStaff.emergencyContactPhone, 'emergencyContactPhone')}
+                {renderField(<Users className="w-4 h-4 text-muted" />, 'Relationship', editedStaff.emergencyContactRelationship, 'emergencyContactRelationship')}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Banking Tab */}
+        {activeTab === 'banking' && (
+          <div className="space-y-6">
+            <div>
+              <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-primary" />
+                Banking & Tax Information
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {renderField(<Building2 className="w-4 h-4 text-muted" />, 'Bank Name', editedStaff.bankName, 'bankName')}
+                {renderField(<CreditCard className="w-4 h-4 text-muted" />, 'Account Number', editedStaff.bankAccountNumber, 'bankAccountNumber')}
+                {renderField(<CreditCard className="w-4 h-4 text-muted" />, 'IFSC Code', editedStaff.bankIfscCode, 'bankIfscCode')}
+                {renderField(<FileText className="w-4 h-4 text-muted" />, 'Tax ID (TIN)', editedStaff.taxIdentificationNumber, 'taxIdentificationNumber')}
+                {renderField(<Banknote className="w-4 h-4 text-muted" />, 'Provident Fund ID', editedStaff.providentFundId, 'providentFundId')}
+                {renderField(<Banknote className="w-4 h-4 text-muted" />, 'Medical Insurance ID', editedStaff.medicalInsuranceId, 'medicalInsuranceId')}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Medical Tab */}
+        {activeTab === 'medical' && (
+          <div className="space-y-6">
+            <div>
+              <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Stethoscope className="w-5 h-5 text-primary" />
+                Medical Information
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {renderField(<Activity className="w-4 h-4 text-muted" />, 'Blood Group', editedStaff.bloodGroup, 'bloodGroup')}
+                {renderField(<AlertCircle className="w-4 h-4 text-muted" />, 'Allergies', editedStaff.allergies, 'allergies', 'textarea')}
+                {renderField(<AlertCircle className="w-4 h-4 text-muted" />, 'Medical Notes', editedStaff.specialMedicalNotes, 'specialMedicalNotes', 'textarea')}
+                {renderField(<Shield className="w-4 h-4 text-muted" />, 'Medical Insurance', editedStaff.medicalInsuranceId, 'medicalInsuranceId')}
+                {renderField(<Shield className="w-4 h-4 text-muted" />, 'Gratuity Applicable', editedStaff.gratuityApplicable ? 'Yes' : 'No', 'gratuityApplicable')}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Resignation Tab */}
+        {activeTab === 'resignation' && (
+          <div className="space-y-6">
+            <div>
+              <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <FileCheck className="w-5 h-5 text-primary" />
+                Resignation & Exit Information
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {renderField(<Calendar className="w-4 h-4 text-muted" />, 'Resignation Date', formatDate(editedStaff.resignationDate), 'resignationDate', 'date')}
+                {renderField(<Calendar className="w-4 h-4 text-muted" />, 'Notice Period Start', formatDate(editedStaff.noticePeriodStart), 'noticePeriodStart', 'date')}
+                {renderField(<Calendar className="w-4 h-4 text-muted" />, 'Notice Period End', formatDate(editedStaff.noticePeriodEnd), 'noticePeriodEnd', 'date')}
+                {renderField(<Calendar className="w-4 h-4 text-muted" />, 'Last Working Date', formatDate(editedStaff.lastWorkingDate), 'lastWorkingDate', 'date')}
+                {renderField(<Calendar className="w-4 h-4 text-muted" />, 'Relieving Date', formatDate(editedStaff.relievingDate), 'relievingDate', 'date')}
+                {renderField(<FileText className="w-4 h-4 text-muted" />, 'Reason for Leaving', editedStaff.reasonForLeaving, 'reasonForLeaving', 'textarea')}
+                {renderField(<BookOpen className="w-4 h-4 text-muted" />, 'Previous Company', editedStaff.previousCompany, 'previousCompany')}
+                {renderField(<Clock className="w-4 h-4 text-muted" />, 'Experience (Years)', editedStaff.experienceYears, 'experienceYears', 'number')}
+                {renderField(<BadgeCheck className="w-4 h-4 text-muted" />, 'Reference Check', editedStaff.referenceCheckStatus, 'referenceCheckStatus')}
+                {renderField(<BadgeCheck className="w-4 h-4 text-muted" />, 'Background Verification', editedStaff.backgroundVerificationStatus, 'backgroundVerificationStatus')}
               </div>
             </div>
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-// Helper component for info items
-function InfoItem({
-  icon: Icon,
-  label,
-  value,
-  editable = false,
-  onChange
-}: {
-  icon: any;
-  label: string;
-  value: string;
-  editable?: boolean;
-  onChange?: (value: string) => void;
-}) {
-  return (
-    <div className="p-4" style={{ backgroundColor: '#f8fafc', borderRadius: '0.5rem' }}>
-      <div className="flex items-center gap-2 mb-2">
-        <Icon className="w-4 h-4 text-muted" />
-        <span className="text-sm text-muted">{label}</span>
-      </div>
-      {editable && onChange ? (
-        <input
-          type="text"
-          className="input"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          style={{ backgroundColor: 'white' }}
-        />
-      ) : (
-        <p className="font-medium" style={{ color: '#0f172a' }}>{value}</p>
-      )}
     </div>
   );
 }

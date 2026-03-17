@@ -61,7 +61,7 @@ export function AllStaffView({ initialSelectedStaff }: { initialSelectedStaff?: 
 
   useEffect(() => {
     loadStaffList();
-  }, [currentPage, activeFilter, departmentFilter]);
+  }, [currentPage, activeFilter, departmentFilter, searchTerm]);
 
   useEffect(() => {
     if (initialSelectedStaff) {
