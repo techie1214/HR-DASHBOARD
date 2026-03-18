@@ -281,6 +281,7 @@ export default function App() {
   
   const [isSystemInitialized, setIsSystemInitialized] = useState<boolean|null>(null); // null = checking, true/false = result
   const prevIsLoggedIn = useRef<boolean | null>(null);
+  const [forceUpdate, setForceUpdate] = useState(0); // Force re-render on login
   const [activeView, setActiveView] = useState("dashboard");
   const [activeTab, setActiveTab] = useState("overview");
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
@@ -393,13 +394,13 @@ export default function App() {
   }, [isSystemInitialized]);
 
   const handleLogin = () => {
+    // Force re-render after login
     const authenticated = isAuthenticated();
-    if (prevIsLoggedIn.current !== authenticated) {
+    if (authenticated) {
       prevIsLoggedIn.current = authenticated;
-      // AuthContext handles user data, just refresh dashboard
-      if (authenticated) {
-        fetchDashboardStats();
-      }
+      fetchDashboardStats();
+      // Force a re-render by updating forceUpdate state
+      setForceUpdate(prev => prev + 1);
     }
   };
 

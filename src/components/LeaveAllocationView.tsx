@@ -1684,10 +1684,10 @@ const LeaveAllocationView = () => {
                       <span className="text-gray-500">Name:</span>
                       <p className="font-medium text-gray-900">{selectedAllocation.user_name || `User ${selectedAllocation.user_id}`}</p>
                     </div>
-                    <div>
+                    {/* <div>
                       <span className="text-gray-500">User ID:</span>
                       <p className="font-medium text-gray-900">{selectedAllocation.user_id}</p>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
 

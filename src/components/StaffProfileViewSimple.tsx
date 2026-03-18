@@ -20,7 +20,7 @@ interface StaffProfileViewProps {
 }
 
 export function StaffProfileView({ staff, onBack, onUpdate }: StaffProfileViewProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'personal' | 'employment' | 'contact' | 'education' | 'emergency' | 'banking' | 'medical' | 'resignation' | 'documents'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'personal' | 'employment' | 'contact' | 'education' | 'emergency' | 'banking' | 'medical' | 'resignation' | 'documents' | 'guarantors'>('overview');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -934,34 +934,72 @@ export function StaffProfileView({ staff, onBack, onUpdate }: StaffProfileViewPr
     {viewingDocument && (
       <>
         <div className="modal-overlay" onClick={() => setViewingDocument(null)} style={{ zIndex: 9999 }}></div>
-        <div className="modal" style={{ maxWidth: '800px', zIndex: 10000, position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
-          <div className="modal-header">
-            <h3>{viewingDocument.document_name}</h3>
-            <button className="btn btn-ghost btn-icon" onClick={() => setViewingDocument(null)}>
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="modal-content" style={{ padding: '1rem' }}>
-            <div className="text-center mb-4">
-              <FileType className="w-16 h-16 text-primary mx-auto mb-2" />
-              <p className="font-medium">{viewingDocument.document_type}</p>
-              <p className="text-sm text-muted">{formatDate(viewingDocument.uploaded_at)}</p>
-              <p className="text-xs text-muted mt-1">{(viewingDocument.file_size / 1024).toFixed(1)} KB</p>
+        <div className="modal" style={{ maxWidth: '900px', zIndex: 10000, position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', height: '80vh', display: 'flex', flexDirection: 'column' }}>
+          <div className="modal-header" style={{ flexShrink: 0 }}>
+            <div className="flex items-center gap-3">
+              <FileType className="w-6 h-6 text-primary" />
+              <div>
+                <h3>{viewingDocument.document_name}</h3>
+                <p className="text-xs text-muted mt-0.5">
+                  {viewingDocument.document_type} • {(viewingDocument.file_size / 1024).toFixed(1)} KB • {formatDate(viewingDocument.uploaded_at)}
+                </p>
+              </div>
             </div>
-            <div className="flex items-center justify-center gap-3">
-              <button className="btn btn-primary" onClick={() => handleDownloadDocument(viewingDocument)}>
-                <Download className="w-4 h-4 mr-2" />
+            <div className="flex items-center gap-2">
+              <button 
+                className="btn btn-sm btn-primary" 
+                onClick={() => handleDownloadDocument(viewingDocument)}
+                title="Download"
+              >
+                <Download className="w-4 h-4" />
                 Download
               </button>
               <a
                 href={getDocumentUrl(viewingDocument.file_path)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn btn-outline"
+                className="btn btn-sm btn-outline"
+                title="Open in new tab"
               >
-                <Eye className="w-4 h-4 mr-2" />
-                Open in New Tab
+                <Eye className="w-4 h-4" />
+                Full Screen
               </a>
+              <button className="btn btn-ghost btn-icon" onClick={() => setViewingDocument(null)}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          <div className="modal-content" style={{ flex: 1, overflow: 'auto', padding: '0', backgroundColor: '#f1f5f9' }}>
+            {/* Document Preview */}
+            <div className="w-full h-full flex items-center justify-center p-4">
+              {viewingDocument.mime_type.includes('image') ? (
+                // Image preview
+                <img
+                  src={getDocumentUrl(viewingDocument.file_path)}
+                  alt={viewingDocument.document_name}
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                  style={{ maxHeight: '70vh' }}
+                />
+              ) : viewingDocument.mime_type === 'application/pdf' ? (
+                // PDF preview
+                <iframe
+                  src={getDocumentUrl(viewingDocument.file_path)}
+                  className="w-full h-full rounded-lg shadow-lg"
+                  style={{ minHeight: '70vh', border: 'none' }}
+                  title={viewingDocument.document_name}
+                />
+              ) : (
+                // Other file types - show download prompt
+                <div className="text-center p-8 bg-white rounded-lg shadow-md">
+                  <File className="w-20 h-20 text-primary mx-auto mb-4" />
+                  <h4 className="text-lg font-semibold mb-2">{viewingDocument.document_name}</h4>
+                  <p className="text-muted mb-4">This file type cannot be previewed. Please download to view.</p>
+                  <button className="btn btn-primary" onClick={() => handleDownloadDocument(viewingDocument)}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Download File
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

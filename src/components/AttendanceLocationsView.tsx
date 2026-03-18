@@ -12,7 +12,8 @@ import {
 import { getAllBranches, Branch } from '../services/branchManagementService';
 import {
   MapPin, Plus, Edit2, Trash2, Search, Filter, RefreshCw,
-  CheckCircle, XCircle, Building, ChevronLeft, ChevronRight
+  CheckCircle, XCircle, Building, ChevronLeft, ChevronRight,
+  LocateFixed, Navigation
 } from 'lucide-react';
 
 interface LocationWithBranch extends AttendanceLocation {
@@ -61,6 +62,75 @@ const AttendanceLocationsView: React.FC = () => {
     branch_id: 0,
     is_active: true,
   });
+
+  // Geolocation state
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  // Get current location using browser geolocation API
+  const getCurrentLocation = async () => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported by your browser');
+      return;
+    }
+
+    setIsGettingLocation(true);
+    setLocationError(null);
+
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          resolve,
+          reject,
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+          }
+        );
+      });
+
+      const { latitude, longitude } = position.coords;
+      
+      // Convert to POINT format: POINT(longitude latitude)
+      const pointFormat = `POINT(${longitude} ${latitude})`;
+      
+      // Update the appropriate form based on which modal is open
+      if (showCreateModal) {
+        setCreateForm({ ...createForm, location_coordinates: pointFormat });
+      } else if (showEditModal) {
+        setEditForm({ ...editForm, location_coordinates: pointFormat });
+      }
+
+      setLocationError(null);
+      
+      // Show success message
+      setSuccessMessage(`Location fetched: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (error: any) {
+      console.error('Geolocation error:', error);
+      
+      let errorMessage = 'Failed to get location. ';
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          errorMessage += 'Please enable location permissions in your browser settings.';
+          break;
+        case error.POSITION_UNAVAILABLE:
+          errorMessage += 'Location information is unavailable.';
+          break;
+        case error.TIMEOUT:
+          errorMessage += 'Location request timed out. Please try again.';
+          break;
+        default:
+          errorMessage += error.message || 'Unknown error occurred.';
+      }
+      
+      setLocationError(errorMessage);
+      setTimeout(() => setLocationError(null), 5000);
+    } finally {
+      setIsGettingLocation(false);
+    }
+  };
 
   // Load data
   useEffect(() => {
@@ -310,7 +380,7 @@ const AttendanceLocationsView: React.FC = () => {
       {/* Filters */}
       <div className="card p-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
+          {/* <div>
             <label className="block text-sm font-medium mb-1">Search</label>
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -322,7 +392,7 @@ const AttendanceLocationsView: React.FC = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-          </div>
+          </div> */}
           <div>
             <label className="block text-sm font-medium mb-1">Branch</label>
             <select
@@ -601,17 +671,39 @@ const AttendanceLocationsView: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Coordinates (POINT format) *</label>
-                  <input
-                    type="text"
-                    className="input w-full"
-                    value={createForm.location_coordinates}
-                    onChange={(e) => setCreateForm({ ...createForm, location_coordinates: e.target.value })}
-                    placeholder="POINT(longitude latitude)"
-                    required
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      className="input w-full"
+                      value={createForm.location_coordinates}
+                      onChange={(e) => setCreateForm({ ...createForm, location_coordinates: e.target.value })}
+                      placeholder="POINT(longitude latitude)"
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={getCurrentLocation}
+                      disabled={isGettingLocation}
+                      title="Get current location"
+                      style={{ minWidth: '3rem' }}
+                    >
+                      {isGettingLocation ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <LocateFixed className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
                   <p className="text-xs text-muted mt-1">
                     Format: POINT(lng lat) e.g., POINT(36.8172 -1.2864)
                   </p>
+                  {locationError && (
+                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <XCircle className="w-3 h-3" />
+                      {locationError}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Radius (meters) *</label>
@@ -687,13 +779,35 @@ const AttendanceLocationsView: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Coordinates (POINT format) *</label>
-                  <input
-                    type="text"
-                    className="input w-full"
-                    value={editForm.location_coordinates}
-                    onChange={(e) => setEditForm({ ...editForm, location_coordinates: e.target.value })}
-                    required
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      className="input w-full"
+                      value={editForm.location_coordinates}
+                      onChange={(e) => setEditForm({ ...editForm, location_coordinates: e.target.value })}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={getCurrentLocation}
+                      disabled={isGettingLocation}
+                      title="Get current location"
+                      style={{ minWidth: '3rem' }}
+                    >
+                      {isGettingLocation ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <LocateFixed className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                  {locationError && (
+                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <XCircle className="w-3 h-3" />
+                      {locationError}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Radius (meters) *</label>

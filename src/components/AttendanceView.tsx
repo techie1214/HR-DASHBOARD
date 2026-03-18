@@ -690,7 +690,7 @@ const AttendanceView = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card p-4 transition-all hover-lift">
+        {/* <div className="card p-4 transition-all hover-lift">
           <div className="flex items-center gap-3">
             <div className="icon-wrapper" style={{ backgroundColor: '#dbeafe', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem' }}>
               <Users className="w-5 h-5" style={{ color: '#2563eb' }} />
@@ -700,7 +700,7 @@ const AttendanceView = () => {
               <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>{totalRecords}</p>
             </div>
           </div>
-        </div>
+        </div> */}
         <div className="card p-4 transition-all hover-lift">
           <div className="flex items-center gap-3">
             <div className="icon-wrapper" style={{ backgroundColor: '#dcfce7', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem' }}>

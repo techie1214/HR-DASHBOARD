@@ -78,6 +78,8 @@ const LeaveManagementView = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   // State for selected leave request details (full details from API)
   const [selectedRequestDetails, setSelectedRequestDetails] = useState<any | null>(null);
+  // State for viewing attachment in modal
+  const [viewingAttachment, setViewingAttachment] = useState<any | null>(null);
   // State for showing create leave type modal
   const [showCreateLeaveTypeModal, setShowCreateLeaveTypeModal] = useState(false);
   // State for showing edit leave type modal
@@ -343,6 +345,48 @@ const LeaveManagementView = () => {
     const diffTime = Math.abs(end.getTime() - start.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end dates
     return diffDays;
+  };
+
+  // Helper function to safely format dates
+  const formatDate = (dateString: string | null | undefined, showTime: boolean = false): string => {
+    if (!dateString) return 'Not specified';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Invalid Date';
+      
+      if (showTime) {
+        return date.toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric', 
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      }
+      return date.toLocaleDateString('en-US', { 
+        weekday: 'short',
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric' 
+      });
+    } catch (error) {
+      return 'Invalid Date';
+    }
+  };
+
+  const formatDateShort = (dateString: string | null | undefined): string => {
+    if (!dateString) return 'Not specified';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Invalid Date';
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric' 
+      });
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
   // Since filtering is done server-side, filteredRequests is just the current page of leaveRequests
@@ -1518,18 +1562,39 @@ const LeaveManagementView = () => {
             </>
           )}
 
-          {/* Details Modal - BAM Design */}
+          {/* Details Modal - Redesigned */}
           {showDetailsModal && selectedRequest && (
             <>
               <div className="bam-overlay" onClick={() => { setShowDetailsModal(false); setSelectedRequestDetails(null); }} style={{ zIndex: 9999 }}></div>
-              <div className="bam-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', zIndex: 10000, position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+              <div 
+                className="bam-modal" 
+                onClick={(e) => e.stopPropagation()} 
+                style={{ 
+                  maxWidth: '750px', 
+                  zIndex: 10000, 
+                  position: 'fixed', 
+                  top: '50%', 
+                  left: '50%', 
+                  transform: 'translate(-50%, -50%)',
+                  maxHeight: '90vh',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+              >
                 {/* Header */}
-                <div className="bam-header">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                <div className="bam-header" style={{ 
+                  padding: '1.25rem', 
+                  borderBottom: '1px solid #e5e7eb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexShrink: 0
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <div style={{
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: '8px',
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '10px',
                       background: '#eff6ff',
                       display: 'flex',
                       alignItems: 'center',
@@ -1537,24 +1602,43 @@ const LeaveManagementView = () => {
                       color: '#2563eb',
                       flexShrink: 0
                     }}>
-                      <FileText className="w-4 h-4" />
+                      <FileText className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 600, color: '#111827' }}>
+                      <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#111827' }}>
                         Leave Request Details
                       </h3>
-                      <p style={{ margin: 0, fontSize: '0.72rem', color: '#6b7280' }}>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280' }}>
                         Request #{selectedRequest.id}
                       </p>
                     </div>
                   </div>
-                  <button className="bam-btn-close" onClick={() => { setShowDetailsModal(false); setSelectedRequestDetails(null); }} title="Close">
-                    <X className="w-[18px] h-[18px]" />
+                  <button 
+                    className="bam-btn-close" 
+                    onClick={() => { setShowDetailsModal(false); setSelectedRequestDetails(null); }} 
+                    title="Close"
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: '#f3f4f6',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
 
                 {/* Body */}
-                <div className="bam-body">
+                <div className="bam-body" style={{ 
+                  padding: '1.25rem', 
+                  overflowY: 'auto',
+                  flex: 1
+                }}>
                   {detailsLoading ? (
                     <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}>
                       <svg className="animate-spin w-8 h-8" style={{ color: '#2563eb' }} fill="none" viewBox="0 0 24 24">
@@ -1563,37 +1647,50 @@ const LeaveManagementView = () => {
                       </svg>
                     </div>
                   ) : selectedRequestDetails ? (
-                    <>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                       {/* Employee Info Card */}
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '1rem',
-                        padding: '1rem',
-                        borderRadius: '0.5rem',
+                        padding: '1.25rem',
+                        borderRadius: '0.75rem',
                         backgroundColor: '#f9fafb',
                         border: '1px solid #e5e7eb'
                       }}>
                         <div className="bam-avatar" style={{
-                          width: '3.5rem',
-                          height: '3.5rem',
-                          fontSize: '0.9375rem',
+                          width: '4rem',
+                          height: '4rem',
+                          fontSize: '1rem',
                           background: '#e0e7ff',
-                          color: '#4338ca'
+                          color: '#4338ca',
+                          borderRadius: '10px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 600,
+                          flexShrink: 0
                         }}>
                           {selectedRequestDetails.user_name?.split(' ').map(n => n[0]).join('').slice(0, 2) || selectedRequest.staffName.split(' ').map(n => n[0]).join('').slice(0, 2)}
                         </div>
-                        <div style={{ flex: 1 }}>
-                          <p style={{ fontWeight: 600, fontSize: '0.9375rem', margin: 0 }}>{selectedRequestDetails.user_name || selectedRequest.staffName}</p>
-                          <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>ID: {selectedRequestDetails.user_id} · {selectedRequest.department || 'General'}</p>
-                          <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>{selectedRequest.branch || 'Main Office'}</p>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontWeight: 600, fontSize: '1rem', margin: 0, color: '#111827' }}>{selectedRequestDetails.user_name || selectedRequest.staffName}</p>
+                          <p style={{ fontSize: '0.8125rem', color: '#6b7280', margin: '0.25rem 0 0' }}>ID: {selectedRequestDetails.user_id} • {selectedRequest.department || 'General'}</p>
+                          <p style={{ fontSize: '0.8125rem', color: '#6b7280', margin: '0.125rem 0 0' }}>{selectedRequest.branch || 'Main Office'}</p>
                         </div>
                         <span className={`badge ${
                           selectedRequestDetails.status === 'approved' ? 'badge-success' :
                           selectedRequestDetails.status === 'rejected' ? 'badge-danger' :
                           selectedRequestDetails.status === 'active' ? 'badge-info' :
                           'badge-warning'
-                        }`} style={{ textTransform: 'capitalize' }}>
+                        }`} style={{ 
+                          textTransform: 'capitalize',
+                          padding: '0.375rem 0.75rem',
+                          borderRadius: '20px',
+                          fontSize: '0.75rem',
+                          fontWeight: 500,
+                          flexShrink: 0
+                        }}>
                           {selectedRequestDetails.status}
                         </span>
                       </div>
@@ -1601,64 +1698,60 @@ const LeaveManagementView = () => {
                       {/* Leave Details Grid */}
                       <div style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                        gap: '1rem',
-                        padding: '1.25rem',
-                        backgroundColor: '#f0f9ff',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #bae6fd'
+                        gridTemplateColumns: 'repeat(2, 1fr)',
+                        gap: '1rem'
                       }}>
-                        <div>
-                          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem', textTransform: 'uppercase', fontWeight: 600 }}>Leave Type</p>
-                          <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>{selectedRequestDetails.leave_type_name || selectedRequest.leaveType}</p>
+                        <div style={{ padding: '1rem', backgroundColor: '#f0f9ff', borderRadius: '0.5rem', border: '1px solid #bae6fd' }}>
+                          <p style={{ fontSize: '0.6875rem', color: '#0369a1', marginBottom: '0.375rem', textTransform: 'uppercase', fontWeight: 600, margin: 0 }}>Leave Type</p>
+                          <p style={{ fontWeight: 600, fontSize: '0.9375rem', color: '#0c4a6e', margin: 0 }}>{selectedRequestDetails.leave_type_name || selectedRequest.leaveType}</p>
                         </div>
-                        <div>
-                          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem', textTransform: 'uppercase', fontWeight: 600 }}>Days Requested</p>
-                          <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>{selectedRequestDetails.days_requested || selectedRequest.duration} days</p>
+                        <div style={{ padding: '1rem', backgroundColor: '#fef3c7', borderRadius: '0.5rem', border: '1px solid #fcd34d' }}>
+                          <p style={{ fontSize: '0.6875rem', color: '#92400e', marginBottom: '0.375rem', textTransform: 'uppercase', fontWeight: 600, margin: 0 }}>Days Requested</p>
+                          <p style={{ fontWeight: 600, fontSize: '0.9375rem', color: '#78350f', margin: 0 }}>{selectedRequestDetails.days_requested || selectedRequest.duration} days</p>
                         </div>
-                        <div>
-                          <p style={{ fontSize: '0.65rem', color: '#64748b', marginBottom: '0.375rem', textTransform: 'uppercase', fontWeight: 600 }}>Submitted</p>
-                          <p style={{ fontWeight: 600, fontSize: '0.8125rem' }}>
-                            {new Date(selectedRequestDetails.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </p>
+                        <div style={{ padding: '1rem', backgroundColor: '#f3f4f6', borderRadius: '0.5rem', border: '1px solid #d1d5db' }}>
+                          <p style={{ fontSize: '0.6875rem', color: '#4b5563', marginBottom: '0.375rem', textTransform: 'uppercase', fontWeight: 600, margin: 0 }}>Submitted</p>
+                          <p style={{ fontWeight: 600, fontSize: '0.9375rem', color: '#1f2937', margin: 0 }}>{formatDateShort(selectedRequestDetails.created_at)}</p>
+                        </div>
+                        <div style={{ padding: '1rem', backgroundColor: '#f3f4f6', borderRadius: '0.5rem', border: '1px solid #d1d5db' }}>
+                          <p style={{ fontSize: '0.6875rem', color: '#4b5563', marginBottom: '0.375rem', textTransform: 'uppercase', fontWeight: 600, margin: 0 }}>Status</p>
+                          <p style={{ fontWeight: 600, fontSize: '0.9375rem', color: '#1f2937', margin: 0, textTransform: 'capitalize' }}>{selectedRequestDetails.status}</p>
                         </div>
                       </div>
 
                       {/* Dates */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div style={{ padding: '1rem', backgroundColor: '#f9fafb', borderRadius: '0.5rem' }}>
-                          <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(2, 1fr)',
+                        gap: '1rem'
+                      }}>
+                        <div style={{ padding: '1rem', backgroundColor: '#f9fafb', borderRadius: '0.5rem', border: '1px solid #e5e7eb' }}>
+                          <p style={{ fontSize: '0.6875rem', color: '#6b7280', marginBottom: '0.375rem', display: 'flex', alignItems: 'center', gap: '0.375rem', margin: 0 }}>
+                            <Calendar className="w-3.5 h-3.5" />
                             Start Date
                           </p>
-                          <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>
-                            {new Date(selectedRequestDetails.start_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                          <p style={{ fontWeight: 600, fontSize: '0.9375rem', color: '#111827', margin: 0 }}>
+                            {formatDate(selectedRequestDetails.start_date)}
                           </p>
                         </div>
-                        <div style={{ padding: '1rem', backgroundColor: '#f9fafb', borderRadius: '0.5rem' }}>
-                          <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
+                        <div style={{ padding: '1rem', backgroundColor: '#f9fafb', borderRadius: '0.5rem', border: '1px solid #e5e7eb' }}>
+                          <p style={{ fontSize: '0.6875rem', color: '#6b7280', marginBottom: '0.375rem', display: 'flex', alignItems: 'center', gap: '0.375rem', margin: 0 }}>
+                            <Calendar className="w-3.5 h-3.5" />
                             End Date
                           </p>
-                          <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>
-                            {new Date(selectedRequestDetails.end_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                          <p style={{ fontWeight: 600, fontSize: '0.9375rem', color: '#111827', margin: 0 }}>
+                            {formatDate(selectedRequestDetails.end_date)}
                           </p>
                         </div>
                       </div>
 
                       {/* Reason */}
-                      <div>
-                        <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
+                      <div style={{ marginBottom: '0' }}>
+                        <p style={{ fontSize: '0.6875rem', color: '#6b7280', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.375rem', margin: 0, textTransform: 'uppercase', fontWeight: 600 }}>
+                          <FileText className="w-3.5 h-3.5" />
                           Reason for Leave
                         </p>
-                        <p style={{ fontSize: '0.875rem', padding: '1rem', backgroundColor: '#f9fafb', borderRadius: '0.5rem', border: '1px solid #e5e7eb', lineHeight: '1.6' }}>
+                        <p style={{ fontSize: '0.875rem', padding: '1rem', backgroundColor: '#f9fafb', borderRadius: '0.5rem', border: '1px solid #e5e7eb', lineHeight: '1.6', margin: 0, color: '#374151' }}>
                           {selectedRequestDetails.reason}
                         </p>
                       </div>
@@ -1714,15 +1807,14 @@ const LeaveManagementView = () => {
                                 </div>
                                 <div style={{ display: 'flex', gap: '0.375rem' }}>
                                   {attachment.file_path && (
-                                    <a
-                                      href={`${import.meta.env.VITE_API_Endpoint || 'http://localhost:3000/api'}${attachment.file_path}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
+                                    <button
+                                      onClick={() => setViewingAttachment(attachment)}
                                       className="bam-btn bam-btn-ghost"
                                       style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem' }}
                                     >
+                                      <Eye className="w-3 h-3 mr-1" />
                                       View
-                                    </a>
+                                    </button>
                                   )}
                                   <a
                                     href={`${import.meta.env.VITE_API_Endpoint || 'http://localhost:3000/api'}${attachment.file_path}`}
@@ -1730,6 +1822,7 @@ const LeaveManagementView = () => {
                                     className="bam-btn bam-btn-primary"
                                     style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem' }}
                                   >
+                                    <Download className="w-3 h-3 mr-1" />
                                     Download
                                   </a>
                                 </div>
@@ -1769,7 +1862,7 @@ const LeaveManagementView = () => {
                             <div>
                               <p style={{ fontSize: '0.65rem', color: '#6b7280', marginBottom: '0.125rem', margin: 0 }}>Date</p>
                               <p style={{ fontWeight: 600, fontSize: '0.8125rem', margin: 0 }}>
-                                {selectedRequestDetails.reviewed_at && new Date(selectedRequestDetails.reviewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                {selectedRequestDetails.reviewed_at && formatDate(selectedRequestDetails.reviewed_at, true)}
                               </p>
                             </div>
                           </div>
@@ -1781,8 +1874,8 @@ const LeaveManagementView = () => {
                           )}
                         </div>
                       )}
-                    </>
-                  ) : (
+                      </div>
+                    ) : (
                     <div style={{ padding: '3rem', textAlign: 'center' }}>
                       <AlertCircle className="w-12 h-12" style={{ color: '#f59e0b', margin: '0 auto 1rem' }} />
                       <p style={{ fontWeight: 600, marginBottom: '0.5rem', margin: 0 }}>Unable to load details</p>
@@ -2036,6 +2129,109 @@ const LeaveManagementView = () => {
               </div>
             </>
           )}
+        </>
+      )}
+
+      {/* Attachment Viewer Modal */}
+      {viewingAttachment && (
+        <>
+          <div 
+            className="modal-overlay" 
+            onClick={() => setViewingAttachment(null)}
+            style={{ zIndex: 9999 }}
+          ></div>
+          <div 
+            className="modal"
+            style={{ 
+              maxWidth: '900px', 
+              zIndex: 10000, 
+              position: 'fixed', 
+              top: '50%', 
+              left: '50%', 
+              transform: 'translate(-50%, -50%)', 
+              height: '80vh',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+          >
+            <div className="modal-header" style={{ flexShrink: 0 }}>
+              <div className="flex items-center gap-3">
+                <FileText className="w-6 h-6 text-primary" />
+                <div>
+                  <h3>{viewingAttachment.file_name || 'Attachment'}</h3>
+                  <p className="text-xs text-muted mt-0.5">
+                    {viewingAttachment.mime_type || 'Unknown'} • {viewingAttachment.file_size ? Math.round(viewingAttachment.file_size / 1024) + ' KB' : ''}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={`${import.meta.env.VITE_API_Endpoint || 'http://localhost:3000/api'}${viewingAttachment.file_path}`}
+                  download={viewingAttachment.file_name}
+                  className="btn btn-sm btn-primary"
+                >
+                  <Download className="w-4 h-4" />
+                  Download
+                </a>
+                <a
+                  href={`${import.meta.env.VITE_API_Endpoint || 'http://localhost:3000/api'}${viewingAttachment.file_path}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-sm btn-outline"
+                >
+                  <Eye className="w-4 h-4" />
+                  Full Screen
+                </a>
+                <button 
+                  className="btn btn-ghost btn-icon" 
+                  onClick={() => setViewingAttachment(null)}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div 
+              className="modal-content" 
+              style={{ 
+                flex: 1, 
+                overflow: 'auto', 
+                padding: '0', 
+                backgroundColor: '#f1f5f9' 
+              }}
+            >
+              <div className="w-full h-full flex items-center justify-center p-4">
+                {viewingAttachment.mime_type?.includes('image') ? (
+                  <img
+                    src={`${import.meta.env.VITE_API_Endpoint || 'http://localhost:3000/api'}${viewingAttachment.file_path}`}
+                    alt={viewingAttachment.file_name || 'Attachment'}
+                    className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                    style={{ maxHeight: '70vh' }}
+                  />
+                ) : viewingAttachment.mime_type?.includes('pdf') ? (
+                  <iframe
+                    src={`${import.meta.env.VITE_API_Endpoint || 'http://localhost:3000/api'}${viewingAttachment.file_path}`}
+                    className="w-full h-full rounded-lg shadow-lg"
+                    style={{ minHeight: '70vh', border: 'none' }}
+                    title={viewingAttachment.file_name || 'Attachment'}
+                  />
+                ) : (
+                  <div className="text-center p-8 bg-white rounded-lg shadow-md">
+                    <File className="w-20 h-20 text-primary mx-auto mb-4" />
+                    <h4 className="text-lg font-semibold mb-2">{viewingAttachment.file_name || 'Attachment'}</h4>
+                    <p className="text-muted mb-4">This file type cannot be previewed. Please download to view.</p>
+                    <a
+                      href={`${import.meta.env.VITE_API_Endpoint || 'http://localhost:3000/api'}${viewingAttachment.file_path}`}
+                      download={viewingAttachment.file_name}
+                      className="btn btn-primary"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download File
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </>
       )}
     </div>
