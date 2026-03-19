@@ -20,6 +20,7 @@ import {
   LeaveBalance,
   LeaveType
 } from '../services/leaveManagementService';
+import { triggerLeaveCleanup, getLeaveCleanupStatus } from '../services/leaveCleanupService';
 import {
   Pagination,
   PaginationContent,
@@ -84,6 +85,12 @@ const LeaveManagementView = () => {
   const [showCreateLeaveTypeModal, setShowCreateLeaveTypeModal] = useState(false);
   // State for showing edit leave type modal
   const [showEditLeaveTypeModal, setShowEditLeaveTypeModal] = useState(false);
+  // State for showing leave cleanup modal
+  const [showCleanupModal, setShowCleanupModal] = useState(false);
+  // State for leave cleanup status
+  const [cleanupStatus, setCleanupStatus] = useState<any | null>(null);
+  // State for cleanup loading
+  const [cleanupLoading, setCleanupLoading] = useState(false);
   // State for leave types
   const [leaveTypes, setLeaveTypes] = useState<any[]>([]);
   // Store raw API leave types for editing
@@ -537,6 +544,67 @@ const LeaveManagementView = () => {
     }
   };
 
+  // Handler for cleaning up expired leave requests
+  const handleLeaveCleanup = async () => {
+    try {
+      setCleanupLoading(true);
+      setError(null);
+
+      const response = await triggerLeaveCleanup();
+
+      if (response.success) {
+        setSuccessMessage(`Cleanup successful! ${response.message}`);
+        setCleanupStatus({
+          ...response.data,
+          processed: response.data.declinedCount + response.data.errorCount,
+        });
+
+        // Refresh leave requests to show updated status with current pagination
+        const refreshResponse = await getAllLeaveRequests(currentPage, itemsPerPage, {
+          status: filterStatus !== 'all' ? filterStatus : undefined,
+          leaveType: filterLeaveType !== 'all' ? filterLeaveType : undefined,
+          search: searchTerm || undefined,
+        });
+        if (refreshResponse.success && refreshResponse.leaveRequests) {
+          setLeaveRequests(refreshResponse.leaveRequests);
+          if (refreshResponse.pagination) {
+            setTotalItems(refreshResponse.pagination.totalItems);
+            setTotalPages(refreshResponse.pagination.totalPages);
+          }
+        }
+
+        // Close modal after successful cleanup and refresh
+        setTimeout(() => {
+          setShowCleanupModal(false);
+          setSuccessMessage(null); // Clear success message after 3 seconds
+        }, 2000);
+      } else {
+        setError(response.message || 'Cleanup failed');
+      }
+    } catch (err) {
+      console.error('Error during leave cleanup:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred during cleanup');
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
+
+  // Handler for fetching cleanup status
+  const handleFetchCleanupStatus = async () => {
+    try {
+      setCleanupLoading(true);
+      const response = await getLeaveCleanupStatus();
+
+      if (response.success) {
+        setCleanupStatus(response.data);
+      }
+    } catch (err) {
+      console.error('Error fetching cleanup status:', err);
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
+
   // Handler for creating a new leave type
   const handleCreateLeaveType = async () => {
     try {
@@ -779,12 +847,25 @@ const LeaveManagementView = () => {
             <Info className="w-4 h-4" style={{ color: '#2563eb' }} />
             <h3 style={{ marginBottom: 0 }}>Leave Types & Policies</h3>
           </div>
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={() => setShowCreateLeaveTypeModal(true)}
-          >
-            + Create Leave Type
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              className="btn btn-outline btn-sm"
+              onClick={() => {
+                handleFetchCleanupStatus();
+                setShowCleanupModal(true);
+              }}
+              title="View and cleanup expired leave requests"
+            >
+              <Clock className="w-4 h-4 mr-1" />
+              Cleanup Expired Leaves
+            </button>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => setShowCreateLeaveTypeModal(true)}
+            >
+              + Create Leave Type
+            </button>
+          </div>
         </div>
         {/* Grid of leave type cards */}
         <div className="grid grid-cols-1 md-grid-cols-2 lg-grid-cols-4 gap-3">
@@ -2233,6 +2314,131 @@ const LeaveManagementView = () => {
             </div>
           </div>
         </>
+      )}
+
+      {/* Leave Cleanup Modal */}
+      {showCleanupModal && (
+        <div className="modal-overlay" onClick={() => setShowCleanupModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="flex items-center gap-3">
+                <Clock className="w-6 h-6 text-primary" />
+                <div>
+                  <h3>Cleanup Expired Leave Requests</h3>
+                  <p className="text-muted text-sm mt-1">
+                    Automatically decline pending leave requests with dates that have passed
+                  </p>
+                </div>
+              </div>
+              <button
+                className="btn btn-ghost btn-icon"
+                onClick={() => setShowCleanupModal(false)}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="modal-content">
+              {/* Status Information */}
+              {cleanupStatus && (
+                <div className="mb-6 p-4 rounded-lg" style={{ backgroundColor: '#f1f5f9' }}>
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                    <Info className="w-4 h-4" />
+                    Current Status
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 rounded" style={{ backgroundColor: 'white' }}>
+                      <p className="text-sm text-muted">Total Pending Leaves</p>
+                      <p className="text-2xl font-bold">{cleanupStatus.totalPendingLeaves || 0}</p>
+                    </div>
+                    <div className="p-3 rounded" style={{ backgroundColor: 'white' }}>
+                      <p className="text-sm text-muted">Expired Pending Leaves</p>
+                      <p className="text-2xl font-bold text-destructive">{cleanupStatus.expiredPendingLeaves || 0}</p>
+                    </div>
+                  </div>
+                  {cleanupStatus.lastRunTime && (
+                    <div className="mt-3 pt-3 border-t">
+                      <p className="text-sm text-muted">
+                        Last run: {new Date(cleanupStatus.lastRunTime).toLocaleString()}
+                      </p>
+                    </div>
+                  )}
+                  {cleanupStatus.nextRunTime && (
+                    <div className="mt-2">
+                      <p className="text-sm text-muted">
+                        Next run: {new Date(cleanupStatus.nextRunTime).toLocaleString()}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Cleanup Results */}
+              {cleanupStatus?.declinedCount !== undefined && (
+                <div className="mb-6 p-4 rounded-lg bg-green-50 border border-green-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                    <h4 className="font-semibold text-green-800">Cleanup Results</h4>
+                  </div>
+                  <p className="text-green-700">
+                    Processed {cleanupStatus.processed || 0} leave requests
+                  </p>
+                  <p className="text-green-700 font-semibold">
+                    Declined {cleanupStatus.declinedCount} expired requests
+                  </p>
+                  {cleanupStatus.errorCount > 0 && (
+                    <p className="text-amber-700 mt-2">
+                      Errors: {cleanupStatus.errorCount}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Info Box */}
+              <div className="mb-6 p-4 rounded-lg" style={{ backgroundColor: '#fff7ed', border: '1px solid #ffedd5' }}>
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-amber-800 mb-1">What will happen?</h4>
+                    <ul className="text-sm text-amber-700 space-y-1">
+                      <li>• All pending leave requests with end dates in the past will be declined</li>
+                      <li>• Status will be changed to "rejected"</li>
+                      <li>• Notes will be set to "Automatically declined: Leave dates have passed"</li>
+                      <li>• This action cannot be undone automatically</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3">
+                <button
+                  className="btn btn-outline"
+                  onClick={() => setShowCleanupModal(false)}
+                  disabled={cleanupLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleLeaveCleanup}
+                  disabled={cleanupLoading}
+                >
+                  {cleanupLoading ? (
+                    <>
+                      <Clock className="w-4 h-4 mr-2 animate-spin" />
+                      Running Cleanup...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Run Cleanup Now
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
