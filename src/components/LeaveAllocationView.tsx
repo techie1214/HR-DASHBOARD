@@ -46,6 +46,15 @@ interface StaffMember {
   department?: string;
 }
 
+// Helper functions for avatar display
+const initials = (name: string) => name.split(' ').map(n => n[0]).join('').slice(0, 2);
+
+const avatarColor = (name: string) => {
+  const colors = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'];
+  const idx = name.charCodeAt(0) % colors.length;
+  return colors[idx];
+};
+
 const LeaveAllocationView = () => {
   // State management
   const [allocations, setAllocations] = useState<LeaveAllocation[]>([]);
@@ -1092,7 +1101,7 @@ const LeaveAllocationView = () => {
                     <option value="" disabled>Select Staff</option>
                     {staffMembers.map(staff => (
                       <option key={staff.id} value={staff.id}>
-                        {staff.name} {staff.staff_id ? `(${staff.staff_id})` : ''}
+                        {staff.name}
                       </option>
                     ))}
                   </select>
@@ -1193,235 +1202,490 @@ const LeaveAllocationView = () => {
       {/* Bulk Allocation Modal */}
       {showBulkModal && (
         <div className="modal-overlay" onClick={() => setShowBulkModal(false)}>
-          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="flex items-center gap-3">
-                <div className="icon-wrapper" style={{ backgroundColor: 'var(--primary-600)', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Users className="w-5 h-5" style={{ color: 'white' }} />
+          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '42rem' }}>
+            {/* Header */}
+            <div className="modal-header" style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '1.35rem 1.6rem',
+              borderBottom: '1px solid #f0f0f4',
+              background: 'linear-gradient(135deg, #fafbff 0%, #f4f6fc 100%)',
+              flexShrink: 0,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                <div style={{
+                  width: '2.75rem',
+                  height: '2.75rem',
+                  borderRadius: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#4f46e5',
+                  boxShadow: '0 4px 12px #4f46e555',
+                  flexShrink: 0,
+                }}>
+                  <Users size={18} color="#fff" />
                 </div>
                 <div>
-                  <h3 className="modal-title">Bulk Allocate to Selected Users</h3>
-                  <p className="text-sm text-muted">Allocate leave days to multiple staff members</p>
+                  <p style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f1117', letterSpacing: '-0.01em' }}>
+                    Bulk Allocate Leave
+                  </p>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: '#8b8fa8', marginTop: '0.1rem' }}>
+                    {bulkForm.user_ids?.length
+                      ? `${bulkForm.user_ids.length} staff member${bulkForm.user_ids.length !== 1 ? 's' : ''} selected`
+                      : 'Select staff members below'}
+                  </p>
                 </div>
               </div>
               <button
-                className="btn btn-ghost btn-icon"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#8b8fa8',
+                  transition: 'background 0.15s, color 0.15s',
+                  flexShrink: 0,
+                }}
                 onClick={() => setShowBulkModal(false)}
               >
-                <X className="w-5 h-5" />
+                <X size={16} />
               </button>
             </div>
-            <div className="modal-content">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Leave Type *
-                  </label>
-                  <select
-                    value={bulkForm.leave_type_id || ''}
-                    onChange={(e) => setBulkForm({ ...bulkForm, leave_type_id: Number(e.target.value) })}
-                    className="input w-full"
-                    required
-                    style={{ backgroundColor: 'white', color: '#1f2937' }}
-                  >
-                    <option value="" disabled>Select Leave Type</option>
-                    {leaveTypes.map(type => (
-                      <option key={type.id} value={type.id} style={{ color: '#1f2937' }}>
-                        {type.name} ({type.days_per_year || type.daysPerYear} days/year)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Allocated Days *
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={bulkForm.allocated_days || ''}
-                    onChange={(e) => setBulkForm({ ...bulkForm, allocated_days: Number(e.target.value) })}
-                    className="input w-full"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Select Users *
-                  </label>
-                  <div className="space-y-3">
-                    {/* Search box */}
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Search staff by name or email..."
-                        value={bulkStaffSearch}
-                        onChange={(e) => setBulkStaffSearch(e.target.value)}
-                        className="w-full px-4 py-2.5 pl-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        style={{ backgroundColor: 'white', color: '#1f2937' }}
-                      />
-                      <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    </div>
 
-                    {/* Selected staff pills */}
-                    {bulkForm.user_ids && bulkForm.user_ids.length > 0 && (
-                      <div className="flex flex-wrap gap-2 p-3 bg-primary-50 rounded-lg border border-primary-200">
-                        <span className="text-xs font-medium text-primary-800 py-1">Selected:</span>
-                        {bulkForm.user_ids.map(userId => {
-                          const staff = staffMembers.find(s => s.id === userId);
-                          if (!staff) return null;
-                          return (
-                            <span
-                              key={userId}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-white text-primary-700 rounded-full text-sm border border-primary-300"
-                            >
-                              {staff.name}
-                              <button
-                                type="button"
-                                onClick={() => setBulkForm({
-                                  ...bulkForm,
-                                  user_ids: bulkForm.user_ids?.filter(id => id !== userId)
-                                })}
-                                className="hover:text-primary-900"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </span>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Search results */}
-                    <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto bg-white" style={{ backgroundColor: 'white' }}>
-                      {bulkStaffSearch ? (
-                        <div className="p-2">
-                          {staffMembers.filter(staff => {
-                            const search = bulkStaffSearch.toLowerCase();
-                            const isAlreadySelected = bulkForm.user_ids?.includes(staff.id);
-                            return (staff.name.toLowerCase().includes(search) ||
-                                   staff.email.toLowerCase().includes(search)) &&
-                                   !isAlreadySelected;
-                          }).map(staff => (
-                            <button
-                              key={staff.id}
-                              type="button"
-                              onClick={() => setBulkForm({
-                                ...bulkForm,
-                                user_ids: [...(bulkForm.user_ids || []), staff.id]
-                              })}
-                              className="w-full flex items-center gap-3 p-2 hover:bg-primary-50 rounded-lg transition-colors text-left"
-                            >
-                              <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
-                                <span className="text-xs font-medium text-primary-600">
-                                  {staff.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                                </span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium text-gray-900">{staff.name}</div>
-                                <div className="text-xs text-gray-500 truncate">{staff.email}</div>
-                              </div>
-                              <Plus className="w-5 h-5 text-gray-400" />
-                            </button>
-                          ))}
-                          {staffMembers.filter(staff => {
-                            const search = bulkStaffSearch.toLowerCase();
-                            const isAlreadySelected = bulkForm.user_ids?.includes(staff.id);
-                            return (staff.name.toLowerCase().includes(search) ||
-                                   staff.email.toLowerCase().includes(search)) &&
-                                   !isAlreadySelected;
-                          }).length === 0 && (
-                            <div className="p-4 text-center text-gray-500">
-                              <p>No staff found matching "{bulkStaffSearch}"</p>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="p-4 text-center text-gray-500">
-                          <p className="text-sm">Type to search for staff...</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Quick actions */}
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setBulkForm({ ...bulkForm, user_ids: staffMembers.map(s => s.id) })}
-                        className="text-xs px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg hover:bg-primary-100 transition-colors font-medium"
-                      >
-                        Select All ({staffMembers.length})
-                      </button>
-                      {bulkForm.user_ids && bulkForm.user_ids.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setBulkForm({ ...bulkForm, user_ids: [] })}
-                          className="text-xs px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors font-medium"
-                        >
-                          Clear All
-                        </button>
-                      )}
-                    </div>
+            {/* Body */}
+            <div className="modal-content" style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '1.5rem 1.6rem',
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+                {/* Leave Type + Days */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#3d3f52', marginBottom: '0.45rem' }}>
+                      Leave Type <span style={{ color: '#ef4444', marginLeft: '0.15rem' }}>*</span>
+                    </label>
+                    <select
+                      style={{
+                        width: '100%',
+                        padding: '0.6rem 0.9rem',
+                        border: '1.5px solid #e8eaf0',
+                        borderRadius: '0.6rem',
+                        fontSize: '0.875rem',
+                        color: '#0f1117',
+                        background: '#fff',
+                        outline: 'none',
+                        cursor: 'pointer',
+                        boxSizing: 'border-box',
+                        transition: 'border 0.15s',
+                      }}
+                      value={bulkForm.leave_type_id || ''}
+                      onChange={(e) => setBulkForm({ ...bulkForm, leave_type_id: Number(e.target.value) })}
+                    >
+                      <option value="" disabled>Select type…</option>
+                      {leaveTypes.map(t => (
+                        <option key={t.id} value={t.id} style={{ color: '#0f1117' }}>
+                          {t.name} ({t.daysPerYear || t.days_per_year} days/yr)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#3d3f52', marginBottom: '0.45rem' }}>
+                      Allocated Days <span style={{ color: '#ef4444', marginLeft: '0.15rem' }}>*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      style={{
+                        width: '100%',
+                        padding: '0.6rem 0.9rem',
+                        border: '1.5px solid #e8eaf0',
+                        borderRadius: '0.6rem',
+                        fontSize: '0.875rem',
+                        color: '#0f1117',
+                        background: '#fff',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                      placeholder="e.g. 21"
+                      value={bulkForm.allocated_days || ''}
+                      onChange={(e) => setBulkForm({ ...bulkForm, allocated_days: Number(e.target.value) })}
+                    />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+
+                {/* Cycle Dates */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Cycle Start Date *
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#3d3f52', marginBottom: '0.45rem' }}>
+                      Cycle Start <span style={{ color: '#ef4444', marginLeft: '0.15rem' }}>*</span>
                     </label>
                     <input
                       type="date"
+                      style={{
+                        width: '100%',
+                        padding: '0.6rem 0.9rem',
+                        border: '1.5px solid #e8eaf0',
+                        borderRadius: '0.6rem',
+                        fontSize: '0.875rem',
+                        color: '#0f1117',
+                        background: '#fff',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
                       value={bulkForm.cycle_start_date}
                       onChange={(e) => setBulkForm({ ...bulkForm, cycle_start_date: e.target.value })}
-                      className="input w-full"
-                      required
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Cycle End Date *
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#3d3f52', marginBottom: '0.45rem' }}>
+                      Cycle End <span style={{ color: '#ef4444', marginLeft: '0.15rem' }}>*</span>
                     </label>
                     <input
                       type="date"
+                      style={{
+                        width: '100%',
+                        padding: '0.6rem 0.9rem',
+                        border: '1.5px solid #e8eaf0',
+                        borderRadius: '0.6rem',
+                        fontSize: '0.875rem',
+                        color: '#0f1117',
+                        background: '#fff',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
                       value={bulkForm.cycle_end_date}
                       onChange={(e) => setBulkForm({ ...bulkForm, cycle_end_date: e.target.value })}
-                      className="input w-full"
-                      required
                     />
                   </div>
                 </div>
+
+                {/* Carried Over */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#3d3f52', marginBottom: '0.45rem' }}>
                     Carried Over Days
                   </label>
                   <input
                     type="number"
                     min="0"
+                    style={{
+                      width: '100%',
+                      padding: '0.6rem 0.9rem',
+                      border: '1.5px solid #e8eaf0',
+                      borderRadius: '0.6rem',
+                      fontSize: '0.875rem',
+                      color: '#0f1117',
+                      background: '#fff',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                    placeholder="0"
                     value={bulkForm.carried_over_days || ''}
                     onChange={(e) => setBulkForm({ ...bulkForm, carried_over_days: Number(e.target.value) })}
-                    className="input w-full"
                   />
+                </div>
+
+                {/* Staff Picker */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#3d3f52', marginBottom: '0.45rem' }}>
+                    Select Staff <span style={{ color: '#ef4444', marginLeft: '0.15rem' }}>*</span>
+                  </label>
+
+                  {/* Search bar */}
+                  <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
+                    <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#8b8fa8' }} />
+                    <input
+                      type="text"
+                      placeholder="Search by name or email…"
+                      value={bulkStaffSearch}
+                      onChange={(e) => setBulkStaffSearch(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.6rem 0.9rem',
+                        border: '1.5px solid #e8eaf0',
+                        borderRadius: '0.6rem',
+                        fontSize: '0.875rem',
+                        color: '#0f1117',
+                        background: '#fff',
+                        outline: 'none',
+                        paddingLeft: '2.25rem',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+
+                  {/* Selected tags */}
+                  {bulkForm.user_ids && bulkForm.user_ids.length > 0 && (
+                    <div style={{
+                      border: '1.5px solid #e8eaf0',
+                      borderRadius: '0.75rem',
+                      padding: '0.75rem',
+                      marginBottom: '0.75rem',
+                      background: '#fafbff',
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.74rem', fontWeight: 600, color: '#8b8fa8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Selected · {bulkForm.user_ids.length}
+                        </span>
+                        <button
+                          onClick={() => setBulkForm({ ...bulkForm, user_ids: [] })}
+                          style={{ fontSize: '0.74rem', color: '#8b8fa8', background: 'none', border: 'none', cursor: 'pointer' }}
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', maxHeight: '7rem', overflowY: 'auto' }}>
+                        {bulkForm.user_ids.map(uid => {
+                          const s = staffMembers.find(x => x.id === uid);
+                          if (!s) return null;
+                          return (
+                            <span
+                              key={uid}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                padding: '0.3rem 0.65rem',
+                                background: '#f0f1fa',
+                                border: '1px solid #e3e5f5',
+                                borderRadius: '100px',
+                                fontSize: '0.72rem',
+                                fontWeight: 600,
+                                color: '#4b4f72',
+                              }}
+                            >
+                              <span>{s.name.split(' ')[0]}</span>
+                              <button
+                                style={{
+                                  border: 'none',
+                                  background: 'none',
+                                  cursor: 'pointer',
+                                  color: '#8b8fa8',
+                                  padding: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                }}
+                                onClick={() => setBulkForm({ ...bulkForm, user_ids: bulkForm.user_ids?.filter(i => i !== uid) })}
+                              >
+                                <X size={11} />
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Results list */}
+                  <div style={{
+                    border: '1.5px solid #e8eaf0',
+                    borderRadius: '0.75rem',
+                    overflowY: 'auto',
+                    maxHeight: '14rem',
+                    background: '#fff',
+                  }}>
+                    {bulkStaffSearch ? (
+                      staffMembers
+                        .filter(s => {
+                          const q = bulkStaffSearch.toLowerCase();
+                          const isAlreadySelected = bulkForm.user_ids?.includes(s.id);
+                          return (s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q)) && !isAlreadySelected;
+                        })
+                        .map((s, i, arr) => (
+                          <div
+                            key={s.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.75rem',
+                              padding: '0.65rem 0.9rem',
+                              cursor: 'pointer',
+                              transition: 'background 0.12s',
+                              background: 'transparent',
+                              border: 'none',
+                              width: '100%',
+                              textAlign: 'left',
+                              borderBottom: i < arr.length - 1 ? '1px solid #f3f4f8' : 'none',
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = '#f7f8fc')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                            onClick={() => setBulkForm({ ...bulkForm, user_ids: [...(bulkForm.user_ids || []), s.id] })}
+                          >
+                            {/* Avatar */}
+                            <div style={{
+                              width: '2.2rem',
+                              height: '2.2rem',
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              background: avatarColor(s.name),
+                              flexShrink: 0,
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              color: '#fff',
+                              letterSpacing: '0.02em',
+                            }}>
+                              {initials(s.name)}
+                            </div>
+                            {/* Info */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0f1117' }}>{s.name}</div>
+                              <div style={{ fontSize: '0.74rem', color: '#8b8fa8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.email}</div>
+                            </div>
+                            {/* Add button */}
+                            <div style={{
+                              width: '1.9rem',
+                              height: '1.9rem',
+                              borderRadius: '50%',
+                              border: '1.5px solid #e3e5f5',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              background: 'transparent',
+                              color: '#8b8fa8',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s',
+                              flexShrink: 0,
+                            }}>
+                              <Plus size={13} />
+                            </div>
+                          </div>
+                        ))
+                    ) : (
+                      <div style={{ padding: '2rem', textAlign: 'center', color: '#8b8fa8', fontSize: '0.83rem' }}>
+                        <Users size={22} style={{ margin: '0 auto 0.5rem', opacity: 0.4 }} />
+                        <div>Type to search staff members</div>
+                      </div>
+                    )}
+                    {bulkStaffSearch && staffMembers.filter(s => {
+                      const q = bulkStaffSearch.toLowerCase();
+                      const isAlreadySelected = bulkForm.user_ids?.includes(s.id);
+                      return (s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q)) && !isAlreadySelected;
+                    }).length === 0 && (
+                      <div style={{ padding: '2rem', textAlign: 'center', color: '#8b8fa8', fontSize: '0.83rem' }}>
+                        No results for "{bulkStaffSearch}"
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Quick actions */}
+                  <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.6rem' }}>
+                    <button
+                      style={{
+                        flex: 1,
+                        padding: '0.55rem 1.2rem',
+                        borderRadius: '0.6rem',
+                        border: 'none',
+                        background: '#4f46e5',
+                        color: '#fff',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.4rem',
+                        transition: 'opacity 0.15s, transform 0.1s',
+                        letterSpacing: '-0.01em',
+                      }}
+                      onClick={() => setBulkForm({ ...bulkForm, user_ids: staffMembers.map(s => s.id) })}
+                    >
+                      Select All ({staffMembers.length})
+                    </button>
+                    {bulkForm.user_ids && bulkForm.user_ids.length > 0 && (
+                      <button
+                        style={{
+                          padding: '0.55rem 1.2rem',
+                          borderRadius: '0.6rem',
+                          border: '1.5px solid #e3e5f5',
+                          background: '#fff',
+                          color: '#5a5d78',
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'background 0.15s',
+                          letterSpacing: '-0.01em',
+                        }}
+                        onClick={() => setBulkForm({ ...bulkForm, user_ids: [] })}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-            <div className="modal-footer">
+
+            {/* Footer */}
+            <div className="modal-footer" style={{
+              display: 'flex',
+              gap: '0.75rem',
+              justifyContent: 'flex-end',
+              padding: '1.1rem 1.6rem',
+              borderTop: '1px solid #f0f0f4',
+              background: '#fafbff',
+              flexShrink: 0,
+            }}>
               <button
                 type="button"
                 onClick={() => {
                   setShowBulkModal(false);
-                  resetBulkForm();
+                  setBulkForm({
+                    leave_type_id: 0,
+                    allocated_days: 21,
+                    cycle_start_date: new Date().toISOString().split('T')[0],
+                    cycle_end_date: new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0],
+                    carried_over_days: 0,
+                    user_ids: [],
+                  });
                 }}
-                className="btn btn-outline"
+                style={{
+                  padding: '0.55rem 1.2rem',
+                  borderRadius: '0.6rem',
+                  border: '1.5px solid #e3e5f5',
+                  background: '#fff',
+                  color: '#5a5d78',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'background 0.15s',
+                  letterSpacing: '-0.01em',
+                }}
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleBulkAllocate}
-                className="btn btn-primary"
-                style={{ backgroundColor: '#7c3aed', borderColor: '#7c3aed' }}
+                disabled={!bulkForm.leave_type_id || !bulkForm.allocated_days || !bulkForm.user_ids?.length}
+                style={{
+                  padding: '0.55rem 1.2rem',
+                  borderRadius: '0.6rem',
+                  border: 'none',
+                  background: '#4f46e5',
+                  color: '#fff',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: (!bulkForm.leave_type_id || !bulkForm.allocated_days || !bulkForm.user_ids?.length) ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  transition: 'opacity 0.15s, transform 0.1s',
+                  letterSpacing: '-0.01em',
+                  opacity: (!bulkForm.leave_type_id || !bulkForm.allocated_days || !bulkForm.user_ids?.length) ? 0.45 : 1,
+                }}
               >
-                Allocate to Selected
+                <Users size={15} />
+                Allocate to {bulkForm.user_ids?.length || 0} Staff
               </button>
             </div>
           </div>
