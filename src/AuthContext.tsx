@@ -190,10 +190,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const result = await authServiceLogin(credentials);
 
       if (result.success) {
-        // Wait a moment for tokens to be stored
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Reload user data after login
+        // Immediately reload user data from localStorage
+        // This ensures the auth state is updated before returning
         loadUserData();
         
         return result;

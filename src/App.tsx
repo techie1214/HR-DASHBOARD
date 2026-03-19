@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { NotificationPanel } from "./components/NotificationPanel";
+import { NotificationPanel } from "./components/NotificationPanel"; // Commented out - not functional
 import { AllStaffView } from "./components/AllStaffView";
 import { BranchManagementView } from "./components/BranchManagementView";
 import { OffDaysView } from "./components/OffDaysView";
@@ -259,7 +259,7 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-primary truncate">
-              {user?.name || 'Guest User'}
+              {user?.name || user?.fullName || 'Guest User'}
             </p>
             <p className="text-xs text-secondary truncate">
               {user?.email || 'No email'}
@@ -278,9 +278,8 @@ export default function App() {
   const isLoggedIn = auth.isAuthenticated;
   const user = auth.user;
   const refreshUserData = auth.refreshUserData;
-  
+
   const [isSystemInitialized, setIsSystemInitialized] = useState<boolean|null>(null); // null = checking, true/false = result
-  const prevIsLoggedIn = useRef<boolean | null>(null);
   const [forceUpdate, setForceUpdate] = useState(0); // Force re-render on login
   const [activeView, setActiveView] = useState("dashboard");
   const [activeTab, setActiveTab] = useState("overview");
@@ -291,6 +290,7 @@ export default function App() {
   const [selectedStaffFromSearch, setSelectedStaffFromSearch] = useState<any>(null);
   const [selectedResultIndex, setSelectedResultIndex] = useState(-1);
   const [searchInputRef, setSearchInputRef] = useState<HTMLInputElement | null>(null);
+  const prevIsLoggedIn = useRef<boolean>(false);
 
   // Dashboard stats state
   const [dashboardStats, setDashboardStats] = useState<any>(null);
@@ -378,30 +378,30 @@ export default function App() {
     if (isSystemInitialized === true) {
       const authenticated = isAuthenticated();
 
-      // Only update state if it has actually changed
-      prevIsLoggedIn.current = prevIsLoggedIn.current ?? !authenticated;
-
-      if (prevIsLoggedIn.current !== authenticated) {
-        prevIsLoggedIn.current = authenticated;
-        
-        // AuthContext handles user data loading automatically
-        // Just trigger a refresh of dashboard stats on login
-        if (authenticated) {
-          fetchDashboardStats();
-        }
+      // Only fetch dashboard if actually logged in and we haven't fetched yet
+      if (authenticated && !dashboardStats) {
+        fetchDashboardStats();
       }
     }
-  }, [isSystemInitialized]);
+  }, [isSystemInitialized]); // Only run when system init completes
 
-  const handleLogin = () => {
-    // Force re-render after login
-    const authenticated = isAuthenticated();
-    if (authenticated) {
-      prevIsLoggedIn.current = authenticated;
+  // Track login state changes
+  useEffect(() => {
+    if (isLoggedIn && !prevIsLoggedIn.current) {
+      // User just logged in
+      console.log('User logged in, fetching dashboard stats');
       fetchDashboardStats();
-      // Force a re-render by updating forceUpdate state
-      setForceUpdate(prev => prev + 1);
     }
+    prevIsLoggedIn.current = isLoggedIn;
+  }, [isLoggedIn]);
+
+  const handleLogin = async () => {
+    // Force a reload of auth state from localStorage
+    await auth.refreshUserData();
+    // Update forceUpdate to trigger re-render and show dashboard
+    setForceUpdate(prev => prev + 1);
+    // Fetch dashboard stats after login
+    fetchDashboardStats();
   };
 
   const handleLogout = () => {
@@ -409,6 +409,8 @@ export default function App() {
     prevIsLoggedIn.current = false;
     // Clear dashboard stats on logout
     setDashboardStats(null);
+    // Force redirect to login
+    window.location.href = '/';
   };
 
   // Handle global search with multiple categories
@@ -1100,12 +1102,14 @@ export default function App() {
             </div>
             <div className="flex items-center gap-3">
               <span className="text-sm font-bold text-gray-700 mr-3">{currentTime}</span>
+              {/* Notification bell commented out - not functional
               <button className="btn btn-ghost btn-icon" onClick={() => setNotificationPanelOpen(!notificationPanelOpen)} style={{ position: 'relative' }}>
                 <Bell className="w-5 h-5" />
                 {unreadNotifications > 0 && (
                   <span className="badge badge-sm badge-error">{unreadNotifications}</span>
                 )}
               </button>
+              */}
               <button className="btn btn-ghost" onClick={handleLogout} style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}>
                 Logout
               </button>

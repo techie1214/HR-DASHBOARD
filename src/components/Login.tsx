@@ -52,7 +52,9 @@ export function Login({ onLogin }: LoginProps) {
       const result = await login({ email, password });
 
       if (result.success) {
-        onLogin();
+        // Call onLogin to notify parent component
+        // The parent will handle auth state update
+        await onLogin();
       } else {
         setError(result.message || "Login failed. Please try again.");
       }

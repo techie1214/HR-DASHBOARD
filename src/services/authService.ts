@@ -86,6 +86,14 @@ export const login = async (credentials: LoginCredentials): Promise<LoginRespons
 
       // Set login status
       secureSetItem('isLoggedIn', 'true');
+      
+      // Debug: log what was stored
+      console.log('Login successful, stored in localStorage:', {
+        authToken: data.tokens.accessToken ? 'present' : 'missing',
+        userInfo: data.user ? 'present' : 'missing',
+        permissions: data.permissions ? 'present' : 'missing',
+        isLoggedIn: 'true'
+      });
     }
 
     return {

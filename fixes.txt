@@ -1,0 +1,18 @@
+First the side bar 
+
+1. Sidebar Text Overflow (Red Annotation)
+The user profile section at the bottom is definitely experiencing a container overflow.
+
+The Issue: The full name "Oluwarotimi Iyanuoluwa Adewumi" and the email address are extending beyond the boundary of the sidebar. This usually happens when the sidebar has a fixed width, but the text inside doesn't have a wrapping or truncation strategy.
+
+Fix: You can apply CSS text-overflow: ellipsis;, white-space: nowrap;, and overflow: hidden; to ensure it cuts off gracefully with "...", or allow it to wrap to a second line.
+
+2. Component Spacing / Gutters (Green Annotation)
+The spacing between the sidebar and the main content area (the "Attendance Locations" view) is indeed very tight.
+
+The Issue: There is almost no visual "breathing room" between the edge of the sidebar and the start of the cards/header. This makes the UI feel cramped and makes it harder for users to distinguish between the navigation and the functional workspace.
+
+Fix: Increasing the padding on the main content container or adding a margin-left to the main area would create a better visual hierarchy. Standard dashboard layouts usually aim for a gutter of at least 24px to 32px.
+
+
+for the All staff the cards the active and the all employess but the  active only shows the total active for the ifrst pagination and not the entore active employess int he db? do you understand
