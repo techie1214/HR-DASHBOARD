@@ -1228,6 +1228,52 @@ input, textarea {
   padding: 1rem;
 }
 
+/* User profile section in sidebar - with text overflow handling */
+.sidebar-footer .user-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0; /* Allow flex item to shrink below content size */
+}
+
+.sidebar-footer .user-profile .avatar {
+  flex-shrink: 0; /* Prevent avatar from shrinking */
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.sidebar-footer .user-profile .user-info {
+  flex: 1;
+  min-width: 0; /* Allow text container to shrink */
+  overflow: hidden; /* Hide overflow */
+}
+
+.sidebar-footer .user-profile .user-name {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #111827;
+  white-space: nowrap; /* Prevent wrapping */
+  overflow: hidden; /* Hide overflow */
+  text-overflow: ellipsis; /* Show ... for overflow */
+  max-width: 100%;
+}
+
+.sidebar-footer .user-profile .user-email {
+  font-size: 0.75rem;
+  color: #6b7280;
+  white-space: nowrap; /* Prevent wrapping */
+  overflow: hidden; /* Hide overflow */
+  text-overflow: ellipsis; /* Show ... for overflow */
+  max-width: 100%;
+  margin-top: 0.125rem;
+}
+
 .sidebar-group {
   margin-bottom: 2rem;
 }
@@ -1310,6 +1356,10 @@ input, textarea {
 .main-content {
   background-color: #fff;
   flex: 1;
+  padding-left: 2rem; /* Add left padding for breathing room (32px) */
+  padding-right: 2rem; /* Add right padding */
+  padding-top: 1.5rem; /* Add top padding (24px) */
+  padding-bottom: 1.5rem; /* Add bottom padding (24px) */
 }
 
 .icon-wrapper {

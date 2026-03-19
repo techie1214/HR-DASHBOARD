@@ -9,6 +9,8 @@ import { EmployeeTable } from "./EmployeeTable";
 import { DepartmentChart } from "./DepartmentChart";
 // Import data functions for employee statistics
 import { getDepartmentStats, getTotalEmployeeCount, getActiveEmployeeCount } from "../data/staffData";
+import { useState, useEffect } from "react";
+import { getAllStaff } from "../services/staffManagementService";
 
 // Main component function for employees view
 export function EmployeesView() {
@@ -18,6 +20,42 @@ export function EmployeesView() {
   const totalEmployees = getTotalEmployeeCount();
   // Get active employee count
   const activeEmployees = getActiveEmployeeCount();
+
+  // State for real API data
+  const [realTotalEmployees, setRealTotalEmployees] = useState<number>(0);
+  const [realActiveEmployees, setRealActiveEmployees] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch real employee counts from API on mount
+  useEffect(() => {
+    const fetchEmployeeCounts = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch all employees (without filters) to get total count
+        const totalResponse = await getAllStaff(1, 1, {});
+        if (totalResponse.success && totalResponse.pagination) {
+          setRealTotalEmployees(totalResponse.pagination.totalItems);
+        }
+
+        // Fetch active employees to get active count
+        const activeResponse = await getAllStaff(1, 1, { status: 'active' });
+        if (activeResponse.success && activeResponse.pagination) {
+          setRealActiveEmployees(activeResponse.pagination.totalItems);
+        }
+      } catch (error) {
+        console.error('Error fetching employee counts:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEmployeeCounts();
+  }, []);
+
+  // Use real API data if available, otherwise fallback to mock data
+  const displayTotal = realTotalEmployees > 0 ? realTotalEmployees : totalEmployees;
+  const displayActive = realActiveEmployees > 0 ? realActiveEmployees : activeEmployees;
 
   // Main render return
   return (
@@ -69,7 +107,7 @@ export function EmployeesView() {
         <div className="card p-6">
           <div>
             <p className="text-muted">Total Employees</p>
-            <h3 className="mt-1">{totalEmployees}</h3>
+            <h3 className="mt-1">{loading ? '...' : displayTotal}</h3>
             <p className="text-muted mt-1">All staff members</p>
           </div>
         </div>
@@ -78,9 +116,9 @@ export function EmployeesView() {
         <div className="card p-6">
           <div>
             <p className="text-muted">Active</p>
-            <h3 className="mt-1">{activeEmployees}</h3>
+            <h3 className="mt-1">{loading ? '...' : displayActive}</h3>
             {/* Calculate and display percentage of active employees */}
-            <p className="text-muted mt-1">{totalEmployees > 0 ? ((activeEmployees / totalEmployees) * 100).toFixed(1) : 0}% of total</p>
+            <p className="text-muted mt-1">{displayTotal > 0 ? ((displayActive / displayTotal) * 100).toFixed(1) : 0}% of total</p>
           </div>
         </div>
 
@@ -98,7 +136,7 @@ export function EmployeesView() {
           <div>
             <p className="text-muted">Avg per Dept</p>
             {/* Calculate average employees per department */}
-            <h3 className="mt-1">{departmentStats.length > 0 ? (totalEmployees / departmentStats.length).toFixed(1) : 0}</h3>
+            <h3 className="mt-1">{departmentStats.length > 0 ? (displayTotal / departmentStats.length).toFixed(1) : 0}</h3>
             <p className="text-muted mt-1">Employees per department</p>
           </div>
         </div>
