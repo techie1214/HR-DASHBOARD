@@ -217,52 +217,6 @@ class ShiftSchedulingService {
     }
   }
 
-  // Shift Schedule methods
-  async getShiftSchedules(params?: {
-    date?: string;
-    department?: string;
-    limit?: number;
-    page?: number;
-  }) {
-    try {
-      const response = await apiServices.getShiftSchedules(params);
-      return response;
-    } catch (error) {
-      console.error('Error fetching shift schedules:', error);
-      throw error;
-    }
-  }
-
-  async createShiftSchedule(data: {employee_id: number, shift_type: string, date: string, start_time: string, end_time: string, department: string, status: string}) {
-    try {
-      const response = await apiServices.createShiftSchedule(data);
-      return response;
-    } catch (error) {
-      console.error('Error creating shift schedule:', error);
-      throw error;
-    }
-  }
-
-  async updateShiftSchedule(id: number, data: {employee_id?: number, shift_type?: string, date?: string, start_time?: string, end_time?: string, department?: string, status?: string}) {
-    try {
-      const response = await apiServices.updateShiftSchedule(id, data);
-      return response;
-    } catch (error) {
-      console.error(`Error updating shift schedule with id ${id}:`, error);
-      throw error;
-    }
-  }
-
-  async deleteShiftSchedule(id: number) {
-    try {
-      const response = await apiServices.deleteShiftSchedule(id);
-      return response;
-    } catch (error) {
-      console.error(`Error deleting shift schedule with id ${id}:`, error);
-      throw error;
-    }
-  }
-
   // Time Off Bank methods
   async getTimeOffBanks(params?: {
     userId?: number;
@@ -354,26 +308,6 @@ class ShiftSchedulingService {
       return response;
     } catch (error) {
       console.error(`Error deleting shift exception with id ${id}:`, error);
-      throw error;
-    }
-  }
-
-  async approveShiftException(id: number) {
-    try {
-      const response = await apiServices.approveShiftException(id);
-      return response;
-    } catch (error) {
-      console.error(`Error approving shift exception with id ${id}:`, error);
-      throw error;
-    }
-  }
-
-  async rejectShiftException(id: number) {
-    try {
-      const response = await apiServices.rejectShiftException(id);
-      return response;
-    } catch (error) {
-      console.error(`Error rejecting shift exception with id ${id}:`, error);
       throw error;
     }
   }

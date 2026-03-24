@@ -883,7 +883,8 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      await axios.delete(`${API_ENDPOINT}/shift-scheduling/schedule-requests/${id}`, {
+      // Backend expects PUT, not DELETE
+      await axios.put(`${API_ENDPOINT}/shift-scheduling/schedule-requests/${id}/cancel`, {}, {
         headers: {
           'Authorization': `Bearer ${token}`,
         }
@@ -909,7 +910,8 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.patch(`${API_ENDPOINT}/shift-scheduling/schedule-requests/${id}/approve`, {}, {
+      // Backend expects PUT, not PATCH
+      const response = await axios.put(`${API_ENDPOINT}/shift-scheduling/schedule-requests/${id}/approve`, {}, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -938,7 +940,8 @@ export const apiServices = {
         throw new Error('Authentication token not found');
       }
 
-      const response = await axios.patch(`${API_ENDPOINT}/shift-scheduling/schedule-requests/${id}/reject`, {}, {
+      // Backend expects PUT, not PATCH
+      const response = await axios.put(`${API_ENDPOINT}/shift-scheduling/schedule-requests/${id}/reject`, {}, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -1164,6 +1167,9 @@ export const apiServices = {
     }
   },
 
+  // Time-Off Bank methods (deprecated - not in use)
+  // Note: Time-Off Banks moved to dedicated /api/time-off-banks route
+
   // Shift Exception methods
   async getAllShiftExceptions(params?: { startDate?: string; endDate?: string; }) {
     try {
@@ -1335,64 +1341,6 @@ export const apiServices = {
       return {
         success: false,
         message: error.response?.data?.message || error.message || 'Failed to delete shift exception'
-      };
-    }
-  },
-
-  async approveShiftException(id: number) {
-    try {
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        throw new Error('Authentication token not found');
-      }
-
-      const response = await axios.post(`${API_ENDPOINT}/shift-scheduling/exceptions/${id}/approve`, {}, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        }
-      });
-
-      return {
-        success: true,
-        message: "Shift exception approved successfully",
-        data: { exception: response.data.data?.exception }
-      };
-    } catch (error: any) {
-      console.error('Error approving shift exception:', error);
-      return {
-        success: false,
-        message: error.response?.data?.message || error.message || 'Failed to approve shift exception',
-        data: { exception: null }
-      };
-    }
-  },
-
-  async rejectShiftException(id: number) {
-    try {
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        throw new Error('Authentication token not found');
-      }
-
-      const response = await axios.post(`${API_ENDPOINT}/shift-scheduling/exceptions/${id}/reject`, {}, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        }
-      });
-
-      return {
-        success: true,
-        message: "Shift exception rejected",
-        data: { exception: response.data.data?.exception }
-      };
-    } catch (error: any) {
-      console.error('Error rejecting shift exception:', error);
-      return {
-        success: false,
-        message: error.response?.data?.message || error.message || 'Failed to reject shift exception',
-        data: { exception: null }
       };
     }
   },

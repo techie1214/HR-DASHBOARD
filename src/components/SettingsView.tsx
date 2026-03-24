@@ -1,75 +1,123 @@
+// src/components/SettingsView.tsx
+// Simplified Settings - Only features with backend implementation
+
 import React, { useState, useEffect } from 'react';
 import {
   getBranchAttendanceSettings,
   updateBranchAttendanceSettings,
-  getGlobalAttendanceSettings,
-  updateGlobalAttendanceSettings
 } from '../services/attendanceSettingsService';
 import { getAllBranches, Branch } from '../services/branchManagementService';
 import {
-  Settings, Bell, Clock, CheckCircle, Globe, Building, Save, RotateCcw,
-  Shield, Users, AlertCircle, TrendingUp, Zap, MapPin, Timer
+  Settings, Clock, Save, AlertCircle, MapPin, Timer
 } from 'lucide-react';
 
+// Design tokens
+const colors = {
+  primary: '#1e40af',
+  primaryPale: '#eff6ff',
+  primaryBorder: '#bfdbfe',
+  surface: '#ffffff',
+  surfaceAlt: '#f8fafc',
+  surfaceMuted: '#f1f5f9',
+  border: '#e2e8f0',
+  textPrimary: '#0f172a',
+  textSecondary: '#475569',
+  textMuted: '#94a3b8',
+  success: '#059669',
+  successPale: '#ecfdf5',
+  successBorder: '#a7f3d0',
+  danger: '#dc2626',
+  dangerPale: '#fef2f2',
+  dangerBorder: '#fecaca',
+};
+
+const card: React.CSSProperties = {
+  background: colors.surface,
+  border: `1px solid ${colors.border}`,
+  borderRadius: '12px',
+  boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
+};
+
+const btnPrimary: React.CSSProperties = {
+  padding: '0.6rem 1.2rem',
+  background: colors.primary,
+  color: '#fff',
+  border: 'none',
+  borderRadius: '8px',
+  fontSize: '0.875rem',
+  fontWeight: 600,
+  cursor: 'pointer',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  fontFamily: 'inherit',
+};
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '0.5rem 0.75rem',
+  border: `1.5px solid ${colors.border}`,
+  borderRadius: '8px',
+  fontSize: '0.875rem',
+  color: colors.textPrimary,
+  background: colors.surface,
+  outline: 'none',
+  fontFamily: 'inherit',
+  transition: 'border-color 0.15s',
+};
+
+const labelStyle: React.CSSProperties = {
+  display: 'block',
+  fontSize: '0.8rem',
+  fontWeight: 600,
+  color: colors.textSecondary,
+  marginBottom: '0.4rem',
+};
+
 const SettingsView = () => {
-  const [activeTab, setActiveTab] = useState<'attendance' | 'notifications' | 'general'>('attendance');
+  const [activeTab, setActiveTab] = useState<'attendance' | 'working-days' | 'auto-mark'>('attendance');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Branch settings state
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [selectedBranchId, setSelectedBranchId] = useState<string | ''>('');
+  const [selectedBranchId, setSelectedBranchId] = useState<string>('');
   const [branchSettingsLoading, setBranchSettingsLoading] = useState(false);
 
-  // Global settings state
-  const [globalSettingsLoading, setGlobalSettingsLoading] = useState(false);
-
-  // Branch settings form state
+  // Branch settings
   const [branchForm, setBranchForm] = useState({
-    require_check_in: true,
-    require_check_out: true,
-    grace_period_minutes: 15,
-    auto_checkout_enabled: true,
-    auto_checkout_minutes_after_close: 30,
-    enable_location_verification: true,
-    allow_manual_attendance_entry: true,
-    enable_weekend_attendance: false,
-    notify_absent_employees: true,
-    notify_supervisors_daily_summary: true,
-    enable_face_recognition: false,
-    enable_biometric_verification: false,
-    enable_holiday_attendance: false,
-    strict_location_mode: false, // NEW: Strict vs Legacy mode
     attendance_mode: 'branch_based' as 'branch_based' | 'multiple_locations' | 'flexible',
-  });
-
-  // Global settings form state
-  const [globalForm, setGlobalForm] = useState({
+    grace_period_minutes: 0,
     auto_checkout_enabled: false,
     auto_checkout_minutes_after_close: 30,
-    grace_period_minutes: 0,
-    notify_absent_employees: true,
-    notify_supervisors_daily_summary: true,
-    enable_weekend_attendance: false,
+    enable_location_verification: false,
+    allow_manual_attendance_entry: true,
+    auto_mark_absent_enabled: true,
+    auto_mark_absent_time: '12:00',
+    auto_mark_absent_timezone: 'Africa/Nairobi',
   });
 
-  // Load branches on mount
+  // Working days state
+  const [workingDaysLoading, setWorkingDaysLoading] = useState(false);
+  const [workingDays, setWorkingDays] = useState<any[]>([
+    { day_of_week: 'monday', is_working_day: true, start_time: '08:00', end_time: '17:00', break_duration_minutes: 30 },
+    { day_of_week: 'tuesday', is_working_day: true, start_time: '08:00', end_time: '17:00', break_duration_minutes: 30 },
+    { day_of_week: 'wednesday', is_working_day: true, start_time: '08:00', end_time: '17:00', break_duration_minutes: 30 },
+    { day_of_week: 'thursday', is_working_day: true, start_time: '08:00', end_time: '17:00', break_duration_minutes: 30 },
+    { day_of_week: 'friday', is_working_day: true, start_time: '08:00', end_time: '17:00', break_duration_minutes: 30 },
+    { day_of_week: 'saturday', is_working_day: false, start_time: '', end_time: '', break_duration_minutes: 0 },
+    { day_of_week: 'sunday', is_working_day: false, start_time: '', end_time: '', break_duration_minutes: 0 },
+  ]);
+
   useEffect(() => {
     loadBranches();
   }, []);
 
-  // Load branch settings when branch is selected
   useEffect(() => {
     if (selectedBranchId) {
       loadBranchSettings(Number(selectedBranchId));
     }
   }, [selectedBranchId]);
-
-  // Load global settings on mount
-  useEffect(() => {
-    loadGlobalSettings();
-  }, []);
 
   const loadBranches = async () => {
     try {
@@ -77,7 +125,7 @@ const SettingsView = () => {
       if (response.success && response.branches) {
         setBranches(response.branches);
         if (response.branches.length > 0 && !selectedBranchId) {
-          setSelectedBranchId(response.branches[0].id);
+          setSelectedBranchId(String(response.branches[0].id));
         }
       }
     } catch (err) {
@@ -88,51 +136,32 @@ const SettingsView = () => {
   const loadBranchSettings = async (branchId: number) => {
     setBranchSettingsLoading(true);
     try {
+      if (!branchId) {
+        console.warn('No branch ID provided');
+        return;
+      }
       const response = await getBranchAttendanceSettings(branchId);
       if (response.success && response.settings) {
+        const s = response.settings;
         setBranchForm({
-          require_check_in: response.settings.require_check_in ?? true,
-          require_check_out: response.settings.require_check_out ?? true,
-          grace_period_minutes: response.settings.grace_period_minutes ?? 15,
-          auto_checkout_enabled: response.settings.auto_checkout_enabled ?? true,
-          auto_checkout_minutes_after_close: response.settings.auto_checkout_minutes_after_close ?? 30,
-          enable_location_verification: response.settings.enable_location_verification ?? true,
-          allow_manual_attendance_entry: response.settings.allow_manual_attendance_entry ?? true,
-          enable_weekend_attendance: response.settings.enable_weekend_attendance ?? false,
-          notify_absent_employees: response.settings.notify_absent_employees ?? true,
-          notify_supervisors_daily_summary: response.settings.notify_supervisors_daily_summary ?? true,
-          enable_face_recognition: response.settings.enable_face_recognition ?? false,
-          enable_biometric_verification: response.settings.enable_biometric_verification ?? false,
-          enable_holiday_attendance: response.settings.enable_holiday_attendance ?? false,
-          strict_location_mode: response.settings.strict_location_mode ?? false,
-          attendance_mode: response.settings.attendance_mode ?? 'branch_based',
+          attendance_mode: s.attendance_mode || 'branch_based',
+          grace_period_minutes: s.grace_period_minutes || 0,
+          auto_checkout_enabled: s.auto_checkout_enabled || false,
+          auto_checkout_minutes_after_close: s.auto_checkout_minutes_after_close || 30,
+          enable_location_verification: s.enable_location_verification || false,
+          allow_manual_attendance_entry: s.allow_manual_attendance_entry || true,
+          auto_mark_absent_enabled: s.auto_mark_absent_enabled ?? true,
+          auto_mark_absent_time: s.auto_mark_absent_time || '12:00',
+          auto_mark_absent_timezone: s.auto_mark_absent_timezone || 'Africa/Nairobi',
         });
+      } else if (response.message && response.message.includes('Branch ID')) {
+        console.warn('Invalid branch ID for attendance settings');
       }
     } catch (err) {
       console.error('Error loading branch settings:', err);
+      // Don't show error for 400 - just use defaults
     } finally {
       setBranchSettingsLoading(false);
-    }
-  };
-
-  const loadGlobalSettings = async () => {
-    setGlobalSettingsLoading(true);
-    try {
-      const response = await getGlobalAttendanceSettings();
-      if (response.success && response.settings) {
-        setGlobalForm({
-          auto_checkout_enabled: response.settings.auto_checkout_enabled ?? false,
-          auto_checkout_minutes_after_close: response.settings.auto_checkout_minutes_after_close ?? 30,
-          grace_period_minutes: response.settings.grace_period_minutes ?? 0,
-          notify_absent_employees: response.settings.notify_absent_employees ?? true,
-          notify_supervisors_daily_summary: response.settings.notify_supervisors_daily_summary ?? true,
-          enable_weekend_attendance: response.settings.enable_weekend_attendance ?? false,
-        });
-      }
-    } catch (err) {
-      console.error('Error loading global settings:', err);
-    } finally {
-      setGlobalSettingsLoading(false);
     }
   };
 
@@ -143,6 +172,7 @@ const SettingsView = () => {
     }
 
     setLoading(true);
+    setError(null);
     try {
       const response = await updateBranchAttendanceSettings({
         branchId: Number(selectedBranchId),
@@ -150,519 +180,592 @@ const SettingsView = () => {
       });
 
       if (response.success) {
-        setSuccessMessage('Branch attendance settings saved successfully');
+        setSuccessMessage('Settings saved successfully');
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        setError(response.message || 'Failed to save branch settings');
+        setError(response.message || 'Failed to save settings');
       }
-    } catch (err) {
-      setError('An error occurred while saving branch settings');
-      console.error(err);
+    } catch (err: any) {
+      setError(err.message || 'An error occurred');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSaveGlobalSettings = async () => {
-    setLoading(true);
-    try {
-      const response = await updateGlobalAttendanceSettings({
-        settings: globalForm,
-      });
-
-      if (response.success) {
-        setSuccessMessage('Global attendance settings saved successfully');
-        setTimeout(() => setSuccessMessage(null), 3000);
-      } else {
-        setError(response.message || 'Failed to save global settings');
-      }
-    } catch (err) {
-      setError('An error occurred while saving global settings');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const Toggle = ({ checked, onChange, label, description }: { checked: boolean; onChange: (v: boolean) => void; label: string; description?: string }) => (
-    <div className="flex items-center justify-between p-4 rounded-xl border border-gray-200 hover:border-blue-300 transition-colors bg-white">
-      <div className="flex-1">
-        <p className="font-medium text-gray-900 text-sm">{label}</p>
-        {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
+  return (
+    <div style={{ padding: '1.5rem', background: colors.surfaceMuted, minHeight: '100%' }}>
+      {/* Header */}
+      <div style={{ marginBottom: '1.5rem' }}>
+        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: colors.textPrimary }}>Settings</h1>
+        <p style={{ margin: '0.5rem 0 0', fontSize: '0.9rem', color: colors.textMuted }}>
+          Configure attendance and auto-mark settings
+        </p>
       </div>
-      <button
-        type="button"
-        onClick={() => onChange(!checked)}
-        className={`relative w-12 h-6 rounded-full transition-colors ${checked ? 'bg-blue-600' : 'bg-gray-300'}`}
-      >
-        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform ${checked ? 'left-6' : 'left-0.5'}`} />
-      </button>
+
+      {/* Info Box */}
+      <div style={{ ...card, padding: '1rem', marginBottom: '1.5rem', background: colors.primaryPale, border: `1px solid ${colors.primaryBorder}` }}>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+          <AlertCircle size={20} color={colors.primary} style={{ flexShrink: 0, marginTop: '0.1rem' }} />
+          <div>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: colors.textPrimary, fontWeight: 600 }}>Working Days Configuration</p>
+            <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: colors.textSecondary, lineHeight: 1.5 }}>
+              Working days are determined by each branch's configuration. To set working days for a branch, the system uses the branch_working_days table.
+              Weekends are NOT automatically non-working days - each day must be explicitly configured.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
+        <button
+          onClick={() => setActiveTab('attendance')}
+          style={{
+            ...btnPrimary,
+            background: activeTab === 'attendance' ? colors.primary : colors.surface,
+            color: activeTab === 'attendance' ? '#fff' : colors.textSecondary,
+            border: `1px solid ${activeTab === 'attendance' ? colors.primary : colors.border}`,
+          }}
+        >
+          <Settings size={16} />
+          Attendance
+        </button>
+        <button
+          onClick={() => setActiveTab('working-days')}
+          style={{
+            ...btnPrimary,
+            background: activeTab === 'working-days' ? colors.primary : colors.surface,
+            color: activeTab === 'working-days' ? '#fff' : colors.textSecondary,
+            border: `1px solid ${activeTab === 'working-days' ? colors.primary : colors.border}`,
+          }}
+        >
+          <Clock size={16} />
+          Working Days
+        </button>
+        <button
+          onClick={() => setActiveTab('auto-mark')}
+          style={{
+            ...btnPrimary,
+            background: activeTab === 'auto-mark' ? colors.primary : colors.surface,
+            color: activeTab === 'auto-mark' ? '#fff' : colors.textSecondary,
+            border: `1px solid ${activeTab === 'auto-mark' ? colors.primary : colors.border}`,
+          }}
+        >
+          <Clock size={16} />
+          Auto-Mark
+        </button>
+      </div>
+
+      {/* Working Days Tab Content */}
+      {activeTab === 'working-days' && (
+        <WorkingDaysTab
+          selectedBranchId={selectedBranchId}
+          branches={branches}
+          workingDays={workingDays}
+          setWorkingDays={setWorkingDays}
+          workingDaysLoading={workingDaysLoading}
+          setWorkingDaysLoading={setWorkingDaysLoading}
+          setError={setError}
+          setSuccessMessage={setSuccessMessage}
+        />
+      )}
+
+      {/* Content */}
+      {activeTab === 'attendance' && (
+        <div style={card}>
+          <div style={{ padding: '1.25rem', borderBottom: `1px solid ${colors.border}` }}>
+            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: colors.textPrimary }}>Attendance Settings</h3>
+            <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: colors.textMuted }}>Configure attendance tracking for your branch</p>
+          </div>
+
+          <div style={{ padding: '1.25rem' }}>
+            {/* Branch Selection */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={labelStyle}>Select Branch</label>
+              <select
+                style={inputStyle}
+                value={selectedBranchId}
+                onChange={(e) => setSelectedBranchId(e.target.value)}
+                disabled={branchSettingsLoading}
+              >
+                {branches.map(branch => (
+                  <option key={branch.id} value={branch.id}>{branch.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Attendance Mode */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={labelStyle}>Attendance Mode</label>
+              <select
+                style={inputStyle}
+                value={branchForm.attendance_mode}
+                onChange={(e) => setBranchForm({ ...branchForm, attendance_mode: e.target.value as any })}
+              >
+                <option value="branch_based">Branch Based</option>
+                <option value="multiple_locations">Multiple Locations</option>
+                <option value="flexible">Flexible</option>
+              </select>
+              <p style={{ margin: '0.3rem 0 0', fontSize: '0.75rem', color: colors.textMuted }}>
+                Determines how attendance is tracked (location-based or flexible)
+              </p>
+            </div>
+
+            {/* Grace Period */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={labelStyle}>Grace Period (minutes)</label>
+              <input
+                style={inputStyle}
+                type="number"
+                min="0"
+                value={branchForm.grace_period_minutes}
+                onChange={(e) => setBranchForm({ ...branchForm, grace_period_minutes: parseInt(e.target.value) || 0 })}
+              />
+              <p style={{ margin: '0.3rem 0 0', fontSize: '0.75rem', color: colors.textMuted }}>
+                Minutes allowed for late clock-in before being marked late
+              </p>
+            </div>
+
+            {/* Auto Checkout */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type="checkbox"
+                  checked={branchForm.auto_checkout_enabled}
+                  onChange={(e) => setBranchForm({ ...branchForm, auto_checkout_enabled: e.target.checked })}
+                />
+                Enable Auto Checkout
+              </label>
+              {branchForm.auto_checkout_enabled && (
+                <div style={{ marginTop: '0.75rem', marginLeft: '1.5rem' }}>
+                  <label style={labelStyle}>Auto checkout after (minutes)</label>
+                  <input
+                    style={inputStyle}
+                    type="number"
+                    min="0"
+                    value={branchForm.auto_checkout_minutes_after_close}
+                    onChange={(e) => setBranchForm({ ...branchForm, auto_checkout_minutes_after_close: parseInt(e.target.value) || 30 })}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Location Verification */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <MapPin size={16} />
+                <input
+                  type="checkbox"
+                  checked={branchForm.enable_location_verification}
+                  onChange={(e) => setBranchForm({ ...branchForm, enable_location_verification: e.target.checked })}
+                />
+                Enable Location Verification
+              </label>
+              <p style={{ margin: '0.3rem 0 0', fontSize: '0.75rem', color: colors.textMuted }}>
+                Require GPS location verification for attendance
+              </p>
+            </div>
+
+            {/* Manual Attendance */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type="checkbox"
+                  checked={branchForm.allow_manual_attendance_entry}
+                  onChange={(e) => setBranchForm({ ...branchForm, allow_manual_attendance_entry: e.target.checked })}
+                />
+                Allow Manual Attendance Entry
+              </label>
+              <p style={{ margin: '0.3rem 0 0', fontSize: '0.75rem', color: colors.textMuted }}>
+                Allow HR to manually enter attendance records
+              </p>
+            </div>
+
+            {/* Error/Success Messages */}
+            {error && (
+              <div style={{ padding: '0.75rem', background: colors.dangerPale, border: `1px solid ${colors.dangerBorder}`, borderRadius: '8px', color: colors.danger, fontSize: '0.875rem', marginBottom: '1rem' }}>
+                {error}
+              </div>
+            )}
+            {successMessage && (
+              <div style={{ padding: '0.75rem', background: colors.successPale, border: `1px solid ${colors.successBorder}`, borderRadius: '8px', color: colors.success, fontSize: '0.875rem', marginBottom: '1rem' }}>
+                {successMessage}
+              </div>
+            )}
+
+            {/* Save Button */}
+            <button
+              style={{ ...btnPrimary, opacity: loading ? 0.7 : 1 }}
+              onClick={handleSaveBranchSettings}
+              disabled={loading || branchSettingsLoading}
+            >
+              {loading ? (
+                <>
+                  <Timer size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save size={16} />
+                  Save Settings
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'auto-mark' && (
+        <div style={card}>
+          <div style={{ padding: '1.25rem', borderBottom: `1px solid ${colors.border}` }}>
+            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: colors.textPrimary }}>Auto-Mark Absent Settings</h3>
+            <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: colors.textMuted }}>Configure automatic absent marking</p>
+          </div>
+
+          <div style={{ padding: '1.25rem' }}>
+            {/* Branch Selection */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={labelStyle}>Select Branch</label>
+              <select
+                style={inputStyle}
+                value={selectedBranchId}
+                onChange={(e) => setSelectedBranchId(e.target.value)}
+                disabled={branchSettingsLoading}
+              >
+                {branches.map(branch => (
+                  <option key={branch.id} value={branch.id}>{branch.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Enable Auto-Mark */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type="checkbox"
+                  checked={branchForm.auto_mark_absent_enabled}
+                  onChange={(e) => setBranchForm({ ...branchForm, auto_mark_absent_enabled: e.target.checked })}
+                />
+                Enable Auto-Mark Absent
+              </label>
+              <p style={{ margin: '0.3rem 0 0', fontSize: '0.75rem', color: colors.textMuted }}>
+                Automatically mark employees as absent if they don't clock in by the specified time
+              </p>
+            </div>
+
+            {/* Auto-Mark Time */}
+            {branchForm.auto_mark_absent_enabled && (
+              <>
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <label style={labelStyle}>Auto-Mark Time</label>
+                  <input
+                    style={inputStyle}
+                    type="time"
+                    value={branchForm.auto_mark_absent_time}
+                    onChange={(e) => setBranchForm({ ...branchForm, auto_mark_absent_time: e.target.value })}
+                  />
+                  <p style={{ margin: '0.3rem 0 0', fontSize: '0.75rem', color: colors.textMuted }}>
+                    Time at which employees will be marked absent (e.g., 12:00 = noon)
+                  </p>
+                </div>
+
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <label style={labelStyle}>Timezone</label>
+                  <select
+                    style={inputStyle}
+                    value={branchForm.auto_mark_absent_timezone}
+                    onChange={(e) => setBranchForm({ ...branchForm, auto_mark_absent_timezone: e.target.value })}
+                  >
+                    <option value="Africa/Nairobi">Africa/Nairobi (EAT)</option>
+                    <option value="Africa/Lagos">Africa/Lagos (WAT)</option>
+                    <option value="Africa/Johannesburg">Africa/Johannesburg (SAST)</option>
+                  </select>
+                </div>
+              </>
+            )}
+
+            {/* Error/Success Messages */}
+            {error && (
+              <div style={{ padding: '0.75rem', background: colors.dangerPale, border: `1px solid ${colors.dangerBorder}`, borderRadius: '8px', color: colors.danger, fontSize: '0.875rem', marginBottom: '1rem' }}>
+                {error}
+              </div>
+            )}
+            {successMessage && (
+              <div style={{ padding: '0.75rem', background: colors.successPale, border: `1px solid ${colors.successBorder}`, borderRadius: '8px', color: colors.success, fontSize: '0.875rem', marginBottom: '1rem' }}>
+                {successMessage}
+              </div>
+            )}
+
+            {/* Save Button */}
+            <button
+              style={{ ...btnPrimary, opacity: loading ? 0.7 : 1 }}
+              onClick={handleSaveBranchSettings}
+              disabled={loading || branchSettingsLoading}
+            >
+              {loading ? (
+                <>
+                  <Timer size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save size={16} />
+                  Save Settings
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
+};
 
-  const renderAttendanceSettings = () => (
-    <div className="space-y-6">
-      {/* Branch Selector Card - Simplified */}
-      <div className="card p-5">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
-              <Building className="w-5 h-5 text-gray-600" />
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-gray-900">Branch Settings</h3>
-              <p className="text-sm text-gray-500">Configure attendance rules per branch</p>
-            </div>
-          </div>
+// Working Days Tab Component
+const WorkingDaysTab = ({
+  selectedBranchId,
+  branches,
+  workingDays,
+  setWorkingDays,
+  workingDaysLoading,
+  setWorkingDaysLoading,
+  setError,
+  setSuccessMessage,
+}: any) => {
+  const [loading, setLoading] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  // Load working days when branch changes
+  useEffect(() => {
+    if (selectedBranchId) {
+      loadWorkingDays();
+    }
+  }, [selectedBranchId]);
+
+  const loadWorkingDays = async () => {
+    setWorkingDaysLoading(true);
+    setLocalError(null);
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('No auth token');
+      }
+      const response = await fetch(`http://localhost:3000/api/branches/${selectedBranchId}/working-days`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to load working days');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success && data.data.workingDays) {
+        // Map API response to our state
+        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        const loadedDays = days.map(day => {
+          const apiDay = data.data.workingDays.find((d: any) => d.day_of_week === day);
+          return apiDay || {
+            day_of_week: day,
+            is_working_day: day !== 'saturday' && day !== 'sunday',
+            start_time: '08:00',
+            end_time: '17:00',
+            break_duration_minutes: 30,
+          };
+        });
+        setWorkingDays(loadedDays);
+      }
+    } catch (err: any) {
+      console.error('Error loading working days:', err);
+      setLocalError(err.message || 'Failed to load working days');
+      setError(err.message || 'Failed to load working days');
+    } finally {
+      setWorkingDaysLoading(false);
+    }
+  };
+
+  const handleSaveWorkingDays = async () => {
+    if (!selectedBranchId) {
+      setError('Please select a branch');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`http://localhost:3000/api/branches/${selectedBranchId}/working-days`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          workingDays: workingDays.map((d: any) => ({
+            day_of_week: d.day_of_week,
+            is_working_day: d.is_working_day,
+            start_time: d.is_working_day ? d.start_time : null,
+            end_time: d.is_working_day ? d.end_time : null,
+            break_duration_minutes: d.break_duration_minutes,
+          }))
+        })
+      });
+      const data = await response.json();
+      
+      if (data.success) {
+        setSuccessMessage('Working days saved successfully');
+        setTimeout(() => setSuccessMessage(null), 3000);
+      } else {
+        setError(data.message || 'Failed to save working days');
+      }
+    } catch (err: any) {
+      setError(err.message || 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateWorkingDay = (index: number, field: string, value: any) => {
+    const updated = [...workingDays];
+    updated[index] = { ...updated[index], [field]: value };
+    setWorkingDays(updated);
+  };
+
+  return (
+    <div style={card}>
+      <div style={{ padding: '1.25rem', borderBottom: `1px solid ${colors.border}` }}>
+        <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: colors.textPrimary }}>Branch Working Days</h3>
+        <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: colors.textMuted }}>Configure which days your branch operates</p>
+      </div>
+
+      <div style={{ padding: '1.25rem' }}>
+        {/* Branch Selection */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={labelStyle}>Select Branch</label>
           <select
+            style={inputStyle}
             value={selectedBranchId}
-            onChange={(e) => setSelectedBranchId(e.target.value || '')}
-            className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 font-medium focus:ring-2 focus:ring-blue-500"
-            style={{ minWidth: '250px' }}
+            onChange={(e) => setSelectedBranchId(e.target.value)}
+            disabled={workingDaysLoading}
           >
-            {branches.map(branch => (
-              <option key={branch.id} value={branch.id}>
-                {branch.name} ({branch.code})
-              </option>
+            {branches.map((branch: any) => (
+              <option key={branch.id} value={branch.id}>{branch.name}</option>
             ))}
           </select>
         </div>
-      </div>
 
-      {/* Branch Settings Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Check-in/Check-out */}
-        <div className="card p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-              <Clock className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-900">Check-in Rules</h4>
-              <p className="text-xs text-gray-500">Attendance requirements</p>
-            </div>
-          </div>
-          <div className="space-y-3">
-            <Toggle
-              checked={branchForm.require_check_in}
-              onChange={(v) => setBranchForm({ ...branchForm, require_check_in: v })}
-              label="Require Check-in"
-              description="Employees must check in"
-            />
-            <Toggle
-              checked={branchForm.require_check_out}
-              onChange={(v) => setBranchForm({ ...branchForm, require_check_out: v })}
-              label="Require Check-out"
-              description="Employees must check out"
-            />
-          </div>
-        </div>
-
-        {/* Grace Period */}
-        <div className="card p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
-              <Timer className="w-5 h-5 text-amber-600" />
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-900">Grace Period</h4>
-              <p className="text-xs text-gray-500">Late arrival tolerance</p>
-            </div>
-          </div>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Minutes</label>
-              <input
-                type="number"
-                min="0"
-                max="60"
-                value={branchForm.grace_period_minutes}
-                onChange={(e) => setBranchForm({ ...branchForm, grace_period_minutes: Number(e.target.value) })}
-                className="input"
-              />
-              <p className="text-xs text-gray-500 mt-1.5">Allow late check-in without marking as late</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Auto Checkout */}
-        <div className="card p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-              <CheckCircle className="w-5 h-5 text-green-600" />
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-900">Auto Checkout</h4>
-              <p className="text-xs text-gray-500">Automatic check-out</p>
-            </div>
-          </div>
-          <div className="space-y-3">
-            <Toggle
-              checked={branchForm.auto_checkout_enabled}
-              onChange={(v) => setBranchForm({ ...branchForm, auto_checkout_enabled: v })}
-              label="Enable Auto Checkout"
-              description="Automatically check out employees"
-            />
-            {branchForm.auto_checkout_enabled && (
-              <div className="pt-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">After Shift End (minutes)</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="180"
-                  value={branchForm.auto_checkout_minutes_after_close}
-                  onChange={(e) => setBranchForm({ ...branchForm, auto_checkout_minutes_after_close: Number(e.target.value) })}
-                  className="input"
-                />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Location */}
-        <div className="card p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-              <MapPin className="w-5 h-5 text-purple-600" />
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-900">Location</h4>
-              <p className="text-xs text-gray-500">GPS verification</p>
-            </div>
-          </div>
-          <div className="space-y-3">
-            <Toggle
-              checked={branchForm.enable_location_verification}
-              onChange={(v) => setBranchForm({ ...branchForm, enable_location_verification: v })}
-              label="Location Verification"
-              description="Verify GPS location on check-in"
-            />
-            <Toggle
-              checked={branchForm.allow_manual_attendance_entry ?? false}
-              onChange={(v) => setBranchForm({ ...branchForm, allow_manual_attendance_entry: v })}
-              label="Manual Entry"
-              description="Allow admin manual attendance"
-            />
-          </div>
-        </div>
-
-        {/* Verification Methods */}
-        <div className="card p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
-              <Shield className="w-5 h-5 text-indigo-600" />
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-900">Advanced Verification</h4>
-              <p className="text-xs text-gray-500">Biometrics & AI</p>
-            </div>
-          </div>
-          <div className="space-y-3">
-            <Toggle
-              checked={branchForm.enable_face_recognition ?? false}
-              onChange={(v) => setBranchForm({ ...branchForm, enable_face_recognition: v })}
-              label="Face Recognition"
-              description="Verify identity via camera"
-            />
-            <Toggle
-              checked={branchForm.enable_biometric_verification ?? false}
-              onChange={(v) => setBranchForm({ ...branchForm, enable_biometric_verification: v })}
-              label="Biometric Verification"
-              description="Fingerprint or FaceID"
-            />
-          </div>
-        </div>
-
-        {/* Attendance Mode */}
-        <div className="card p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
-              <Building className="w-5 h-5 text-slate-600" />
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-900">Attendance Mode</h4>
-              <p className="text-xs text-gray-500">Operation style</p>
-            </div>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
-              <select
-                value={branchForm.attendance_mode}
-                onChange={(e) => setBranchForm({ ...branchForm, attendance_mode: e.target.value as any })}
-                className="input"
+        {/* Working Days List */}
+        {workingDaysLoading ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: colors.textMuted }}>Loading...</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
+            {workingDays.map((day: any, idx: number) => (
+              <div
+                key={day.day_of_week}
+                style={{
+                  padding: '1rem',
+                  background: day.is_working_day ? colors.surface : colors.surfaceMuted,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '8px',
+                  opacity: day.is_working_day ? 1 : 0.7,
+                }}
               >
-                <option value="branch_based">Branch Based (Geofencing)</option>
-                <option value="multiple_locations">Multiple Locations (Approved Hotspots)</option>
-                <option value="flexible">Flexible (Anywhere)</option>
-              </select>
-            </div>
-            
-            {/* Strict vs Legacy Mode Toggle */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  id="strict-mode-toggle"
-                  checked={branchForm.strict_location_mode ?? false}
-                  onChange={(e) => setBranchForm({ ...branchForm, strict_location_mode: e.target.checked })}
-                  className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <div className="flex-1">
-                  <label htmlFor="strict-mode-toggle" className="font-medium text-gray-900 cursor-pointer">
-                    Strict Location Mode
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                  {/* Day Name */}
+                  <div style={{ minWidth: '100px', fontWeight: 600, color: colors.textPrimary, textTransform: 'capitalize' }}>
+                    {day.day_of_week}
+                  </div>
+
+                  {/* Working Day Toggle */}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={day.is_working_day}
+                      onChange={(e) => updateWorkingDay(idx, 'is_working_day', e.target.checked)}
+                    />
+                    <span style={{ fontSize: '0.85rem', color: colors.textSecondary }}>Working Day</span>
                   </label>
-                  <p className="text-xs text-gray-600 mt-1">
-                    <strong>ON (Strict):</strong> Staff can ONLY check in at their assigned locations. 
-                    If no location is assigned, they cannot check in.
-                  </p>
-                  <p className="text-xs text-gray-600 mt-1">
-                    <strong>OFF (Legacy):</strong> Staff can check in at branch location or any approved 
-                    location based on attendance mode above.
-                  </p>
+
+                  {/* Time Inputs (only if working day) */}
+                  {day.is_working_day && (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <input
+                          type="time"
+                          value={day.start_time || '08:00'}
+                          onChange={(e) => updateWorkingDay(idx, 'start_time', e.target.value)}
+                          style={{ ...inputStyle, width: '120px' }}
+                        />
+                        <span style={{ color: colors.textMuted }}>to</span>
+                        <input
+                          type="time"
+                          value={day.end_time || '17:00'}
+                          onChange={(e) => updateWorkingDay(idx, 'end_time', e.target.value)}
+                          style={{ ...inputStyle, width: '120px' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <label style={{ fontSize: '0.8rem', color: colors.textMuted }}>Break:</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="120"
+                          value={day.break_duration_minutes || 30}
+                          onChange={(e) => updateWorkingDay(idx, 'break_duration_minutes', parseInt(e.target.value) || 0)}
+                          style={{ ...inputStyle, width: '60px' }}
+                        />
+                        <span style={{ fontSize: '0.8rem', color: colors.textMuted }}>min</span>
+                      </div>
+                    </>
+                  )}
+
+                  {!day.is_working_day && (
+                    <span style={{ fontSize: '0.8rem', color: colors.textMuted, fontStyle: 'italic' }}>
+                      Not a working day
+                    </span>
+                  )}
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Additional Settings */}
-      <div className="card p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg bg-pink-100 flex items-center justify-center">
-            <Bell className="w-5 h-5 text-pink-600" />
-          </div>
-          <div>
-            <h4 className="font-semibold text-gray-900">Notifications & Policy</h4>
-            <p className="text-xs text-gray-500">Additional options</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          <Toggle
-            checked={branchForm.enable_weekend_attendance ?? false}
-            onChange={(v) => setBranchForm({ ...branchForm, enable_weekend_attendance: v })}
-            label="Weekend Tracking"
-            description="Track on Sat/Sun"
-          />
-          <Toggle
-            checked={branchForm.enable_holiday_attendance ?? false}
-            onChange={(v) => setBranchForm({ ...branchForm, enable_holiday_attendance: v })}
-            label="Holiday Attendance"
-            description="Allow check-in on holidays"
-          />
-          <Toggle
-            checked={branchForm.notify_absent_employees ?? false}
-            onChange={(v) => setBranchForm({ ...branchForm, notify_absent_employees: v })}
-            label="Absent Alerts"
-            description="Notify employees"
-          />
-          <Toggle
-            checked={branchForm.notify_supervisors_daily_summary ?? true}
-            onChange={(v) => setBranchForm({ ...branchForm, notify_supervisors_daily_summary: v })}
-            label="Supervisor Summary"
-            description="Notify daily summary"
-          />
-        </div>
-        <div className="flex items-center justify-end">
-          <button
-            className="btn btn-primary px-6"
-            onClick={handleSaveBranchSettings}
-            disabled={loading || branchSettingsLoading}
-          >
-            {loading ? (
-              <span className="flex items-center gap-2">
-                <RotateCcw className="w-4 h-4 animate-spin" />
-                Saving...
-              </span>
-            ) : (
-              <span className="flex items-center gap-2">
-                <Save className="w-4 h-4" />
-                Save Branch Settings
-              </span>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Global Settings */}
-      <div className="card p-5" style={{ backgroundColor: '#2563eb' }}>
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-            <Globe className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-white">Global Settings</h3>
-            <p className="text-sm text-white/80">System-wide defaults for all branches</p>
-          </div>
-        </div>
-
-        {globalSettingsLoading ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white"></div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Toggle
-              checked={globalForm.auto_checkout_enabled}
-              onChange={(v) => setGlobalForm({ ...globalForm, auto_checkout_enabled: v })}
-              label="Auto Checkout (Global)"
-              description="Default for all branches"
-            />
-            <Toggle
-              checked={globalForm.notify_supervisors_daily_summary}
-              onChange={(v) => setGlobalForm({ ...globalForm, notify_supervisors_daily_summary: v })}
-              label="Supervisor Summaries"
-              description="Daily attendance reports"
-            />
-            <Toggle
-              checked={globalForm.notify_absent_employees}
-              onChange={(v) => setGlobalForm({ ...globalForm, notify_absent_employees: v })}
-              label="Absent Notifications (Global)"
-              description="System-wide notifications"
-            />
-            <Toggle
-              checked={globalForm.enable_weekend_attendance}
-              onChange={(v) => setGlobalForm({ ...globalForm, enable_weekend_attendance: v })}
-              label="Weekend Attendance (Global)"
-              description="Default weekend setting"
-            />
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-white mb-2">Global Grace Period (minutes)</label>
-              <input
-                type="number"
-                min="0"
-                max="60"
-                value={globalForm.grace_period_minutes}
-                onChange={(e) => setGlobalForm({ ...globalForm, grace_period_minutes: Number(e.target.value) })}
-                className="px-4 py-2.5 rounded-lg border-0 bg-white/95 text-gray-900 font-medium shadow-lg focus:ring-2 focus:ring-white/50"
-                style={{ maxWidth: '200px' }}
-              />
-            </div>
-            <div className="md:col-span-2 flex justify-end">
-              <button
-                className="btn px-6"
-                style={{ backgroundColor: 'white', color: '#c026d3', fontWeight: 600 }}
-                onClick={handleSaveGlobalSettings}
-                disabled={loading}
-              >
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    <RotateCcw className="w-4 h-4 animate-spin" />
-                    Saving...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <Save className="w-4 h-4" />
-                    Save Global Settings
-                  </span>
-                )}
-              </button>
-            </div>
+            ))}
           </div>
         )}
-      </div>
-    </div>
-  );
 
-  const renderNotificationsSettings = () => (
-    <div className="card p-8 text-center">
-      <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
-        <Bell className="w-8 h-8 text-gray-400" />
-      </div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">Notification Settings</h3>
-      <p className="text-gray-500 max-w-md mx-auto">
-        Configure email, SMS, and push notifications for attendance, shifts, and system alerts.
-      </p>
-    </div>
-  );
-
-  const renderGeneralSettings = () => (
-    <div className="card p-8 text-center">
-      <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
-        <Settings className="w-8 h-8 text-gray-400" />
-      </div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">General Settings</h3>
-      <p className="text-gray-500 max-w-md mx-auto">
-        System-wide configuration including company info, working hours, holidays, and localization.
-      </p>
-    </div>
-  );
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-          <p className="text-gray-600 mt-1">Configure attendance and system preferences</p>
-        </div>
-      </div>
-
-      {/* Success/Error Messages */}
-      {successMessage && (
-        <div className="p-4 bg-green-50 border-l-4 border-green-500 rounded-lg flex items-start gap-3">
-          <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-green-900">{successMessage}</p>
+        {/* Error/Success Messages */}
+        {localError && (
+          <div style={{ padding: '0.75rem', background: colors.dangerPale, border: `1px solid ${colors.dangerBorder}`, borderRadius: '8px', color: colors.danger, fontSize: '0.875rem', marginBottom: '1rem' }}>
+            {localError}
           </div>
-          <button onClick={() => setSuccessMessage(null)} className="text-green-600 hover:text-green-800">×</button>
-        </div>
-      )}
-
-      {error && (
-        <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded-lg flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-red-900">{error}</p>
+        )}
+        {successMessage && (
+          <div style={{ padding: '0.75rem', background: colors.successPale, border: `1px solid ${colors.successBorder}`, borderRadius: '8px', color: colors.success, fontSize: '0.875rem', marginBottom: '1rem' }}>
+            {successMessage}
           </div>
-          <button onClick={() => setError(null)} className="text-red-600 hover:text-red-800">×</button>
-        </div>
-      )}
+        )}
 
-      {/* Enhanced Tabs */}
-      <div className="card p-2" style={{ backgroundColor: '#dbeafe' }}>
-        <div className="flex gap-2">
-          <button
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all ${
-              activeTab === 'attendance'
-                ? 'bg-blue-600 text-black shadow-md'
-                : 'text-black hover:bg-blue-200'
-            }`}
-            onClick={() => setActiveTab('attendance')}
-          >
-            <Clock className="w-4 h-4" />
-            Attendance
-          </button>
-          <button
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all ${
-              activeTab === 'notifications'
-                ? 'bg-blue-600 text-black shadow-md'
-                : 'text-black hover:bg-blue-200'
-            }`}
-            onClick={() => setActiveTab('notifications')}
-          >
-            <Bell className="w-4 h-4" />
-            Notifications
-          </button>
-          <button
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all ${
-              activeTab === 'general'
-                ? 'bg-blue-600 text-black shadow-md'
-                : 'text-black hover:bg-blue-200'
-            }`}
-            onClick={() => setActiveTab('general')}
-          >
-            <Settings className="w-4 h-4" />
-            General
-          </button>
-        </div>
+        {/* Save Button */}
+        <button
+          style={{ ...btnPrimary, opacity: loading ? 0.7 : 1 }}
+          onClick={handleSaveWorkingDays}
+          disabled={loading || workingDaysLoading}
+        >
+          {loading ? (
+            <>
+              <Timer size={16} style={{ animation: 'spin 1s linear infinite' }} />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save size={16} />
+              Save Working Days
+            </>
+          )}
+        </button>
       </div>
-
-      {/* Tab Content */}
-      {activeTab === 'attendance' && renderAttendanceSettings()}
-      {activeTab === 'notifications' && renderNotificationsSettings()}
-      {activeTab === 'general' && renderGeneralSettings()}
     </div>
   );
 };

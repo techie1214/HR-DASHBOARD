@@ -2,6 +2,7 @@
 // Enhanced Shift Scheduling — Restyled with refined industrial-precision aesthetic
 
 import React, { useState, useEffect, useMemo } from 'react';
+import axios from 'axios';
 import {
   shiftSchedulingService,
   ShiftTemplate,
@@ -230,11 +231,19 @@ const ShiftSchedulingView = () => {
   const [isRecurringException, setIsRecurringException] = useState(false);
   const [bulkExceptionDates, setBulkExceptionDates] = useState<Date[]>([]);
   const [bulkExceptionConfig, setBulkExceptionConfig] = useState({
-    recurrence_pattern: 'weekly' as 'daily' | 'weekly' | 'custom',
-    recurrence_days: [] as string[],
+    recurrence_pattern: 'weekly',
+    recurrence_days: [],
     start_date: new Date().toISOString().split('T')[0],
-    end_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    end_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   });
+
+  // Bulk Assign Shift states
+  const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
+  const [bulkAssignSelectedUsers, setBulkAssignSelectedUsers] = useState<number[]>([]);
+  const [bulkAssignTemplate, setBulkAssignTemplate] = useState<number | null>(null);
+  const [bulkAssignFromDate, setBulkAssignFromDate] = useState(new Date().toISOString().split('T')[0]);
+  const [bulkAssignAssignmentType, setBulkAssignAssignmentType] = useState<'permanent' | 'temporary' | 'rotating'>('permanent');
+  const [bulkAssignSearchQuery, setBulkAssignSearchQuery] = useState('');
 
   const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
   const dayLabels = { monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' };
@@ -392,6 +401,76 @@ const ShiftSchedulingView = () => {
   const resetAssignmentForm = () => {
     setAssignmentForm({ user_id: 0, shift_template_id: 0, effective_from: new Date().toISOString().split('T')[0], effective_to: '', assignment_type: 'permanent', recurrence_pattern: 'none', recurrence_day_of_week: '', recurrence_end_date: '' });
     setEditingAssignment(null);
+  };
+
+  // Bulk Assign handlers
+  const resetBulkAssignForm = () => {
+    setBulkAssignSelectedUsers([]);
+    setBulkAssignTemplate(null);
+    setBulkAssignFromDate(new Date().toISOString().split('T')[0]);
+    setBulkAssignAssignmentType('permanent');
+    setBulkAssignSearchQuery('');
+  };
+
+  const handleBulkAssign = async () => {
+    if (bulkAssignSelectedUsers.length === 0) {
+      setError('Please select at least one staff member');
+      return;
+    }
+    if (!bulkAssignTemplate) {
+      setError('Please select a shift template');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Backend expects: { user_ids: number[], shift_template_id, effective_from, effective_to, assignment_type }
+      const payload = {
+        user_ids: bulkAssignSelectedUsers,
+        shift_template_id: bulkAssignTemplate,
+        effective_from: bulkAssignFromDate,
+        effective_to: null,
+        assignment_type: bulkAssignAssignmentType
+      };
+
+      console.log('Submitting bulk assignments:', { ...payload, user_ids: bulkAssignSelectedUsers.slice(0, 5), total: bulkAssignSelectedUsers.length });
+      
+      // Call the bulk assign API with the correct format
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await axios.post(
+        'http://localhost:3000/api/shift-scheduling/employee-shift-assignments/bulk',
+        payload,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+
+      const result = response.data;
+
+      if (result.success) {
+        setSuccessMessage(`Successfully assigned shifts to ${bulkAssignSelectedUsers.length} staff members`);
+        setShowBulkAssignModal(false);
+        resetBulkAssignForm();
+        loadData();
+        setTimeout(() => setSuccessMessage(null), 3000);
+      } else {
+        setError(result.message || 'Failed to assign shifts');
+      }
+    } catch (err: any) {
+      console.error('Bulk assign error:', err);
+      setError(err.response?.data?.message || err.message || 'An error occurred during bulk assignment');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ─── Exception handlers ──────────────────────────────────────────────────
@@ -678,6 +757,14 @@ const ShiftSchedulingView = () => {
 
   const renderTemplatesTab = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* Info Box */}
+      <div style={{ padding: '1rem', background: colors.primaryPale, border: `1px solid ${colors.primaryBorder}`, borderRadius: '8px' }}>
+        <p style={{ margin: 0, fontSize: '0.85rem', color: colors.textPrimary, lineHeight: 1.5 }}>
+          <strong>What this does:</strong> Create reusable shift patterns (e.g., "Morning Shift 8am-6:30pm"). 
+          Templates save time when assigning the same schedule to multiple staff.
+        </p>
+      </div>
+      
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: colors.textPrimary }}>Shift Templates</h2>
@@ -771,16 +858,35 @@ const ShiftSchedulingView = () => {
 
   const renderAssignmentsTab = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* Info Box */}
+      <div style={{ padding: '1rem', background: colors.purplePale, border: `1px solid ${colors.purpleBorder}`, borderRadius: '8px' }}>
+        <p style={{ margin: 0, fontSize: '0.85rem', color: colors.textPrimary, lineHeight: 1.5 }}>
+          <strong>What this does:</strong> Assign shift templates to staff members. 
+          Use <strong>Bulk Assign</strong> to assign the same shift to multiple staff at once.
+          Assignments determine when staff should clock in/out and are used to calculate late arrivals.
+        </p>
+      </div>
+      
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: colors.textPrimary }}>Employee Assignments</h2>
           <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: colors.textMuted }}>Assign shift templates to your team members</p>
         </div>
-        <button style={btnPrimary} onClick={() => { resetAssignmentForm(); setShowAssignmentModal(true); }}
-          onMouseEnter={e => (e.currentTarget.style.background = '#1d3a9e')}
-          onMouseLeave={e => (e.currentTarget.style.background = colors.primary)}>
-          <Plus size={15} /> Assign Shift
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button style={btnPrimary} onClick={() => { resetAssignmentForm(); setShowAssignmentModal(true); }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#1d3a9e')}
+            onMouseLeave={e => (e.currentTarget.style.background = colors.primary)}>
+            <Plus size={15} /> Assign Shift
+          </button>
+          <button 
+            style={{ ...btnPrimary, background: colors.purple }} 
+            onClick={() => setShowBulkAssignModal(true)}
+            onMouseEnter={e => (e.currentTarget.style.background = '#6d28d9')}
+            onMouseLeave={e => (e.currentTarget.style.background = colors.purple)}
+          >
+            <Users size={15} /> Bulk Assign
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px,1fr))', gap: '0.75rem' }}>
@@ -879,6 +985,14 @@ const ShiftSchedulingView = () => {
     };
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        {/* Info Box */}
+        <div style={{ padding: '1rem', background: colors.accentPale, border: `1px solid ${colors.accentBorder}`, borderRadius: '8px' }}>
+          <p style={{ margin: 0, fontSize: '0.85rem', color: colors.textPrimary, lineHeight: 1.5 }}>
+            <strong>What this does:</strong> Create one-time schedule overrides (e.g., "John leaves early every Monday" or "Sarah works Sunday").
+            Use <strong>Bulk Exception Creation</strong> toggle to create recurring exceptions for multiple weeks at once.
+          </p>
+        </div>
+        
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div>
             <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: colors.textPrimary }}>Shift Exceptions</h2>
@@ -978,6 +1092,14 @@ const ShiftSchedulingView = () => {
 
   const renderTypesTab = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* Info Box */}
+      <div style={{ padding: '1rem', background: colors.successPale, border: `1px solid ${colors.successBorder}`, borderRadius: '8px' }}>
+        <p style={{ margin: 0, fontSize: '0.85rem', color: colors.textPrimary, lineHeight: 1.5 }}>
+          <strong>What this does:</strong> Create custom exception categories (e.g., "Medical Appointment", "Training", "Remote Work").
+          System types (Late Start, Early Release, Day Off) cannot be deleted. Add custom types to categorize exceptions for reporting.
+        </p>
+      </div>
+      
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: colors.textPrimary }}>Exception Types</h2>
@@ -1362,6 +1484,242 @@ const ShiftSchedulingView = () => {
               </button>
             </ModalFooter>
           </form>
+        </Modal>
+      )}
+
+      {/* Bulk Assign Modal */}
+      {showBulkAssignModal && (
+        <Modal onClose={() => { setShowBulkAssignModal(false); resetBulkAssignForm(); }} width="40rem">
+          <ModalHeader 
+            title="Bulk Shift Assignment" 
+            sub="Assign the same shift template to multiple staff members at once"
+            accentColor={colors.purple} 
+            icon={Users}
+            onClose={() => { setShowBulkAssignModal(false); resetBulkAssignForm(); }} 
+          />
+          <ModalBody>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              
+              {/* Select Staff */}
+              <FormField label="Select Staff Members" required hint={`${bulkAssignSelectedUsers.length} staff member${bulkAssignSelectedUsers.length !== 1 ? 's' : ''} selected`}>
+                {/* Search Box */}
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <input
+                    type="text"
+                    placeholder="Search by name, email, or department..."
+                    value={bulkAssignSearchQuery}
+                    onChange={e => setBulkAssignSearchQuery(e.target.value)}
+                    style={{
+                      ...inputStyle,
+                      padding: '0.5rem 0.75rem',
+                      border: `2px solid ${colors.border}`,
+                      borderRadius: '6px'
+                    }}
+                  />
+                </div>
+                
+                {/* Select All Buttons */}
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const filtered = staffMembers.filter(staff => {
+                        const query = bulkAssignSearchQuery.toLowerCase();
+                        return staff.name.toLowerCase().includes(query) ||
+                               staff.email.toLowerCase().includes(query) ||
+                               (staff.department && staff.department.toLowerCase().includes(query));
+                      });
+                      setBulkAssignSelectedUsers(filtered.map(s => s.id));
+                    }}
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '0.25rem 0.75rem',
+                      background: colors.primaryPale,
+                      color: colors.primary,
+                      border: `1px solid ${colors.primaryBorder}`,
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontWeight: 600
+                    }}
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBulkAssignSelectedUsers([])}
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '0.25rem 0.75rem',
+                      background: colors.surfaceMuted,
+                      color: colors.textSecondary,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontWeight: 600
+                    }}
+                  >
+                    Deselect All
+                  </button>
+                </div>
+                
+                {/* Staff List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '250px', overflowY: 'auto', padding: '0.5rem', border: `1px solid ${colors.border}`, borderRadius: '8px' }}>
+                  {(() => {
+                    const filtered = staffMembers.filter(staff => {
+                      const query = bulkAssignSearchQuery.toLowerCase();
+                      return staff.name.toLowerCase().includes(query) ||
+                             staff.email.toLowerCase().includes(query) ||
+                             (staff.department && staff.department.toLowerCase().includes(query));
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <div style={{ padding: '1rem', textAlign: 'center', color: colors.textMuted, fontSize: '0.875rem' }}>
+                          No staff found matching "{bulkAssignSearchQuery}"
+                        </div>
+                      );
+                    }
+
+                    // Group by department
+                    const grouped: Record<string, typeof filtered> = {};
+                    filtered.forEach(staff => {
+                      const dept = staff.department || 'Other';
+                      if (!grouped[dept]) grouped[dept] = [];
+                      grouped[dept].push(staff);
+                    });
+
+                    return Object.entries(grouped).map(([dept, staffs]) => (
+                      <div key={dept} style={{ marginBottom: '0.75rem' }}>
+                        {/* Department Header */}
+                        <div style={{ 
+                          padding: '0.4rem 0.6rem', 
+                          background: colors.primaryPale, 
+                          borderRadius: '6px', 
+                          marginBottom: '0.5rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}>
+                          <Building size={14} color={colors.primary} />
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.primary, textTransform: 'uppercase' }}>
+                            {dept}
+                          </span>
+                          <span style={{ fontSize: '0.7rem', color: colors.textMuted, marginLeft: 'auto' }}>
+                            {staffs.length}
+                          </span>
+                        </div>
+                        
+                        {/* Staff in Department */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          {staffs.map(staff => {
+                            const isSelected = bulkAssignSelectedUsers.includes(staff.id);
+                            return (
+                              <label
+                                key={staff.id}
+                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', borderRadius: '6px', cursor: 'pointer', background: isSelected ? colors.primaryPale : 'transparent', transition: 'background 0.15s' }}
+                                onMouseEnter={e => !isSelected && (e.currentTarget.style.background = colors.surfaceAlt)}
+                                onMouseLeave={e => !isSelected && (e.currentTarget.style.background = 'transparent')}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={e => {
+                                    if (e.target.checked) {
+                                      setBulkAssignSelectedUsers([...bulkAssignSelectedUsers, staff.id]);
+                                    } else {
+                                      setBulkAssignSelectedUsers(bulkAssignSelectedUsers.filter(id => id !== staff.id));
+                                    }
+                                  }}
+                                  style={{ width: '1rem', height: '1rem', cursor: 'pointer', flexShrink: 0 }}
+                                />
+                                <span style={{ fontSize: '0.875rem', color: colors.textPrimary, fontWeight: 500, flex: 1 }}>
+                                  {staff.name}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </FormField>
+
+              {/* Select Template */}
+              <FormField label="Shift Template" required>
+                <select 
+                  style={inputStyle} 
+                  value={bulkAssignTemplate || ''} 
+                  onChange={e => setBulkAssignTemplate(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">Select a template...</option>
+                  {templates.map(t => (
+                    <option key={t.id} value={t.id}>{t.name} ({t.start_time?.substring(0, 5)} - {t.end_time?.substring(0, 5)})</option>
+                  ))}
+                </select>
+              </FormField>
+
+              {/* Start Date */}
+              <FormField label="Effective From" required>
+                <input 
+                  style={inputStyle} 
+                  type="date" 
+                  value={bulkAssignFromDate} 
+                  onChange={e => setBulkAssignFromDate(e.target.value)}
+                />
+              </FormField>
+
+              {/* Assignment Type */}
+              <FormField label="Assignment Type" required>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  {(['permanent', 'temporary', 'rotating'] as const).map(type => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setBulkAssignAssignmentType(type)}
+                      style={{
+                        flex: 1,
+                        padding: '0.5rem',
+                        border: `2px solid ${bulkAssignAssignmentType === type ? colors.primary : colors.border}`,
+                        borderRadius: '6px',
+                        background: bulkAssignAssignmentType === type ? colors.primaryPale : 'transparent',
+                        color: bulkAssignAssignmentType === type ? colors.primary : colors.textSecondary,
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </FormField>
+
+              {/* Error Message */}
+              {error && (
+                <div style={{ padding: '0.75rem', background: colors.dangerPale, border: `1px solid ${colors.dangerBorder}`, borderRadius: '6px', color: colors.danger, fontSize: '0.875rem' }}>
+                  {error}
+                </div>
+              )}
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <button 
+              style={btnGhost} 
+              onClick={() => { setShowBulkAssignModal(false); resetBulkAssignForm(); }}
+              disabled={loading}
+            >
+              Cancel
+            </button>
+            <button 
+              style={{ ...btnPrimary, background: colors.purple, minWidth: '8rem' }} 
+              onClick={handleBulkAssign}
+              disabled={loading || bulkAssignSelectedUsers.length === 0 || !bulkAssignTemplate}
+            >
+              {loading ? <><RotateCcw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Assigning…</> : <><Users size={14} /> Assign to {bulkAssignSelectedUsers.length} Staff</>}
+            </button>
+          </ModalFooter>
         </Modal>
       )}
     </div>
