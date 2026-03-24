@@ -3,14 +3,12 @@ import {
   getBranchAttendanceSettings,
   updateBranchAttendanceSettings,
   getGlobalAttendanceSettings,
-  updateGlobalAttendanceSettings,
-  getLockStatus
+  updateGlobalAttendanceSettings
 } from '../services/attendanceSettingsService';
 import { getAllBranches, Branch } from '../services/branchManagementService';
-import { AutoMarkSettingsModal } from './AutoMarkSettingsModal';
 import {
   Settings, Bell, Clock, CheckCircle, Globe, Building, Save, RotateCcw,
-  Shield, Users, AlertCircle, TrendingUp, Zap, MapPin, Timer, Lock
+  Shield, Users, AlertCircle, TrendingUp, Zap, MapPin, Timer
 } from 'lucide-react';
 
 const SettingsView = () => {
@@ -55,10 +53,6 @@ const SettingsView = () => {
     notify_supervisors_daily_summary: true,
     enable_weekend_attendance: false,
   });
-
-  // Auto-mark modal state
-  const [showAutoMarkModal, setShowAutoMarkModal] = useState(false);
-  const [lockStatus, setLockStatus] = useState<any>(null);
 
   // Load branches on mount
   useEffect(() => {
@@ -237,33 +231,6 @@ const SettingsView = () => {
 
       {/* Branch Settings Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Auto-Mark Absent Settings */}
-        <div className="card p-5 border-2 border-blue-200 dark:border-blue-800">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-              <Lock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-900 dark:text-white">Auto-Mark Absent</h4>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Automatic absent marking & lock</p>
-            </div>
-          </div>
-          <div className="space-y-3">
-            <p className="text-sm text-gray-600 dark:text-gray-300">
-              Configure when attendance is automatically marked absent and locked. After this time, employees cannot change their attendance.
-            </p>
-            <button
-              onClick={() => {
-                setShowAutoMarkModal(true);
-              }}
-              className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center justify-center gap-2"
-            >
-              <Lock className="w-4 h-4" />
-              Configure Auto-Mark
-            </button>
-          </div>
-        </div>
-
         {/* Check-in/Check-out */}
         <div className="card p-5">
           <div className="flex items-center gap-3 mb-4">
@@ -696,20 +663,6 @@ const SettingsView = () => {
       {activeTab === 'attendance' && renderAttendanceSettings()}
       {activeTab === 'notifications' && renderNotificationsSettings()}
       {activeTab === 'general' && renderGeneralSettings()}
-
-      {/* Auto-Mark Settings Modal */}
-      <AutoMarkSettingsModal
-        isOpen={showAutoMarkModal}
-        onClose={() => setShowAutoMarkModal(false)}
-        branchId={selectedBranchId ? Number(selectedBranchId) : 0}
-        branchName={branches.find(b => b.id === selectedBranchId)?.name || ''}
-        onSuccess={() => {
-          // Refresh settings after modal closes
-          if (selectedBranchId) {
-            loadBranchSettings(Number(selectedBranchId));
-          }
-        }}
-      />
     </div>
   );
 };

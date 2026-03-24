@@ -4,7 +4,7 @@
 // Import React hooks for state management
 import { useState, useEffect } from 'react';
 // Import Lucide React icons for UI elements
-import { Search, Calendar, Download, Filter, Check, X, Clock, User, Building, FileText, TrendingUp, AlertCircle, CalendarDays, Info, CheckCircle } from 'lucide-react';
+import { Search, Calendar, Download, Filter, Check, X, Clock, User, Building, FileText, TrendingUp, AlertCircle, CalendarDays, Info, CheckCircle, Eye } from 'lucide-react';
 // Import utility functions
 import { cn } from '@/components/ui/utils';
 // Import leave management service
@@ -16,6 +16,7 @@ import {
   createLeaveType,
   getAllLeaveTypes,
   getLeaveRequestById,
+  getLeaveRequestFiles,
   LeaveRequest as LeaveRequestType,
   LeaveBalance,
   LeaveType
@@ -428,14 +429,33 @@ const LeaveManagementView = () => {
   const handleViewDetails = async (request: LeaveRequest) => {
     setSelectedRequest(request);
     setShowDetailsModal(true);
-    
+
     // Fetch full details from API
     setDetailsLoading(true);
     try {
       const response = await getLeaveRequestById(parseInt(request.id));
       if (response.success && response.leaveRequest) {
-        setSelectedRequestDetails(response.leaveRequest);
-        console.log('Leave request details:', response.leaveRequest);
+        // Fetch attachments separately (may fail if endpoint doesn't exist)
+        let attachments = [];
+        try {
+          const filesResponse = await getLeaveRequestFiles(parseInt(request.id));
+          if (filesResponse.success) {
+            attachments = filesResponse.files || [];
+          }
+        } catch (fileErr) {
+          console.warn('Could not fetch attachments, using empty array:', fileErr);
+          // Attachments endpoint may not exist or user may not have permission
+        }
+        
+        // Combine leave request data with attachments
+        setSelectedRequestDetails({
+          ...response.leaveRequest,
+          attachments: attachments
+        });
+        console.log('Leave request details with attachments:', {
+          ...response.leaveRequest,
+          attachments: attachments
+        });
       } else {
         console.warn('Failed to load leave request details:', response.message);
       }
@@ -867,54 +887,48 @@ const LeaveManagementView = () => {
             </button>
           </div>
         </div>
-        {/* Grid of leave type cards */}
+        {/* Grid of leave type cards - Compact design */}
         <div className="grid grid-cols-1 md-grid-cols-2 lg-grid-cols-4 gap-3">
-          {/* Check if leave types exist */}
           {leaveTypes.length > 0 ? (
-            /* Map through leave types to create interactive cards */
             leaveTypes.map(type => (
               <div
                 key={type.id || type.type}
-                className="flex items-center gap-2 p-3 rounded-lg cursor-pointer transition-all hover-lift relative"
+                className="flex items-center gap-2 p-2.5 rounded-lg relative"
                 style={{
-                  backgroundColor: filterLeaveType === type.type ? type.color + '20' : '#f9fafb',
-                  border: filterLeaveType === type.type ? `2px solid ${type.color}` : '1px solid #e5e7eb',
-                  minHeight: '80px'
+                  backgroundColor: '#f9fafb',
+                  border: '1px solid #e5e7eb',
+                  minHeight: '64px'
                 }}
-                onClick={() => setFilterLeaveType(filterLeaveType === type.type ? 'all' : type.type)}
               >
                 {/* Leave type icon - left side */}
-                <div className="icon-wrapper flex-shrink-0" style={{ backgroundColor: type.color + '30', width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div className="flex-shrink-0" style={{ backgroundColor: type.color + '20', width: '2rem', height: '2rem', borderRadius: '0.375rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Calendar className="w-4 h-4" style={{ color: type.color }} />
                 </div>
                 {/* Leave type details - middle */}
-                <div style={{ flex: 1, minWidth: 0 }} onClick={(e) => e.stopPropagation()}>
-                  <p style={{ fontWeight: 600, fontSize: '0.8125rem', marginBottom: '0.125rem', lineHeight: 1.2 }}>{type.type}</p>
-                  <p className="text-xs text-muted" style={{ fontSize: '0.6875rem', lineHeight: 1.3 }}>{type.description}</p>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontWeight: 600, fontSize: '0.75rem', marginBottom: '0.125rem', lineHeight: 1.2 }}>{type.type}</p>
+                  <p className="text-xs text-muted" style={{ fontSize: '0.625rem', lineHeight: 1.2 }}>{type.description}</p>
                 </div>
                 {/* Edit button - right side */}
                 <button
                   className="flex-shrink-0 btn btn-sm btn-outline"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openEditLeaveTypeModal(type);
-                  }}
+                  onClick={() => openEditLeaveTypeModal(type)}
                   title="Edit leave type"
                   style={{
-                    padding: '0.25rem 0.5rem',
+                    padding: '0.25rem',
                     height: 'auto',
                     minWidth: 'auto',
-                    fontSize: '0.6875rem'
+                    fontSize: '0.625rem',
+                    borderColor: '#d1d5db'
                   }}
                 >
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
                 </button>
               </div>
             ))
           ) : (
-            /* Empty state when no leave types exist */
             <div className="col-span-full text-center py-12">
               <div className="mx-auto w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mb-4">
                 <Calendar className="w-8 h-8 text-blue-500" />

@@ -16,12 +16,14 @@ import { getAllStaff } from '../services/staffManagementService';
 import { getAllBranches, Branch } from '../services/branchManagementService';
 import ProcessAttendanceModal from './ProcessAttendanceModal';
 import { holidayService } from '../services/holidayService';
+import { AutoMarkSettingsModal } from './AutoMarkSettingsModal';
+import { getLockStatus } from '../services/attendanceSettingsService';
 // Calendar view temporarily disabled - focusing on list view functionality
 // import AttendanceCalendarWrapper from './AttendanceCalendarWrapper';
 import {
   Calendar, Clock, CheckCircle, XCircle, AlertCircle, Search, Filter, Download,
   Plus, Edit3, Trash2, Users, Building, TrendingUp, TrendingDown, RefreshCw,
-  ChevronLeft, ChevronRight, RotateCcw
+  ChevronLeft, ChevronRight, RotateCcw, Lock
 } from 'lucide-react';
 
 interface StaffMember {
@@ -130,6 +132,11 @@ const AttendanceView = () => {
 
   // Calendar state
   const [calendarDate, setCalendarDate] = useState(new Date());
+
+  // Auto-Mark settings state
+  const [showAutoMarkModal, setShowAutoMarkModal] = useState(false);
+  const [lockStatus, setLockStatus] = useState<any>(null);
+  const [selectedBranchForAutoMark, setSelectedBranchForAutoMark] = useState<number | ''>('');
 
   // Load data
   useEffect(() => {
@@ -533,6 +540,23 @@ const AttendanceView = () => {
           >
             <Filter className="w-4 h-4 mr-2" />
             {showAdvancedFilters ? 'Hide' : 'Show'} Filters
+          </button>
+          <button
+            className="btn btn-outline"
+            onClick={() => {
+              const branchId = selectedBranch || (branches[0]?.id ?? 0);
+              console.log('Opening Auto-Mark Modal for branch:', branchId, branches[0]);
+              if (branchId === 0) {
+                alert('Please select a branch first or ensure branches are loaded');
+                return;
+              }
+              setSelectedBranchForAutoMark(branchId);
+              setShowAutoMarkModal(true);
+            }}
+            title="Configure auto-mark absent time and lock attendance"
+          >
+            <Lock className="w-4 h-4 mr-2" />
+            Auto-Mark Settings
           </button>
           {/* Commented out - Admin only functions */}
           {/* <button
@@ -1001,6 +1025,7 @@ const AttendanceView = () => {
   };
 
   return (
+    <>
     <div className="space-y-6">
       {/* Header */}
       {/* <div>
@@ -1562,6 +1587,18 @@ const AttendanceView = () => {
         </>
       )}
     </div>
+    {/* Auto-Mark Settings Modal - Outside main container for proper z-index */}
+    <AutoMarkSettingsModal
+      isOpen={showAutoMarkModal}
+      onClose={() => setShowAutoMarkModal(false)}
+      branchId={typeof selectedBranchForAutoMark === 'number' ? selectedBranchForAutoMark : Number(selectedBranchForAutoMark)}
+      branchName={branches.find(b => b.id === selectedBranchForAutoMark)?.name || 'Branch'}
+      onSuccess={() => {
+        setSuccessMessage('Auto-mark settings updated successfully');
+        setTimeout(() => setSuccessMessage(null), 3000);
+      }}
+    />
+    </>
   );
 };
 
