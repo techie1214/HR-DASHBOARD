@@ -571,12 +571,6 @@ const LeaveAllocationView = () => {
     });
   };
 
-  // Calculate stats
-  const totalAllocated = allocations.reduce((sum, a) => sum + (Number(a.allocated_days) || 0), 0);
-  const totalUsed = allocations.reduce((sum, a) => sum + (Number(a.used_days) || 0), 0);
-  const totalRemaining = totalAllocated - totalUsed;
-  const avgUtilization = totalAllocated > 0 ? (totalUsed / totalAllocated) * 100 : 0;
-
   // Get cycle year from cycle_end_date
   const getCycleYear = (dateString: string) => {
     return new Date(dateString).getFullYear();
@@ -594,6 +588,26 @@ const LeaveAllocationView = () => {
 
     return matchesSearch && matchesUser && matchesLeaveType && matchesYear;
   });
+
+  // Build staff filter dropdown ONLY from users that actually have allocations
+  // This ensures the dropdown never shows misleading options
+  const staffInAllocations = (() => {
+    const seen = new Map<number, string>();
+    allocations.forEach(a => {
+      if (!seen.has(a.user_id)) {
+        seen.set(a.user_id, a.user_name || `User ${a.user_id}`);
+      }
+    });
+    return Array.from(seen.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  })();
+
+  // Calculate stats from FILTERED allocations (not raw data)
+  const totalAllocated = filteredAllocations.reduce((sum, a) => sum + (Number(a.allocated_days) || 0), 0);
+  const totalUsed = filteredAllocations.reduce((sum, a) => sum + (Number(a.used_days) || 0), 0);
+  const totalRemaining = totalAllocated - totalUsed;
+  const avgUtilization = totalAllocated > 0 ? (totalUsed / totalAllocated) * 100 : 0;
 
   // Calculate remaining days
   const calculateRemaining = (allocated: number, used: number) => allocated - used;
@@ -659,8 +673,10 @@ const LeaveAllocationView = () => {
               <Users className="w-5 h-5" style={{ color: 'var(--primary-600)' }} />
             </div>
             <div>
-              <p className="text-muted">Total Allocations</p>
-              <p className="text-2xl font-bold text-primary">{allocations.length}</p>
+              <p className="text-muted">
+                {selectedUserId || selectedLeaveTypeId || selectedYear ? 'Filtered Allocations' : 'Total Allocations'}
+              </p>
+              <p className="text-2xl font-bold text-primary">{filteredAllocations.length}</p>
             </div>
           </div>
         </div>
@@ -818,7 +834,7 @@ const LeaveAllocationView = () => {
                 style={{ backgroundColor: 'white', color: '#1f2937' }}
               >
                 <option value="">All Staff</option>
-                {staffMembers.map(staff => (
+                {staffInAllocations.map(staff => (
                   <option key={staff.id} value={staff.id}>
                     {staff.name}
                   </option>
