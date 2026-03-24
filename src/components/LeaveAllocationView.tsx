@@ -91,7 +91,24 @@ const LeaveAllocationView = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [createModalError, setCreateModalError] = useState<string | null>(null);
   const [selectedAllocation, setSelectedAllocation] = useState<LeaveAllocation | null>(null);
+
+  // Export filters
+  const [exportFilters, setExportFilters] = useState<{
+    userId: number | '';
+    leaveTypeId: number | '';
+    year: number | '';
+    dateFrom: string;
+    dateTo: string;
+  }>({
+    userId: '',
+    leaveTypeId: '',
+    year: '',
+    dateFrom: '',
+    dateTo: ''
+  });
 
   // Bulk selection
   const [selectedAllocationIds, setSelectedAllocationIds] = useState<number[]>([]);
@@ -251,6 +268,7 @@ const LeaveAllocationView = () => {
   // Handlers
   const handleCreateAllocation = async (e: React.FormEvent) => {
     e.preventDefault();
+    setCreateModalError(null); // Clear previous errors
 
     console.log('Creating allocation with form data:', createForm);
 
@@ -265,11 +283,13 @@ const LeaveAllocationView = () => {
         fetchData();
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        setError(result.message || 'Failed to create allocation');
+        // Show error in modal
+        setCreateModalError(result.message || 'Failed to create allocation');
       }
     } catch (err: any) {
       console.error('Error creating allocation:', err);
-      setError(err.message || 'An error occurred while creating allocation');
+      // Show error in modal
+      setCreateModalError(err.message || 'An error occurred while creating allocation');
     }
   };
 
@@ -425,6 +445,7 @@ const LeaveAllocationView = () => {
       cycle_end_date: new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0],
       carried_over_days: 0,
     });
+    setCreateModalError(null); // Clear errors when resetting
   };
 
   const resetBulkForm = () => {
@@ -481,10 +502,33 @@ const LeaveAllocationView = () => {
     return selectedAllocationIds.includes(id);
   };
 
-  // Export to CSV
+  // Export to CSV with filters
   const exportToCSV = () => {
+    // Filter allocations based on export filters
+    let filteredData = allocations;
+    
+    if (exportFilters.userId) {
+      filteredData = filteredData.filter(a => a.user_id === Number(exportFilters.userId));
+    }
+    if (exportFilters.leaveTypeId) {
+      filteredData = filteredData.filter(a => a.leave_type_id === Number(exportFilters.leaveTypeId));
+    }
+    if (exportFilters.year) {
+      filteredData = filteredData.filter(a => 
+        new Date(a.cycle_end_date).getFullYear() === Number(exportFilters.year)
+      );
+    }
+    if (exportFilters.dateFrom) {
+      const fromDate = new Date(exportFilters.dateFrom);
+      filteredData = filteredData.filter(a => new Date(a.cycle_start_date) >= fromDate);
+    }
+    if (exportFilters.dateTo) {
+      const toDate = new Date(exportFilters.dateTo);
+      filteredData = filteredData.filter(a => new Date(a.cycle_end_date) <= toDate);
+    }
+
     const headers = ['Staff Name', 'Email', 'Leave Type', 'Allocated Days', 'Used Days', 'Remaining Days', 'Carried Over', 'Cycle Start', 'Cycle End'];
-    const data = allocations.map(a => [
+    const data = filteredData.map(a => [
       a.user_name || '',
       staffMembers.find(s => s.id === a.user_id)?.email || '',
       a.leave_type_name || '',
@@ -503,9 +547,28 @@ const LeaveAllocationView = () => {
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
+    
+    // Create filename with filter info
+    const filterParts = [];
+    if (exportFilters.userId) filterParts.push(`user${exportFilters.userId}`);
+    if (exportFilters.leaveTypeId) filterParts.push(`type${exportFilters.leaveTypeId}`);
+    if (exportFilters.year) filterParts.push(exportFilters.year);
+    const filterSuffix = filterParts.length > 0 ? `_${filterParts.join('_')}` : '';
+    
     link.href = URL.createObjectURL(blob);
-    link.download = `leave_allocations_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `leave_allocations${filterSuffix}_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
+    
+    // Close modal after export
+    setShowExportModal(false);
+    // Reset filters
+    setExportFilters({
+      userId: '',
+      leaveTypeId: '',
+      year: '',
+      dateFrom: '',
+      dateTo: ''
+    });
   };
 
   // Calculate stats
@@ -685,7 +748,7 @@ const LeaveAllocationView = () => {
           <div className="flex-1"></div>
 
           <button
-            onClick={exportToCSV}
+            onClick={() => setShowExportModal(true)}
             className="btn btn-sm btn-outline"
             title="Export to CSV"
           >
@@ -757,7 +820,7 @@ const LeaveAllocationView = () => {
                 <option value="">All Staff</option>
                 {staffMembers.map(staff => (
                   <option key={staff.id} value={staff.id}>
-                    {staff.name} {staff.staff_id ? `(${staff.staff_id})` : ''}
+                    {staff.name}
                   </option>
                 ))}
               </select>
@@ -885,7 +948,6 @@ const LeaveAllocationView = () => {
                       <td className="table-cell">
                         <div>
                           <p className="font-medium text-primary">{allocation.user_name || `User ${allocation.user_id}`}</p>
-                          <p className="text-xs text-muted">ID: {allocation.user_id}</p>
                         </div>
                       </td>
                       <td className="table-cell">
@@ -1087,6 +1149,24 @@ const LeaveAllocationView = () => {
               </button>
             </div>
             <div className="modal-content">
+              {/* Error Display */}
+              {createModalError && (
+                <div className="p-4 bg-orange-50 border-2 border-orange-300 rounded-lg flex items-start gap-3 mb-4">
+                  <AlertCircle className="w-6 h-6 text-orange-600 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-base font-bold text-orange-900">Error</p>
+                    <p className="text-sm font-semibold text-orange-800 mt-1">{createModalError}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCreateModalError(null)}
+                    className="text-orange-600 hover:text-orange-800"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
+
               <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2075,6 +2155,143 @@ const LeaveAllocationView = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <>
+          <div className="modal-overlay" onClick={() => setShowExportModal(false)}></div>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>
+                <Download className="w-5 h-5 mr-2 inline" />
+                Export Leave Allocations
+              </h3>
+              <button className="btn btn-ghost btn-icon" onClick={() => setShowExportModal(false)}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="modal-content">
+              <p className="text-sm text-gray-600 mb-4">
+                Filter the data before exporting. Leave fields empty to export all allocations.
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Staff Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Users className="w-4 h-4 inline mr-1" />
+                    Staff Member
+                  </label>
+                  <select
+                    className="input w-full"
+                    value={exportFilters.userId}
+                    onChange={(e) => setExportFilters({ ...exportFilters, userId: e.target.value ? Number(e.target.value) : '' })}
+                  >
+                    <option value="">All Staff</option>
+                    {staffMembers.map(staff => (
+                      <option key={staff.id} value={staff.id}>
+                        {staff.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Leave Type Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Calendar className="w-4 h-4 inline mr-1" />
+                    Leave Type
+                  </label>
+                  <select
+                    className="input w-full"
+                    value={exportFilters.leaveTypeId}
+                    onChange={(e) => setExportFilters({ ...exportFilters, leaveTypeId: e.target.value ? Number(e.target.value) : '' })}
+                  >
+                    <option value="">All Leave Types</option>
+                    {leaveTypes.map(type => (
+                      <option key={type.id} value={type.id}>
+                        {type.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Year Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Clock className="w-4 h-4 inline mr-1" />
+                    Cycle Year
+                  </label>
+                  <select
+                    className="input w-full"
+                    value={exportFilters.year}
+                    onChange={(e) => setExportFilters({ ...exportFilters, year: e.target.value ? Number(e.target.value) : '' })}
+                  >
+                    <option value="">All Years</option>
+                    {availableYears.map(year => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Date Range */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <CalendarDays className="w-4 h-4 inline mr-1" />
+                    Cycle Start Date From
+                  </label>
+                  <input
+                    type="date"
+                    className="input w-full"
+                    value={exportFilters.dateFrom}
+                    onChange={(e) => setExportFilters({ ...exportFilters, dateFrom: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <CalendarDays className="w-4 h-4 inline mr-1" />
+                    Cycle End Date To
+                  </label>
+                  <input
+                    type="date"
+                    className="input w-full"
+                    value={exportFilters.dateTo}
+                    onChange={(e) => setExportFilters({ ...exportFilters, dateTo: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Preview count */}
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>
+                    {(() => {
+                      let count = allocations.length;
+                      if (exportFilters.userId) count = allocations.filter(a => a.user_id === Number(exportFilters.userId)).length;
+                      if (exportFilters.leaveTypeId) count = allocations.filter(a => a.leave_type_id === Number(exportFilters.leaveTypeId)).length;
+                      if (exportFilters.year) count = allocations.filter(a => new Date(a.cycle_end_date).getFullYear() === Number(exportFilters.year)).length;
+                      return count;
+                    })()}
+                  </strong>{' '}
+                  allocations will be exported
+                </p>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-outline" onClick={() => setShowExportModal(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={exportToCSV}>
+                <Download className="w-4 h-4 mr-2" />
+                Export CSV
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Delete Confirmation Modal */}

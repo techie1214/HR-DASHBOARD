@@ -267,18 +267,19 @@ export const createAllocation = async (data: CreateAllocationRequest): Promise<{
 
     console.log('Create allocation response:', response.data);
 
-    if (response.data?.success && response.data?.data?.allocation) {
+    // Backend returns: { success: true, message: '...', data: { leaveAllocation: {...} } }
+    if (response.data?.success && (response.data?.data?.leaveAllocation || response.data?.data?.allocation)) {
       return {
         success: true,
-        allocation: response.data.data.allocation,
-        message: 'Leave allocation created successfully',
+        allocation: response.data.data.leaveAllocation || response.data.data.allocation,
+        message: response.data.message || 'Leave allocation created successfully',
       };
     }
 
     console.warn('Unexpected response format:', response.data);
     return {
       success: false,
-      message: 'Unexpected response format',
+      message: response.data?.message || 'Unexpected response format',
     };
   } catch (error: any) {
     console.error('Error creating allocation:', error);

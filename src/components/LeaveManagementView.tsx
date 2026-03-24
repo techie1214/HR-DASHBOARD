@@ -226,7 +226,7 @@ const LeaveManagementView = () => {
               reason: req.reason,
               status: transformedStatus,
               requestDate: req.created_at || req.createdAt,
-              approvedBy: req.reviewed_by ? 'Manager' : undefined,
+              approvedBy: req.reviewed_by ? 'Admin' : undefined,
               approvalDate: req.reviewed_at || req.updatedAt,
               declineReason: req.rejection_reason || req.rejectionReason,
               coveringStaff: undefined
@@ -492,7 +492,7 @@ const LeaveManagementView = () => {
             ? { 
                 ...req, 
                 status: approvalAction === 'approve' ? 'Approved' : 'Declined',
-                approvedBy: approvalAction === 'approve' ? 'HR Manager' : undefined,
+                approvedBy: approvalAction === 'approve' ? 'Admin' : undefined,
                 approvalDate: approvalAction === 'approve' ? new Date().toISOString() : undefined,
                 declineReason: approvalAction === 'decline' ? declineReason : undefined
               }
@@ -1951,7 +1951,7 @@ const LeaveManagementView = () => {
                                 {selectedRequestDetails.status === 'approved' ? 'Approved By' : 'Rejected By'}
                               </p>
                               <p style={{ fontWeight: 600, fontSize: '0.8125rem', margin: 0 }}>
-                                {selectedRequestDetails.reviewed_by_name || 'HR Manager'}
+                                {selectedRequestDetails.reviewed_by_name || 'Admin'}
                               </p>
                             </div>
                             <div>
