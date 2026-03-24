@@ -25,7 +25,6 @@ import KPIView from "./components/KPIView";
 import HolidayManagementView from "./components/HolidayManagementView";
 import HolidayDutyRosterView from "./components/HolidayDutyRosterView";
 import ShiftSchedulingView from "./components/ShiftSchedulingView";
-import MyShiftsView from "./components/MyShiftsView";
 import SettingsView from "./components/SettingsView";
 import StaffLocationAssignmentView from "./components/StaffLocationAssignmentView";
 import { getDashboardStats } from "./services/dashboardService";
@@ -207,15 +206,6 @@ function Sidebar({ activeView, onNavigate, user }: SidebarProps) {
               >
                 <Calendar className="w-4 h-4" />
                 <span>Shift Scheduling</span>
-              </button>
-            </li>
-            <li className="sidebar-menu-item">
-              <button
-                onClick={() => onNavigate("myshifts")}
-                className={`sidebar-menu-button ${activeView === "myshifts" ? "active" : ""}`}
-              >
-                <Clock className="w-4 h-4" />
-                <span>My Shifts</span>
               </button>
             </li>
           </ul>
@@ -725,9 +715,6 @@ export default function App() {
       case "shiftscheduling":
         return <ShiftSchedulingView />;
 
-      case "myshifts":
-        return <MyShiftsView />;
-
       case "usermanagement":
         return <UserManagementView />;
       case "rolemanagement":
@@ -838,11 +825,6 @@ export default function App() {
         return {
           title: "Shift Scheduling",
           subtitle: "Manage employee shift assignments and schedules"
-        };
-      case "myshifts":
-        return {
-          title: "My Shifts",
-          subtitle: "View your assigned shifts and upcoming schedule"
         };
       case "usermanagement":
         return {

@@ -25,7 +25,6 @@ const RoleManagementView = () => {
   // Form states
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
-  const [showPermissionsForm, setShowPermissionsForm] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
 
   // Form data
@@ -184,26 +183,39 @@ const RoleManagementView = () => {
     setSelectedPermissions([]);
     setShowCreateForm(false);
     setShowEditForm(false);
-    setShowPermissionsForm(false);
     setEditingRole(null);
     setError(null);
   };
 
-  const handleEditClick = (role: Role) => {
+  const handleEditClick = async (role: any) => {
+    // Ensure available permissions are loaded first
+    let perms = availablePermissions;
+    if (perms.length === 0) {
+      const permissionsResponse = await getAvailablePermissions();
+      if (permissionsResponse.success && permissionsResponse.permissions) {
+        perms = permissionsResponse.permissions;
+        setAvailablePermissions(perms);
+      }
+    }
+    
     setEditingRole(role);
     setRoleName(role.name);
     setRoleDescription(role.description);
-    setSelectedPermissions(role.permissions.map(p => p.key));
+    
+    // Role permissions are strings from backend (e.g., 'leave:create')
+    const rolePermissionKeys = Array.isArray(role.permissions) 
+      ? role.permissions 
+      : (JSON.parse(role.permissions || '[]') as string[]);
+    
+    console.log('Editing role:', role.name);
+    console.log('Role has permissions:', rolePermissionKeys);
+    console.log('Available permissions count:', perms.length);
+    setSelectedPermissions(rolePermissionKeys);
     setShowEditForm(true);
     setError(null);
   };
 
-  const handleManagePermissionsClick = (role: Role) => {
-    setEditingRole(role);
-    setSelectedPermissions(role.permissions.map(p => p.key));
-    setShowPermissionsForm(true);
-    setError(null);
-  };
+  // Removed handleManagePermissionsClick - no longer needed (Edit handles permissions now)
 
   const togglePermission = (permissionKey: string) => {
     if (selectedPermissions.includes(permissionKey)) {
@@ -472,86 +484,6 @@ const RoleManagementView = () => {
         </>
       )}
 
-      {/* Permissions Management Form Modal */}
-      {showPermissionsForm && editingRole && (
-        <>
-          <div className="modal-overlay" onClick={() => resetForm()}></div>
-          <div className="modal">
-            <div className="modal-header">
-              <h3>Manage Permissions for: {editingRole.name}</h3>
-              <button className="btn btn-ghost btn-icon" style={{ width: '2rem', height: '2rem' }} onClick={() => resetForm()}>
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="modal-content">
-              <div className="space-y-4">
-                <div className="p-4 rounded bg-blue-50 border border-blue-200">
-                  <div className="flex items-start gap-2">
-                    <Key className="w-5 h-5 text-blue-600 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-blue-900">Assign or Remove Permissions</p>
-                      <p className="text-xs text-blue-700 mt-1">Check permissions to assign, uncheck to remove. Changes will be applied when you save.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Available Permissions</label>
-                  <div className="border rounded-lg p-4 max-h-80 overflow-y-auto bg-gray-50">
-                    {availablePermissions.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {availablePermissions.map((permission) => (
-                          <div key={permission.key} className="flex items-start p-2 rounded hover:bg-white transition-colors">
-                            <input
-                              type="checkbox"
-                              id={`manage-perm-${permission.key}`}
-                              checked={selectedPermissions.includes(permission.key)}
-                              onChange={() => togglePermission(permission.key)}
-                              className="mt-1 mr-2 w-4 h-4"
-                            />
-                            <label htmlFor={`manage-perm-${permission.key}`} className="flex-1 cursor-pointer">
-                              <div className="text-sm text-gray-700">{permission.description}</div>
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-gray-500 text-center py-4">No permissions available</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-outline" onClick={() => resetForm()}>Cancel</button>
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  const currentPermissions = editingRole.permissions.map(p => p.key);
-                  const permissionsToAdd = selectedPermissions.filter(p => !currentPermissions.includes(p));
-                  const permissionsToRemove = currentPermissions.filter(p => !selectedPermissions.includes(p));
-
-                  if (permissionsToAdd.length > 0) {
-                    handleAssignPermissions(editingRole.id, permissionsToAdd);
-                  }
-
-                  if (permissionsToRemove.length > 0) {
-                    handleRemovePermissions(editingRole.id, permissionsToRemove);
-                  }
-
-                  if (permissionsToAdd.length === 0 && permissionsToRemove.length === 0) {
-                    resetForm();
-                  }
-                }}
-              >
-                <Check className="w-4 h-4 mr-2" />
-                Save Permissions
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
       {/* Roles Table */}
       <div className="card">
         <div className="p-4 border-b">
@@ -605,16 +537,10 @@ const RoleManagementView = () => {
                       <button
                         onClick={() => handleEditClick(role)}
                         className="btn btn-sm btn-outline"
+                        title="Edit role details and permissions"
                       >
                         <Edit3 className="w-3 h-3 mr-1" />
                         Edit
-                      </button>
-                      <button
-                        onClick={() => handleManagePermissionsClick(role)}
-                        className="btn btn-sm btn-outline"
-                      >
-                        <Key className="w-3 h-3 mr-1" />
-                        Permissions
                       </button>
                       <button
                         onClick={() => handleDeleteRole(role.id)}
